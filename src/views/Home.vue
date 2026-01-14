@@ -31,7 +31,7 @@
         </div>
         
         <div class="mt-16 text-center">
-          <button class="px-8 py-3 border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white font-bold rounded-lg transition-all duration-300">
+          <button @click="goToProducts" class="px-8 py-3 border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white font-bold rounded-lg transition-all duration-300">
             查看所有商品
           </button>
         </div>
@@ -104,21 +104,27 @@
 
 <script setup>
 import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product'
 import Navbar from '../components/Navbar.vue'
 import HeroParallax from '../components/HeroParallax.vue'
 import ProductCard from '../components/ProductCard.vue'
 import Footer from '../components/Footer.vue'
 
+const router = useRouter()
 const productStore = useProductStore()
 
 onMounted(() => {
-  productStore.fetchProducts()
+  productStore.fetchFeaturedProducts()
 })
 
 const scrollToSection = (sectionId) => {
   if (sectionId === 'home') {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+}
+
+const goToProducts = () => {
+  router.push('/products')
 }
 </script>
