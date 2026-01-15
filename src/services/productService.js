@@ -125,6 +125,40 @@ export const productService = {
             fields: ['id', 'name', 'slug'],
             sort: ['sort']
         }))
+    },
+
+    /**
+     * 根據 slug 獲取單一商品詳情
+     */
+    async getProductBySlug(slug) {
+        const response = await directus.request(readItems('products', {
+            filter: {
+                slug: { _eq: slug }
+            },
+            fields: [
+                'id',
+                'name',
+                'slug',
+                'short_description',
+                'description',
+                'image',
+                'category.id',
+                'category.name',
+                'category.slug',
+                'tags.tags_id.id',
+                'tags.tags_id.name',
+                'tags.tags_id.color',
+                'variants.id',
+                'variants.spec_name',
+                'variants.price',
+                'variants.stock',
+                'variants.sku',
+                'variants.status'
+            ],
+            limit: 1
+        }))
+
+        return response.length > 0 ? response[0] : null
     }
 }
 

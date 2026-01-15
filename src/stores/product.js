@@ -40,7 +40,6 @@ export const useProductStore = defineStore('product', {
                     page: this.currentPage,
                     limit: this.itemsPerPage
                 })
-                console.log(response, 123)
                 const items = response.data
                 const meta = response.meta
 
