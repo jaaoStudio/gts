@@ -8,21 +8,21 @@
         <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-4">
           <router-link to="/" class="hover:text-brand-primary transition-colors">首頁</router-link>
           <span>›</span>
-          <span v-if="currentCategory" class="text-slate-900 dark:text-white font-medium">{{ currentCategory }}</span>
+          <span v-if="categorySlug" class="text-slate-900 dark:text-white font-medium">{{ currentCategory }}</span>
           <span v-else-if="searchKeyword" class="text-slate-900 dark:text-white font-medium">搜尋結果</span>
           <span v-else class="text-slate-900 dark:text-white font-medium">所有商品</span>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-            <span v-if="currentCategory">{{ currentCategory }}</span>
+            <span v-if="categorySlug">{{ currentCategory }}</span>
             <span v-else-if="searchKeyword">搜尋：{{ searchKeyword }}</span>
             <span v-else>所有商品</span>
           </h1>
           
           <!-- Clear filters -->
           <button 
-            v-if="currentCategory || searchKeyword"
+            v-if="categorySlug || searchKeyword"
             @click="clearFilters"
             class="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-brand-primary border border-slate-300 dark:border-slate-700 rounded-lg transition-colors"
           >
@@ -50,7 +50,7 @@
         <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">找不到商品</h3>
         <p class="text-slate-600 dark:text-slate-400 mb-6">
           <span v-if="searchKeyword">搜尋「{{ searchKeyword }}」沒有找到相關商品</span>
-          <span v-else-if="currentCategory">此分類目前沒有商品</span>
+          <span v-else-if="categorySlug">此分類目前沒有商品</span>
           <span v-else>目前沒有可顯示的商品</span>
         </p>
         <router-link 
@@ -119,9 +119,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product'
+import { useCategoryStore } from '../stores/category'
 import Navbar from '../components/Navbar.vue'
 import ProductCard from '../components/ProductCard.vue'
 import Footer from '../components/Footer.vue'
@@ -129,10 +130,17 @@ import Footer from '../components/Footer.vue'
 const route = useRoute()
 const router = useRouter()
 const productStore = useProductStore()
+const categoryStore = useCategoryStore()
 
 // Current filters from URL
-const currentCategory = computed(() => route.query.category || '')
+const categorySlug = computed(() => route.query.category || '')
 const searchKeyword = computed(() => route.query.search || '')
+
+// Look up category name by slug (using store getter)
+const currentCategory = computed(() => {
+  if (!categorySlug.value) return ''
+  return categoryStore.getCategoryNameBySlug(categorySlug.value)
+})
 
 // 計算要顯示的頁碼（最多顯示 5 個）
 const visiblePages = computed(() => {
@@ -173,7 +181,9 @@ watch(() => [route.query.category, route.query.search], () => {
 }, { immediate: false })
 
 // Initial fetch
-onMounted(() => {
+onMounted(async () => {
+  // Ensure categories are loaded (will use cache if already loaded)
+  await categoryStore.fetchCategories()
   fetchFilteredProducts(1)
 })
 </script>

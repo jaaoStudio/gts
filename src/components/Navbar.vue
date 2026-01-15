@@ -27,7 +27,7 @@
                 <router-link 
                   v-for="category in categories" 
                   :key="category.id"
-                  :to="`/products?category=${category.slug}`"
+                  :to="{ path: '/products', query: { category: category.slug } }"
                   class="block px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-primary transition-colors"
                 >
                   {{ category.name }}
@@ -154,25 +154,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { productService } from '../services/productService'
+import { useCategoryStore } from '../stores/category'
 
 const router = useRouter()
+const categoryStore = useCategoryStore()
 
 // State
-const categories = ref([])
 const searchQuery = ref('')
 const mobileMenuOpen = ref(false)
 const mobileSearchOpen = ref(false)
 
+// Categories from store
+const categories = computed(() => categoryStore.categories)
+
 // Fetch categories on mount
-onMounted(async () => {
-  try {
-    categories.value = await productService.getCategories()
-  } catch (err) {
-    console.error('Failed to load categories:', err)
-  }
+onMounted(() => {
+  categoryStore.fetchCategories()
 })
 
 // Search handler
