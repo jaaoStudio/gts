@@ -115,6 +115,16 @@ export const productService = {
                 ]
             }
         })
+    },
+
+    /**
+     * 獲取所有分類
+     */
+    async getCategories() {
+        return await directus.request(readItems('categories', {
+            fields: ['id', 'name', 'slug'],
+            sort: ['sort']
+        }))
     }
 }
 

@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-slate-50 dark:bg-slate-900">
-    <Navbar @navigate="scrollToSection" />
+    <Navbar />
     
     <main>
       <HeroParallax id="home" />
@@ -118,11 +118,7 @@ onMounted(() => {
   productStore.fetchFeaturedProducts()
 })
 
-const scrollToSection = (sectionId) => {
-  if (sectionId === 'home') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-}
+
 
 const goToProducts = () => {
   router.push('/products')
