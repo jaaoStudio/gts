@@ -158,9 +158,10 @@ const visiblePages = computed(() => {
 
 // Fetch products based on filters
 const fetchFilteredProducts = async (page = 1) => {
-  // TODO: Update store to support category and search filters
-  // For now, just fetch all products
-  await productStore.fetchProducts(page)
+  await productStore.fetchProducts(page, {
+    categorySlug: categorySlug.value,
+    keyword: searchKeyword.value
+  })
 }
 
 // Page navigation

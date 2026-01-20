@@ -159,6 +159,49 @@ export const productService = {
         }))
 
         return response.length > 0 ? response[0] : null
+    },
+
+    /**
+     * 建構篩選條件
+     * @param {Object} options
+     * @param {string} options.categorySlug - 分類 slug
+     * @param {string} options.keyword - 搜尋關鍵字
+     * @returns {Object} Directus filter object
+     */
+    buildFilter({ categorySlug = '', keyword = '' } = {}) {
+        const filters = []
+
+        if (categorySlug) {
+            filters.push({ category: { slug: { _eq: categorySlug } } })
+        }
+
+        if (keyword) {
+            filters.push({
+                _or: [
+                    { name: { _contains: keyword } },
+                    { short_description: { _contains: keyword } },
+                    { description: { _contains: keyword } }
+                ]
+            })
+        }
+
+        if (filters.length === 0) return {}
+        if (filters.length === 1) return filters[0]
+        return { _and: filters }
+    },
+
+    /**
+     * 統一篩選產品（支援分類、關鍵字、分頁）
+     * @param {Object} options - 查詢選項
+     * @param {number} options.page - 頁碼
+     * @param {number} options.limit - 每頁數量
+     * @param {string} options.categorySlug - 分類 slug
+     * @param {string} options.keyword - 搜尋關鍵字
+     * @param {string} options.sort - 排序欄位
+     */
+    async getFilteredProducts({ page = 1, limit = 12, categorySlug = '', keyword = '', sort = '-date_created' } = {}) {
+        const filter = this.buildFilter({ categorySlug, keyword })
+        return await this.getProducts({ page, limit, filter, sort })
     }
 }
 
