@@ -1,0 +1,11 @@
+services:
+  gts_web_store:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${REMOTE_REGISTRY_IP}/gts/gts_web_store:${FRONTEND_VERSION}
+    platform: linux/arm64
+    container_name: gts_web_store
+    ports:
+      - "9053:80"
+    restart: always
