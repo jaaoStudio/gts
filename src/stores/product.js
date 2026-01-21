@@ -12,6 +12,12 @@ export const useProductStore = defineStore('product', {
         itemsPerPage: 12,
         totalItems: 0,
         totalPages: 0,
+
+        // 篩選條件
+        currentFilters: {
+            categorySlug: '',
+            keyword: ''
+        }
     }),
 
     getters: {
@@ -28,19 +34,30 @@ export const useProductStore = defineStore('product', {
 
     actions: {
         /**
-         * 獲取產品（分頁版本）
+         * 獲取產品（支援分頁與篩選）
+         * @param {number} page - 頁碼
+         * @param {Object} filters - 篩選條件
+         * @param {string} filters.categorySlug - 分類 slug
+         * @param {string} filters.keyword - 搜尋關鍵字
          */
-        async fetchProducts(page = 1) {
+        async fetchProducts(page = 1, filters = {}) {
             this.loading = true
             this.error = null
             this.currentPage = page
 
+            // 儲存當前篩選條件
+            this.currentFilters = {
+                categorySlug: filters.categorySlug || '',
+                keyword: filters.keyword || ''
+            }
+
             try {
-                const response = await productService.getProducts({
+                const response = await productService.getFilteredProducts({
                     page: this.currentPage,
-                    limit: this.itemsPerPage
+                    limit: this.itemsPerPage,
+                    categorySlug: this.currentFilters.categorySlug,
+                    keyword: this.currentFilters.keyword
                 })
-                console.log(response, 123)
                 const items = response.data
                 const meta = response.meta
 
@@ -63,7 +80,7 @@ export const useProductStore = defineStore('product', {
          */
         async nextPage() {
             if (this.hasNextPage) {
-                await this.fetchProducts(this.currentPage + 1)
+                await this.fetchProducts(this.currentPage + 1, this.currentFilters)
             }
         },
 
@@ -72,7 +89,7 @@ export const useProductStore = defineStore('product', {
          */
         async prevPage() {
             if (this.hasPrevPage) {
-                await this.fetchProducts(this.currentPage - 1)
+                await this.fetchProducts(this.currentPage - 1, this.currentFilters)
             }
         },
 
@@ -81,7 +98,7 @@ export const useProductStore = defineStore('product', {
          */
         async goToPage(page) {
             if (page >= 1 && page <= this.totalPages) {
-                await this.fetchProducts(page)
+                await this.fetchProducts(page, this.currentFilters)
             }
         },
 
