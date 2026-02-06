@@ -13,10 +13,9 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'https://localhost:1254',
-        rewrite: (path) => path.replace(/^\/api/, ""),
+        target: 'https://gts-core.jaao.tw',
         changeOrigin: true,
-        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

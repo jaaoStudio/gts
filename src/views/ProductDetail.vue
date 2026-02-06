@@ -23,18 +23,23 @@
       <!-- Product Content -->
       <div v-else>
         <!-- Breadcrumb -->
-        <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-6">
+        <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-6 flex-wrap">
           <router-link to="/" class="hover:text-brand-primary transition-colors">首頁</router-link>
           <span>›</span>
           <router-link to="/products" class="hover:text-brand-primary transition-colors">所有商品</router-link>
-          <span v-if="product.category">›</span>
-          <router-link 
-            v-if="product.category" 
-            :to="`/products?category=${product.category.slug}`"
-            class="hover:text-brand-primary transition-colors"
-          >
-            {{ product.category.name }}
-          </router-link>
+          
+          <template v-if="breadcrumbs.length > 0">
+            <template v-for="crumb in breadcrumbs" :key="crumb.id">
+              <span>›</span>
+              <router-link 
+                :to="`/products?category=${crumb.slug}`"
+                class="hover:text-brand-primary transition-colors"
+              >
+                {{ crumb.name }}
+              </router-link>
+            </template>
+          </template>
+          
           <span>›</span>
           <span class="text-slate-900 dark:text-white font-medium">{{ product.name }}</span>
         </div>
@@ -42,21 +47,35 @@
         <!-- Product Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <!-- Left: Product Image -->
-          <div class="relative">
+          <div class="relative flex flex-col gap-4">
+            <!-- Main Image -->
             <div class="aspect-square rounded-2xl overflow-hidden bg-white dark:bg-slate-800 shadow-lg">
               <img 
-                :src="productImage" 
+                :src="activeImage || '/placeholder.jpg'" 
                 :alt="product.name"
-                class="w-full h-full object-cover"
+                class="w-full h-full object-cover transition-opacity duration-300"
               />
             </div>
             
+            <!-- Gallery Thumbnails -->
+            <div v-if="galleryImages.length > 1" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+               <button 
+                 v-for="(img, index) in galleryImages" 
+                 :key="index"
+                 @click="activeImage = img"
+                 class="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all"
+                 :class="activeImage === img ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-slate-200 dark:border-slate-700 hover:border-brand-primary/50'"
+               >
+                  <img :src="img" class="w-full h-full object-cover" />
+               </button>
+            </div>
+
             <!-- Tags -->
             <div v-if="productTags.length > 0" class="absolute top-4 left-4 flex flex-wrap gap-2">
               <span 
                 v-for="tag in productTags" 
                 :key="tag.id"
-                class="px-3 py-1 text-sm font-medium rounded-full text-white shadow-md"
+                class="px-3 py-1 text-sm font-medium rounded-full text-white shadow-md backdrop-blur-sm"
                 :style="{ backgroundColor: tag.color || '#f97316' }"
               >
                 {{ tag.name }}
@@ -167,22 +186,35 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { productService, productMapper } from '../services/productService'
-import { getAssetUrl } from '../utils/directus'
+import { productService } from '../services/productService'
+import { useCategoryStore } from '../stores/category'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 
 const route = useRoute()
+const categoryStore = useCategoryStore()
 
 // State
 const product = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
+const activeImage = ref('')
 
 // Computed
-const productImage = computed(() => {
-  return product.value?.image ? getAssetUrl(product.value.image) : '/placeholder.jpg'
+const galleryImages = computed(() => {
+  if (!product.value) return []
+  const imgs = []
+  
+  if (product.value.image) {
+    imgs.push(product.value.image)
+  }
+  
+  if (product.value.gallery && Array.isArray(product.value.gallery)) {
+    imgs.push(...product.value.gallery)
+  }
+  
+  return [...new Set(imgs)]
 })
 
 const productTags = computed(() => {
@@ -194,7 +226,7 @@ const productTags = computed(() => {
 
 const publishedVariants = computed(() => {
   if (!product.value?.variants) return []
-  return product.value.variants.filter(v => v.status === 'published')
+  return product.value.variants
 })
 
 const priceDisplay = computed(() => {
@@ -212,6 +244,34 @@ const priceDisplay = computed(() => {
   return `$${min.toLocaleString()} - $${max.toLocaleString()}`
 })
 
+const breadcrumbs = computed(() => {
+  if (!product.value) return []
+  
+  // 收集所有相關分類 (包含主分類和多重分類)
+  const candidates = []
+  if (product.value.category) candidates.push(product.value.category)
+  if (product.value.categories && Array.isArray(product.value.categories)) {
+    candidates.push(...product.value.categories)
+  }
+  
+  // 去除重複 (依照 slug)
+  const uniqueCandidates = [...new Map(candidates.map(c => [c.slug, c])).values()]
+  
+  if (uniqueCandidates.length === 0) return []
+  
+  // 找出路徑最長的分類 (也就是最深層的子分類)
+  let longestPath = []
+  
+  uniqueCandidates.forEach(cat => {
+    const path = categoryStore.getCategoryBreadcrumb(cat.slug)
+    if (path.length > longestPath.length) {
+      longestPath = path
+    }
+  })
+  
+  return longestPath
+})
+
 // Fetch product
 const fetchProduct = async (slug) => {
   loading.value = true
@@ -221,6 +281,11 @@ const fetchProduct = async (slug) => {
     const data = await productService.getProductBySlug(slug)
     product.value = data
     
+    // Set initial image
+    if (data.image) {
+      activeImage.value = data.image
+    }
+
     // Auto-select first published variant
     if (publishedVariants.value.length > 0) {
       selectedVariant.value = publishedVariants.value[0]
@@ -233,15 +298,26 @@ const fetchProduct = async (slug) => {
   }
 }
 
-// Watch route changes
+// Watchers
 watch(() => route.params.slug, (newSlug) => {
   if (newSlug) {
     fetchProduct(newSlug)
   }
 }, { immediate: false })
 
+// When variant changes, update image if variant has one
+watch(selectedVariant, (newVal) => {
+  if (newVal && newVal.image) {
+    activeImage.value = newVal.image
+  } else if (product.value && product.value.image) {
+    // Revert to main image if variant has no specific image or if we switch back
+    activeImage.value = product.value.image
+  }
+})
+
 // Initial fetch
 onMounted(() => {
+  categoryStore.fetchCategories() // Ensure categories are loaded for breadcrumbs
   if (route.params.slug) {
     fetchProduct(route.params.slug)
   }

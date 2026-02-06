@@ -22,18 +22,31 @@
             </button>
             
             <!-- Dropdown Menu -->
-            <div class="absolute left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top scale-95 group-hover:scale-100">
+            <div class="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top scale-95 group-hover:scale-100 max-h-[80vh] overflow-y-auto">
               <div class="py-2">
-                <router-link 
-                  v-for="category in categories" 
-                  :key="category.id"
-                  :to="{ path: '/products', query: { category: category.slug } }"
-                  class="block px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-primary transition-colors"
-                >
-                  {{ category.name }}
-                </router-link>
+                <div v-for="category in categoryTree" :key="category.id">
+                  <!-- Parent Category -->
+                  <router-link 
+                    :to="{ path: '/products', query: { category: category.slug } }"
+                    class="block px-4 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-primary transition-colors"
+                  >
+                    {{ category.name }}
+                  </router-link>
+                  
+                  <!-- Children Categories -->
+                  <div v-if="category.children && category.children.length > 0" class="bg-slate-50 dark:bg-slate-800/50">
+                    <router-link 
+                      v-for="child in category.children" 
+                      :key="child.id"
+                      :to="{ path: '/products', query: { category: child.slug } }"
+                      class="block pl-8 pr-4 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-brand-primary hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      {{ child.name }}
+                    </router-link>
+                  </div>
+                </div>
                 
-                <div v-if="categories.length === 0" class="px-4 py-2.5 text-sm text-slate-400">
+                <div v-if="categoryTree.length === 0" class="px-4 py-2.5 text-sm text-slate-400">
                   載入中...
                 </div>
               </div>
@@ -138,15 +151,28 @@
           <div class="px-3 mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             商品分類
           </div>
-          <router-link 
-            v-for="category in categories" 
-            :key="category.id"
-            :to="`/products?category=${category.slug}`"
-            @click="mobileMenuOpen = false"
-            class="block px-3 py-2.5 rounded-lg text-base text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-brand-primary transition-colors"
-          >
-            {{ category.name }}
-          </router-link>
+          <div v-for="category in categoryTree" :key="category.id">
+            <!-- Parent -->
+            <router-link 
+              :to="`/products?category=${category.slug}`"
+              @click="mobileMenuOpen = false"
+              class="block px-3 py-2 rounded-lg text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-brand-primary transition-colors"
+            >
+              {{ category.name }}
+            </router-link>
+            <!-- Children -->
+            <div v-if="category.children && category.children.length > 0" class="pl-4 border-l-2 border-slate-100 dark:border-slate-800 ml-3 my-1">
+              <router-link 
+                v-for="child in category.children" 
+                :key="child.id"
+                :to="`/products?category=${child.slug}`"
+                @click="mobileMenuOpen = false"
+                class="block px-3 py-1.5 rounded-lg text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-brand-primary transition-colors"
+              >
+                {{ child.name }}
+              </router-link>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -167,7 +193,7 @@ const mobileMenuOpen = ref(false)
 const mobileSearchOpen = ref(false)
 
 // Categories from store
-const categories = computed(() => categoryStore.categories)
+const categoryTree = computed(() => categoryStore.categoryTree)
 
 // Fetch categories on mount
 onMounted(() => {

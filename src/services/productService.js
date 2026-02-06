@@ -46,7 +46,7 @@ export const productService = {
             ])
 
             return {
-                data,
+                data: productMapper.mapProducts(data),
                 meta: {
                     filter_count: countResult[0].count,
                     total_count: countResult[0].count,
@@ -63,7 +63,7 @@ export const productService = {
      * 獲取精選產品（不需要分頁，數量固定）
      */
     async getFeatured(limit = 4) {
-        return await directus.request(readItems('products', {
+        const data = await directus.request(readItems('products', {
             filter: {
                 tags: {
                     tags_id: {
@@ -85,6 +85,7 @@ export const productService = {
                 'variants.*'
             ]
         }))
+        return productMapper.mapProducts(data)
     },
 
     /**
@@ -122,7 +123,7 @@ export const productService = {
      */
     async getCategories() {
         return await directus.request(readItems('categories', {
-            fields: ['id', 'name', 'slug'],
+            fields: ['id', 'name', 'slug', 'parent'],
             sort: ['sort']
         }))
     },
@@ -145,6 +146,9 @@ export const productService = {
                 'category.id',
                 'category.name',
                 'category.slug',
+                'categories.categories_id.id',
+                'categories.categories_id.name',
+                'categories.categories_id.slug',
                 'tags.tags_id.id',
                 'tags.tags_id.name',
                 'tags.tags_id.color',
@@ -153,26 +157,34 @@ export const productService = {
                 'variants.price',
                 'variants.stock',
                 'variants.sku',
-                'variants.status'
+                'variants.status',
+                'variants.variant_image',
+                'gallery.directus_files_id'
             ],
             limit: 1
         }))
 
-        return response.length > 0 ? response[0] : null
+        return response.length > 0 ? productMapper.mapProduct(response[0]) : null
     },
 
     /**
      * 建構篩選條件
      * @param {Object} options
-     * @param {string} options.categorySlug - 分類 slug
+     * @param {Array<string>} options.categoryIds - 分類 ID 列表
      * @param {string} options.keyword - 搜尋關鍵字
      * @returns {Object} Directus filter object
      */
-    buildFilter({ categorySlug = '', keyword = '' } = {}) {
+    buildFilter({ categoryIds = [], keyword = '' } = {}) {
         const filters = []
 
-        if (categorySlug) {
-            filters.push({ category: { slug: { _eq: categorySlug } } })
+        if (categoryIds && categoryIds.length > 0) {
+            filters.push({
+                categories: {
+                    categories_id: {
+                        id: { _in: categoryIds }
+                    }
+                }
+            })
         }
 
         if (keyword) {
@@ -191,16 +203,16 @@ export const productService = {
     },
 
     /**
-     * 統一篩選產品（支援分類、關鍵字、分頁）
+     * 統一篩選產品（支援多重分類、關鍵字、分頁）
      * @param {Object} options - 查詢選項
      * @param {number} options.page - 頁碼
      * @param {number} options.limit - 每頁數量
-     * @param {string} options.categorySlug - 分類 slug
+     * @param {Array<string>} options.categoryIds - 分類 ID 列表
      * @param {string} options.keyword - 搜尋關鍵字
      * @param {string} options.sort - 排序欄位
      */
-    async getFilteredProducts({ page = 1, limit = 12, categorySlug = '', keyword = '', sort = '-date_created' } = {}) {
-        const filter = this.buildFilter({ categorySlug, keyword })
+    async getFilteredProducts({ page = 1, limit = 12, categoryIds = [], keyword = '', sort = '-date_created' } = {}) {
+        const filter = this.buildFilter({ categoryIds, keyword })
         return await this.getProducts({ page, limit, filter, sort })
     }
 }
@@ -217,14 +229,36 @@ export const productMapper = {
             ? item.tags[0].tags_id
             : null
 
-        const publishedVariants = item.variants || []
-        const variantPrices = publishedVariants
+        const variants = (item.variants || [])
+            .map(v => ({
+                ...v,
+                image: v.variant_image ? getAssetUrl(v.variant_image) : null
+            }))
+
+        const variantPrices = variants
             .map(v => v.price)
             .filter(p => p !== null && p !== undefined)
 
         const displayPrice = variantPrices.length > 0
             ? Math.min(...variantPrices)
             : 0
+
+        // 處理相簿圖片
+        let gallery = []
+        if (item.gallery && Array.isArray(item.gallery)) {
+            gallery = item.gallery
+                .filter(g => g && g.directus_files_id)
+                .map(g => getAssetUrl(g.directus_files_id))
+        }
+
+        const mainImage = item.image ? getAssetUrl(item.image) : null
+
+        // 處理分類：優先使用主分類 (M2O)，如果沒有則使用多對多關聯的第一個分類
+        const m2mCategories = (item.categories || [])
+            .map(c => c.categories_id)
+            .filter(c => c !== null)
+
+        const primaryCategory = item.category || (m2mCategories.length > 0 ? m2mCategories[0] : null)
 
         return {
             id: item.id,
@@ -233,10 +267,13 @@ export const productMapper = {
             short_description: item.short_description,
             description: item.description,
             price: displayPrice,
-            image: getAssetUrl(item.image),
+            image: mainImage,
+            gallery: gallery,
+            category: primaryCategory,
+            categories: m2mCategories, // 額外回傳完整分類列表備用
             badge: firstTag ? firstTag.name : null,
             badgeColor: firstTag ? firstTag.color : null,
-            variants: publishedVariants
+            variants: variants
         }
     },
 
