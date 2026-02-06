@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { productService, productMapper } from '../services/productService'
+import { useCategoryStore } from './category'
 
 export const useProductStore = defineStore('product', {
     state: () => ({
@@ -52,16 +53,31 @@ export const useProductStore = defineStore('product', {
             }
 
             try {
+                // 準備分類 ID 列表（包含子分類）
+                let categoryIds = []
+                if (this.currentFilters.categorySlug) {
+                    const categoryStore = useCategoryStore()
+                    // 確保分類資料已載入
+                    if (!categoryStore.loaded) {
+                        await categoryStore.fetchCategories()
+                    }
+
+                    const rootId = categoryStore.getCategoryIdBySlug(this.currentFilters.categorySlug)
+                    if (rootId) {
+                        categoryIds = categoryStore.getAllChildIds(rootId)
+                    }
+                }
+
                 const response = await productService.getFilteredProducts({
                     page: this.currentPage,
                     limit: this.itemsPerPage,
-                    categorySlug: this.currentFilters.categorySlug,
+                    categoryIds: categoryIds,
                     keyword: this.currentFilters.keyword
                 })
                 const items = response.data
                 const meta = response.meta
 
-                this.products = productMapper.mapProducts(items)
+                this.products = items
 
                 if (meta) {
                     this.totalItems = meta.filter_count || meta.total_count || 0
@@ -111,7 +127,7 @@ export const useProductStore = defineStore('product', {
             try {
                 const response = await productService.getFeatured(4)
                 const items = Array.isArray(response) ? response : (response.data || response)
-                this.products = productMapper.mapProducts(items)
+                this.products = items
             } catch (err) {
                 this.error = 'Failed to load featured products'
                 console.error(err)
@@ -123,21 +139,31 @@ export const useProductStore = defineStore('product', {
         /**
          * 根據分類獲取產品
          */
+        /**
+         * 根據分類獲取產品
+         */
         async fetchProductsByCategory(categoryId, page = 1) {
             this.loading = true
             this.error = null
             this.currentPage = page
 
             try {
-                const response = await productService.getByCategory(categoryId, {
+                const categoryStore = useCategoryStore()
+                if (!categoryStore.loaded) {
+                    await categoryStore.fetchCategories()
+                }
+                const categoryIds = categoryStore.getAllChildIds(categoryId)
+
+                const response = await productService.getFilteredProducts({
                     page: this.currentPage,
-                    limit: this.itemsPerPage
+                    limit: this.itemsPerPage,
+                    categoryIds: categoryIds
                 })
 
                 const items = Array.isArray(response) ? response : (response.data || response)
                 const meta = response.meta
 
-                this.products = productMapper.mapProducts(items)
+                this.products = items
 
                 if (meta) {
                     this.totalItems = meta.filter_count || meta.total_count || 0
