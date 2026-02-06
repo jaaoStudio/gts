@@ -37,6 +37,9 @@ export const useCategoryStore = defineStore('category', {
          * 獲取分類樹狀結構 (Root -> Children)
          */
         categoryTree: (state) => {
+            if (!Array.isArray(state.categories)) {
+                return [];
+            }
             const buildTree = (parentId = null) => {
                 return state.categories
                     .filter(c => c.parent === parentId) // 找出當前層級的節點

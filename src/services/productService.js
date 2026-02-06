@@ -281,6 +281,10 @@ export const productMapper = {
      * 將多個產品資料轉換
      */
     mapProducts(items) {
+        if (!Array.isArray(items)) {
+            console.error('mapProducts expected an array but got:', items);
+            return [];
+        }
         return items.map(item => this.mapProduct(item))
     }
 }
