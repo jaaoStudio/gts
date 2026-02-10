@@ -14,7 +14,9 @@ export const useCategoryStore = defineStore('category', {
          * 根據 slug 查找分類名稱
          */
         getCategoryNameBySlug: (state) => (slug) => {
-            const found = state.categories.find(c => c.slug === slug)
+            if (!slug) return ''
+            const target = String(slug).trim().toLowerCase()
+            const found = state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target)
             return found ? found.name : slug
         },
 
@@ -22,7 +24,9 @@ export const useCategoryStore = defineStore('category', {
          * 根據 slug 查找分類 ID
          */
         getCategoryIdBySlug: (state) => (slug) => {
-            const found = state.categories.find(c => c.slug === slug)
+            if (!slug) return null
+            const target = String(slug).trim().toLowerCase()
+            const found = state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target)
             return found ? found.id : null
         },
 
@@ -57,7 +61,9 @@ export const useCategoryStore = defineStore('category', {
          */
         getCategoryBreadcrumb: (state) => (slug) => {
             const path = []
-            let current = state.categories.find(c => c.slug === slug)
+            if (!slug) return path
+            const target = String(slug).trim().toLowerCase()
+            let current = state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target)
 
             while (current) {
                 path.unshift(current)

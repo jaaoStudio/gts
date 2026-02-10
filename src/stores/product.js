@@ -65,6 +65,13 @@ export const useProductStore = defineStore('product', {
                     const rootId = categoryStore.getCategoryIdBySlug(this.currentFilters.categorySlug)
                     if (rootId) {
                         categoryIds = categoryStore.getAllChildIds(rootId)
+                    } else {
+                        console.warn('Category ID not found for slug:', this.currentFilters.categorySlug)
+                        // 若指定了分類但找不到 ID，應該顯示空結果，而不是所有商品
+                        this.products = []
+                        this.totalItems = 0
+                        this.totalPages = 0
+                        return
                     }
                 }
 
