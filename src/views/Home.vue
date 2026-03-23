@@ -80,20 +80,40 @@
         </div>
       </section>
       
-      <!-- Newsletter Section -->
+      <!-- CTA Section -->
       <section class="py-20 bg-brand-secondary relative overflow-hidden">
         <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
         <div class="max-w-4xl mx-auto px-4 relative z-10 text-center">
-          <h2 class="text-3xl sm:text-4xl font-bold text-white mb-6">加入專業會員</h2>
-          <p class="text-slate-300 mb-8 text-lg">
-            獲取新產品發布的獨家訪問權、專業提示和會員專屬折扣。
-          </p>
-          <div class="flex flex-col sm:flex-row gap-4 justify-center max-w-lg mx-auto">
-            <input type="email" placeholder="輸入您的電子郵件" class="flex-1 px-6 py-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary text-slate-900" />
-            <button class="px-8 py-4 bg-brand-primary hover:bg-orange-600 text-white font-bold rounded-lg shadow-lg transition-colors duration-300">
-              註冊
-            </button>
-          </div>
+          <template v-if="!authStore.isAuthenticated">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white mb-6">加入會員</h2>
+            <p class="text-slate-300 mb-8 text-lg">
+              使用 Google 帳號快速登入，享受會員專屬服務與優惠。
+            </p>
+            <router-link
+              to="/login"
+              class="inline-flex items-center gap-3 px-8 py-4 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105"
+            >
+              <svg class="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              使用 Google 帳號登入
+            </router-link>
+          </template>
+          <template v-else>
+            <h2 class="text-3xl sm:text-4xl font-bold text-white mb-6">歡迎回來！</h2>
+            <p class="text-slate-300 mb-8 text-lg">
+              {{ authStore.userName }}，感謝您的支持。探索更多優質商品吧！
+            </p>
+            <router-link
+              to="/products"
+              class="inline-block px-8 py-4 bg-brand-primary hover:bg-orange-600 text-white font-bold rounded-lg shadow-lg transition-colors duration-300"
+            >
+              瀏覽商品
+            </router-link>
+          </template>
         </div>
       </section>
     </main>
@@ -106,6 +126,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product'
+import { useAuthStore } from '../stores/auth'
 import Navbar from '../components/Navbar.vue'
 import HeroParallax from '../components/HeroParallax.vue'
 import ProductCard from '../components/ProductCard.vue'
@@ -113,9 +134,11 @@ import Footer from '../components/Footer.vue'
 
 const router = useRouter()
 const productStore = useProductStore()
+const authStore = useAuthStore()
 
 onMounted(() => {
   productStore.fetchFeaturedProducts()
+  authStore.init()
 })
 
 

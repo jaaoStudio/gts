@@ -46,53 +46,54 @@ export const useProductStore = defineStore('product', {
             this.error = null
             this.currentPage = page
 
-            // 儲存當前篩選條件
+            // 合併新舊篩選條件
             this.currentFilters = {
-                categorySlug: filters.categorySlug || '',
-                keyword: filters.keyword || ''
+                categorySlug: filters.categorySlug ?? this.currentFilters.categorySlug,
+                categoryId: filters.categoryId ?? this.currentFilters.categoryId,
+                keyword: filters.keyword ?? this.currentFilters.keyword
             }
 
             try {
-                // 準備分類 ID 列表（包含子分類）
-                let categoryIds = []
-                if (this.currentFilters.categorySlug) {
-                    const categoryStore = useCategoryStore()
-                    // 確保分類資料已載入
-                    if (!categoryStore.loaded) {
-                        await categoryStore.fetchCategories()
-                    }
-
-                    const rootId = categoryStore.getCategoryIdBySlug(this.currentFilters.categorySlug)
-                    if (rootId) {
-                        categoryIds = categoryStore.getAllChildIds(rootId)
-                    } else {
-                        console.warn('Category ID not found for slug:', this.currentFilters.categorySlug)
-                        // 若指定了分類但找不到 ID，應該顯示空結果，而不是所有商品
-                        this.products = []
-                        this.totalItems = 0
-                        this.totalPages = 0
-                        return
-                    }
+                const categoryStore = useCategoryStore()
+                if (!categoryStore.loaded) {
+                    await categoryStore.fetchCategories()
                 }
 
+                let categoryIds = []
+
+                // 邏輯合併：優先判斷是否有明確的 ID，沒有再用 Slug 去找 ID
+                let rootId = this.currentFilters.categoryId
+                if (!rootId && this.currentFilters.categorySlug) {
+                    rootId = categoryStore.getCategoryIdBySlug(this.currentFilters.categorySlug)
+                }
+
+                // 如果有找到對應的分類 ID，展開所有子分類
+                if (rootId) {
+                    categoryIds = categoryStore.getAllChildIds(rootId)
+                } else if (this.currentFilters.categorySlug) {
+                    // 如果給了 Slug 卻找不到分類，直接回傳空陣列
+                    this.products = []
+                    this.totalItems = 0
+                    this.totalPages = 0
+                    return
+                }
+
+                // 統一呼叫 Service
                 const response = await productService.getFilteredProducts({
                     page: this.currentPage,
                     limit: this.itemsPerPage,
                     categoryIds: categoryIds,
                     keyword: this.currentFilters.keyword
                 })
-                const items = response.data
-                const meta = response.meta
 
-                this.products = items
-
-                if (meta) {
-                    this.totalItems = meta.filter_count || meta.total_count || 0
-                    this.totalPages = meta.total_pages || 0
+                this.products = response.data
+                if (response.meta) {
+                    this.totalItems = response.meta.total_count || 0
+                    this.totalPages = response.meta.total_pages || 0
                 }
             } catch (err) {
                 this.error = 'Failed to load products'
-                console.error('Error details:', err)
+                console.error(err)
             } finally {
                 this.loading = false
             }
@@ -142,46 +143,5 @@ export const useProductStore = defineStore('product', {
                 this.loading = false
             }
         },
-
-        /**
-         * 根據分類獲取產品
-         */
-        /**
-         * 根據分類獲取產品
-         */
-        async fetchProductsByCategory(categoryId, page = 1) {
-            this.loading = true
-            this.error = null
-            this.currentPage = page
-
-            try {
-                const categoryStore = useCategoryStore()
-                if (!categoryStore.loaded) {
-                    await categoryStore.fetchCategories()
-                }
-                const categoryIds = categoryStore.getAllChildIds(categoryId)
-
-                const response = await productService.getFilteredProducts({
-                    page: this.currentPage,
-                    limit: this.itemsPerPage,
-                    categoryIds: categoryIds
-                })
-
-                const items = Array.isArray(response) ? response : (response.data || response)
-                const meta = response.meta
-
-                this.products = items
-
-                if (meta) {
-                    this.totalItems = meta.filter_count || meta.total_count || 0
-                    this.totalPages = Math.ceil(this.totalItems / this.itemsPerPage)
-                }
-            } catch (err) {
-                this.error = 'Failed to load products by category'
-                console.error(err)
-            } finally {
-                this.loading = false
-            }
-        }
     }
 })

@@ -18,6 +18,28 @@ const routes = [
         path: '/product/:slug',
         name: 'ProductDetail',
         component: ProductDetail
+    },
+    {
+        path: '/login',
+        name: 'Login',
+        component: () => import('../views/AdminLogin.vue')
+    },
+    {
+        path: '/admin/callback',
+        name: 'AdminCallback',
+        component: () => import('../views/AdminCallback.vue')
+    },
+    {
+        path: '/account',
+        name: 'Account',
+        component: () => import('../views/Account.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/admin',
+        name: 'Admin',
+        component: () => import('../views/Admin.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
     }
 ]
 
@@ -29,6 +51,32 @@ const router = createRouter({
             return savedPosition
         } else {
             return { top: 0 }
+        }
+    }
+})
+
+// 路由守衛：檢查認證與管理員權限
+router.beforeEach(async (to) => {
+    if (to.meta.requiresAuth || to.meta.requiresAdmin) {
+        const { useAuthStore } = await import('../stores/auth')
+        const authStore = useAuthStore()
+
+        // 未登入 → 登入頁
+        if (!authStore.isAuthenticated) {
+            return '/login'
+        }
+
+        // 如果還沒拿到使用者資料（重新整理頁面時），先取得
+        if (!authStore.user) {
+            await authStore.fetchCurrentUser()
+            if (!authStore.isAuthenticated) {
+                return '/login'
+            }
+        }
+
+        // 需要管理員權限但使用者不是管理員 → 導向會員頁
+        if (to.meta.requiresAdmin && !authStore.isAdmin) {
+            return '/account'
         }
     }
 })

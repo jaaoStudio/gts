@@ -11,23 +11,32 @@ export const useCategoryStore = defineStore('category', {
 
     getters: {
         /**
-         * 根據 slug 查找分類名稱
+         * 核心底層 Getter：根據 slug 查找完整分類物件
          */
-        getCategoryNameBySlug: (state) => (slug) => {
-            if (!slug) return ''
-            const target = String(slug).trim().toLowerCase()
-            const found = state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target)
-            return found ? found.name : slug
+        getCategoryBySlug: (state) => (slug) => {
+            if (!slug) return null;
+            const target = String(slug).trim().toLowerCase();
+            return state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target) || null;
         },
 
         /**
-         * 根據 slug 查找分類 ID
+         * 複用底層 Getter 找名稱
          */
-        getCategoryIdBySlug: (state) => (slug) => {
-            if (!slug) return null
-            const target = String(slug).trim().toLowerCase()
-            const found = state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target)
-            return found ? found.id : null
+        getCategoryNameBySlug() {
+            return (slug) => {
+                const found = this.getCategoryBySlug(slug);
+                return found ? found.name : slug;
+            }
+        },
+
+        /**
+         * 複用底層 Getter 找 ID
+         */
+        getCategoryIdBySlug() {
+            return (slug) => {
+                const found = this.getCategoryBySlug(slug);
+                return found ? found.id : null;
+            }
         },
 
         /**
@@ -59,21 +68,17 @@ export const useCategoryStore = defineStore('category', {
         /**
          * 獲取麵包屑路徑 (Root -> Leaf)
          */
-        getCategoryBreadcrumb: (state) => (slug) => {
-            const path = []
-            if (!slug) return path
-            const target = String(slug).trim().toLowerCase()
-            let current = state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target)
+        getCategoryBreadcrumb() {
+            return (slug) => {
+                const path = []
+                let current = this.getCategoryBySlug(slug);
 
-            while (current) {
-                path.unshift(current)
-                if (current.parent) {
-                    current = state.categories.find(c => c.id === current.parent)
-                } else {
-                    current = null
+                while (current) {
+                    path.unshift(current)
+                    current = current.parent ? this.getCategoryById(current.parent) : null
                 }
+                return path
             }
-            return path
         }
     },
 
