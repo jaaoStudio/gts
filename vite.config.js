@@ -1,16 +1,18 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import mkcert from 'vite-plugin-mkcert'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    mkcert()
+  ],
   server: {
-    // https: {
-    //   key: fs.readFileSync('./vite-key.pem'),
-    //   cert: fs.readFileSync('./vite.pem'),
-    // },
     host: '0.0.0.0',
     port: 5174,
+    https: true,
+    allowedHosts: ['local.jaao.tw'],
     proxy: {
       '/api': {
         target: 'https://gts-core.jaao.tw',

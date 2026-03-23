@@ -53,28 +53,6 @@
         <div class="flex-1">
           <!-- Breadcrumb / Filter Info -->
           <div class="mb-8">
-            <!-- Mobile Category Filter (Horizontal Scroll) -->
-            <div class="lg:hidden mb-6 -mx-4 px-4 overflow-x-auto">
-              <div class="flex gap-2">
-                <router-link 
-                  to="/products"
-                  class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-                  :class="!categorySlug ? 'bg-brand-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'"
-                >
-                  所有商品
-                </router-link>
-                <router-link 
-                  v-for="cat in categoryTree"
-                  :key="cat.id"
-                  :to="{ path: '/products', query: { category: cat.slug } }"
-                  class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-                  :class="categorySlug === cat.slug ? 'bg-brand-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'"
-                >
-                  {{ cat.name }}
-                </router-link>
-              </div>
-            </div>
-
             <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-4 flex-wrap">
               <router-link to="/" class="hover:text-brand-primary transition-colors">首頁</router-link>
               <span>›</span>
@@ -155,7 +133,7 @@
           
           <div v-else>
             <!-- 商品列表 -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8 mb-12">
               <ProductCard 
                 v-for="product in productStore.products" 
                 :key="product.id" 

@@ -15,10 +15,10 @@
     <div class="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto"
          :style="{ transform: `translateY(${offset * 0.2}px)` }">
       <h1 class="text-4xl sm:text-6xl md:text-7xl font-extrabold text-white tracking-tight mb-6 animate-fade-in-up">
-        打造您的夢想 <span class="text-brand-primary">精準工藝</span>
+        專鑄品質・<span class="text-brand-primary">穩健施工 </span>
       </h1>
       <p class="mt-4 text-xl sm:text-2xl text-gray-200 max-w-3xl mx-auto mb-10 animate-fade-in-up delay-100">
-        為專業承包商和 DIY 愛好者提供專業級工具和五金。值得信賴的品質，經久耐用的保證。
+        供應各式測量畫線、手工具、工安防護及五金配件。<br>提供您最可靠的選擇。
       </p>
       <div class="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-up delay-200">
         <button class="px-8 py-4 bg-brand-primary hover:bg-orange-600 text-white font-bold rounded-lg shadow-lg transform hover:-translate-y-1 transition-all duration-300 text-lg">
