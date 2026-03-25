@@ -38,7 +38,7 @@ export const useAuthStore = defineStore('auth', {
 
     actions: {
         getGoogleLoginUrl() {
-            const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL || 'https://gts-core.jaao.tw'
+            const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
             const callbackUrl = `${window.location.origin}/admin/callback`
             return `${publicUrl}/auth/login/google?redirect=${encodeURIComponent(callbackUrl)}`
         },
@@ -48,21 +48,17 @@ export const useAuthStore = defineStore('auth', {
             this.error = null
 
             try {
-                // 1. 保留你原本的邏輯：去 Public URL 拿 Cookie 換 Token
-                const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL || 'https://gts-core.jaao.tw'
+                const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
                 const response = await axios.post(`${publicUrl}/auth/refresh`, {}, {
                     withCredentials: true,
                 })
 
                 const accessToken = response.data.data.access_token
 
-                // 2. 將拿到的 Token 餵給 SDK 接管！
                 await directus.setToken(accessToken)
 
-                // 3. 備份到 localStorage (維持你原本的習慣)
                 this._saveTokens(accessToken)
 
-                // 4. 去抓使用者資料
                 await this.fetchCurrentUser()
                 return true
             } catch (err) {
@@ -132,11 +128,9 @@ export const useAuthStore = defineStore('auth', {
             this.user = null
             this.customer = null
             localStorage.removeItem('auth_access_token')
-            // 同步清除 SDK 內的 Token
             directus.setToken(null)
         },
         async init() {
-            // 網頁重新整理時，把 localStorage 的 token 塞回 SDK
             if (this.accessToken) {
                 await directus.setToken(this.accessToken)
                 this.loading = true

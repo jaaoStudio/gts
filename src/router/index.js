@@ -5,6 +5,10 @@ import ProductDetail from '../views/ProductDetail.vue'
 
 const routes = [
     {
+        path: '/:pathMatch(.*)*',
+        redirect: '/'
+    },
+    {
         path: '/',
         name: 'Home',
         component: Home
