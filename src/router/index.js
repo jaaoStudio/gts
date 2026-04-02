@@ -70,14 +70,6 @@ router.beforeEach(async (to) => {
             return '/login'
         }
 
-        // 如果還沒拿到使用者資料（重新整理頁面時），先取得
-        if (!authStore.user) {
-            await authStore.fetchCurrentUser()
-            if (!authStore.isAuthenticated) {
-                return '/login'
-            }
-        }
-
         // 需要管理員權限但使用者不是管理員 → 導向會員頁
         if (to.meta.requiresAdmin && !authStore.isAdmin) {
             return '/account'

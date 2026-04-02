@@ -8,6 +8,11 @@ export default defineConfig({
     vue(),
     mkcert()
   ],
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 5174,

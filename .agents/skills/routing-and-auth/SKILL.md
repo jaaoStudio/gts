@@ -109,3 +109,35 @@ scrollBehavior(to, from, savedPosition) {
 3. Use lazy-loading (`() => import(...)`) unless it's a core storefront page.
 4. Add `meta: { requiresAuth: true }` if auth is required.
 5. Add `meta: { requiresAdmin: true }` if admin-only.
+
+## Authentication Initialization Flow (認證初始化流程)
+
+### 核心原則：Init Before Mount (掛載前初始化)
+為了避免頁面重整時發生 Token 過期 (403/401)、畫面閃爍，或是因為 Router Guard 與 App.vue 同時檢查權限而導致 API 重複呼叫 (Race Condition)，本專案嚴格遵守 **「在 main.js 中完成 Auth 狀態確認後，才掛載 Vue 實體」** 的架構。
+
+### 絕對禁止的做法 ❌
+1. **禁止在 `App.vue` 的 `onMounted` 呼叫初始化：** 這樣會變成 Fire-and-forget，Router Guard 執行時可能 Auth 狀態還沒回來。
+2. **禁止在 Router Guard 內部做首次 Token Refresh：** 這會導致複雜的狀態管理和可能的無窮迴圈。
+3. **禁止使用 Promise 去重 (`_initPromise`) 等過度設計：** 架構正確就不需要去重。
+
+### 標準實作架構 ✅
+
+**1. Store 層 (`src/stores/auth.js`):**
+`init()` 方法必須處理以下邏輯，並確保所有非同步操作都 `await` 完成：
+- 檢查 `localStorage` 是否有 token。若無，立即 `return` (非會員)。
+- 嘗試使用現有 token 呼叫 `/users/me`。
+- 若發生 401/403，必須靜默攔截錯誤，並嘗試呼叫 `/auth/refresh` 換取新 token。
+- 若 Refresh 失敗，則清除本地 Auth 狀態 (`clearAuth()`)。
+
+**2. 進入點 (`src/main.js`):**
+必須在 `app.mount('#app')` 之前，`await useAuthStore().init()`：
+```javascript
+// main.js 標準寫法
+const app = createApp(App)
+app.use(pinia)
+
+const authStore = useAuthStore()
+await authStore.init() // 等待 Token 刷新與使用者資料載入
+
+app.use(router)
+app.mount('#app')

@@ -9,4 +9,10 @@ const app = createApp(App)
 
 app.use(pinia)
 app.use(router)
-app.mount('#app')
+
+// 在 mount 前初始化認證狀態（只執行一次）
+import { useAuthStore } from './stores/auth'
+const authStore = useAuthStore()
+authStore.init().then(() => {
+    app.mount('#app')
+})

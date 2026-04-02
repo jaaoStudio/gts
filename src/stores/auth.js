@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import directus from '../utils/directus'
 import { readMe, readItems, logout } from '@directus/sdk'
 import axios from "axios";
+import { customerService } from '../services/customerService'
 
 /**
  * 認證狀態管理
@@ -107,6 +108,44 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        /**
+         * 更新會員資料（Token 過期時會自動刷新並重試一次）
+         * @param {object} data - 要更新的欄位
+         * @returns {Promise<{success: boolean, error?: string, needLogin?: boolean}>}
+         */
+        async updateCustomerProfile(data) {
+            if (!this.customer?.id) return { success: false, error: '找不到會員資料' }
+
+            try {
+                const updated = await customerService.updateProfile(this.customer.id, data)
+                this.customer = { ...this.customer, ...updated }
+                return { success: true }
+            } catch (err) {
+                // Token 過期 → 嘗試靜默刷新並重試
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    try {
+                        const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
+                        const res = await axios.post(`${publicUrl}/auth/refresh`, {}, { withCredentials: true })
+                        const newToken = res.data.data.access_token
+                        await directus.setToken(newToken)
+                        this._saveTokens(newToken)
+
+                        // 用新 token 重試儲存
+                        const updated = await customerService.updateProfile(this.customer.id, data)
+                        this.customer = { ...this.customer, ...updated }
+                        return { success: true }
+                    } catch (refreshErr) {
+                        console.warn('Token refresh failed during save:', refreshErr.message)
+                        this.clearAuth()
+                        return { success: false, error: '登入已過期，請重新登入', needLogin: true }
+                    }
+                }
+
+                console.error('Update customer error:', err)
+                return { success: false, error: '儲存失敗，請稍後再試' }
+            }
+        },
+
         async logout() {
             try {
                 // 使用 SDK 原生的登出
@@ -131,14 +170,31 @@ export const useAuthStore = defineStore('auth', {
             directus.setToken(null)
         },
         async init() {
-            if (this.accessToken) {
+            if (!this.accessToken) return
+
+            this.loading = true
+            try {
+                // 1. 先嘗試用 localStorage 的現有 token
                 await directus.setToken(this.accessToken)
-                this.loading = true
+                await this.fetchCurrentUser()
+            } catch (firstErr) {
+                // 2. Token 過期，嘗試用 cookie 刷新
                 try {
+                    const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
+                    const response = await axios.post(`${publicUrl}/auth/refresh`, {}, {
+                        withCredentials: true,
+                    })
+                    const newToken = response.data.data.access_token
+                    await directus.setToken(newToken)
+                    this._saveTokens(newToken)
                     await this.fetchCurrentUser()
-                } finally {
-                    this.loading = false
+                } catch (refreshErr) {
+                    // 3. 兩種方式都失敗，才清除登入狀態
+                    console.warn('Auth init failed:', refreshErr.message)
+                    this.clearAuth()
                 }
+            } finally {
+                this.loading = false
             }
         },
     }
