@@ -325,6 +325,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@reference "../style.css";
+
 /* Prose styles for rich text content */
 .prose :deep(img) {
   @apply rounded-lg shadow-md;
