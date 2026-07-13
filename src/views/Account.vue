@@ -11,26 +11,25 @@
       <!-- Profile -->
       <div v-else-if="authStore.user" class="space-y-6">
         <!-- Header card -->
-        <div class="overflow-hidden rounded-[2rem] bg-white ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)]">
-          <div class="relative h-32 bg-steel-900">
-            <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-30" />
-            <div class="pointer-events-none absolute -right-8 -top-10 h-48 w-48 rounded-full bg-brand-500/25 blur-3xl" />
-          </div>
-          <div class="-mt-12 px-6 pb-6">
-            <div class="flex items-end gap-4">
-              <img
-                v-if="authStore.userAvatar"
-                :src="authStore.userAvatar"
-                :alt="authStore.userName"
-                class="h-24 w-24 rounded-2xl object-cover shadow-lg ring-4 ring-white"
-              />
-              <div v-else class="flex h-24 w-24 items-center justify-center rounded-2xl bg-steel-900 text-3xl font-bold text-brand-500 shadow-lg ring-4 ring-white">
-                {{ authStore.userName?.charAt(0)?.toUpperCase() || '?' }}
-              </div>
-              <div class="pb-1">
-                <h1 class="font-display text-2xl font-bold tracking-tight text-steel-900">{{ authStore.userName }}</h1>
-                <p class="font-mono text-sm text-steel-400">{{ authStore.user.email }}</p>
-              </div>
+        <div class="relative overflow-hidden rounded-[2rem] bg-steel-900 p-6 ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)] sm:p-8">
+          <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-20" />
+          <div class="pointer-events-none absolute -right-10 -top-12 h-56 w-56 rounded-full bg-brand-500/25 blur-3xl" />
+
+          <div class="relative flex items-center gap-5">
+            <img
+              v-if="authStore.userAvatar"
+              :src="authStore.userAvatar"
+              :alt="authStore.userName"
+              class="h-20 w-20 shrink-0 rounded-2xl object-cover shadow-lg ring-2 ring-white/20 sm:h-24 sm:w-24"
+            />
+            <div v-else class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-brand-500 text-3xl font-bold text-white shadow-lg ring-2 ring-white/20 sm:h-24 sm:w-24">
+              {{ authStore.userName?.charAt(0)?.toUpperCase() || '?' }}
+            </div>
+
+            <div class="min-w-0">
+              <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-brand-400">會員專區 · Member</p>
+              <h1 class="mt-1.5 truncate font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">{{ authStore.userName }}</h1>
+              <p class="mt-1 truncate font-mono text-sm text-steel-400">{{ authStore.user.email }}</p>
             </div>
           </div>
         </div>
