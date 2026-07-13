@@ -14,7 +14,7 @@
             <span class="font-display text-2xl font-bold tracking-tight text-white">GTS</span>
           </div>
           <p class="mt-5 max-w-sm text-sm leading-relaxed text-steel-400">
-            自 1995 年起，為專業工班與 DIY 玩家供應可靠的工具與五金。選料嚴謹，交期準時。
+            在地深耕近三十年，為您提供專業、耐用的五金工具。品質嚴格把關，現貨穩定供應。
           </p>
         </div>
         <a
@@ -55,7 +55,7 @@
 
         <div class="col-span-2">
           <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">訂閱新品與優惠</h3>
-          <p class="mt-5 text-sm text-steel-400">留下 Email，第一時間掌握到貨與工班專案價。</p>
+          <p class="mt-5 text-sm text-steel-400">留下 Email，第一時間掌握新品上架與專屬優惠資訊。</p>
           <form class="mt-4 flex max-w-md gap-2" @submit.prevent>
             <input
               type="email"

@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    mkcert()
+    // 憑證需涵蓋自訂 dev 網域，否則瀏覽器連 https://local.jaao.tw:5174 會 CERT_COMMON_NAME_INVALID
+    mkcert({ hosts: ['localhost', '127.0.0.1', 'local.jaao.tw'] })
   ],
   resolve: {
     alias: {

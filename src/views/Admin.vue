@@ -1,58 +1,55 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-    <!-- Top Bar -->
-    <header class="bg-slate-800/50 backdrop-blur-xl border-b border-slate-700/50">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <!-- Logo -->
-          <div class="flex items-center gap-3">
-            <router-link to="/" class="flex items-center gap-2 text-slate-400 hover:text-orange-400 transition-colors">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span class="text-sm">返回商店</span>
-            </router-link>
-            <div class="h-4 w-px bg-slate-700"></div>
-            <h1 class="text-white font-semibold">管理後台</h1>
+  <div class="min-h-[100dvh] bg-steel-50">
+    <!-- Top bar -->
+    <header class="sticky top-0 z-40 border-b border-steel-900/[0.06] bg-white/75 backdrop-blur-xl">
+      <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
+        <!-- Left -->
+        <div class="flex items-center gap-3">
+          <router-link to="/" class="inline-flex items-center gap-1.5 text-sm text-steel-500 transition-colors hover:text-brand-600">
+            <PhArrowLeft :size="16" weight="bold" /> 返回商店
+          </router-link>
+          <span class="h-4 w-px bg-steel-200" />
+          <div class="flex items-center gap-2">
+            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-steel-900 text-brand-500">
+              <PhWrench :size="16" weight="fill" />
+            </span>
+            <h1 class="font-display text-base font-bold tracking-tight text-steel-900">管理後台</h1>
           </div>
+        </div>
 
-          <!-- User Info -->
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-3">
-              <img
-                v-if="authStore.userAvatar"
-                :src="authStore.userAvatar"
-                :alt="authStore.userName"
-                class="w-8 h-8 rounded-full object-cover ring-2 ring-slate-700"
-              />
-              <div v-else class="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white text-sm font-medium">
-                {{ authStore.userName?.charAt(0)?.toUpperCase() || '?' }}
-              </div>
-              <span class="text-sm text-slate-300 hidden sm:block">{{ authStore.userName }}</span>
-            </div>
-            <button
-              @click="handleLogout"
-              class="px-3 py-1.5 text-xs text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-500/50 rounded-lg transition-all"
-            >
-              登出
-            </button>
+        <!-- Right -->
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2.5">
+            <img
+              v-if="authStore.userAvatar"
+              :src="authStore.userAvatar"
+              :alt="authStore.userName"
+              class="h-8 w-8 rounded-full object-cover ring-1 ring-steel-200"
+            />
+            <span v-else class="flex h-8 w-8 items-center justify-center rounded-full bg-steel-900 text-sm font-semibold text-white">
+              {{ authStore.userName?.charAt(0)?.toUpperCase() || '?' }}
+            </span>
+            <span class="hidden text-sm font-medium text-steel-700 sm:block">{{ authStore.userName }}</span>
           </div>
+          <button
+            @click="handleLogout"
+            class="inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-3.5 py-1.5 text-xs font-medium text-steel-600 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-600"
+          >
+            <PhSignOut :size="14" weight="bold" /> 登出
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- 歡迎訊息 -->
-      <div class="bg-slate-800/30 backdrop-blur border border-slate-700/50 rounded-2xl p-8 text-center">
-        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
-          <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
+    <!-- Content -->
+    <main class="mx-auto max-w-7xl px-5 py-12 sm:px-8">
+      <div class="rounded-[2rem] bg-white p-10 text-center ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)] sm:p-16">
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50">
+          <PhCheckCircle :size="34" weight="fill" class="text-brand-500" />
         </div>
-        <h2 class="text-xl font-semibold text-white mb-2">登入成功！</h2>
-        <p class="text-slate-400 text-sm mb-1">歡迎，{{ authStore.userName }}</p>
-        <p class="text-slate-500 text-xs">商品分類管理功能即將上線</p>
+        <h2 class="mt-5 font-display text-2xl font-bold tracking-tight text-steel-900">登入成功</h2>
+        <p class="mt-2 text-steel-500">歡迎，{{ authStore.userName }}</p>
+        <p class="mt-1 font-mono text-xs text-steel-400">商品分類管理功能即將上線</p>
       </div>
     </main>
   </div>
@@ -62,6 +59,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { PhArrowLeft, PhWrench, PhSignOut, PhCheckCircle } from '@phosphor-icons/vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

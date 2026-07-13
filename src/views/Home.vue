@@ -12,7 +12,7 @@
           <!-- Copy -->
           <div class="lg:col-span-6">
             <span class="hero-el inline-flex items-center gap-2 rounded-full border border-steel-200 bg-white/70 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-steel-500 backdrop-blur">
-              <span class="h-1.5 w-1.5 rounded-full bg-brand-500" /> Est. 1995 · 工班備料夥伴
+              <span class="h-1.5 w-1.5 rounded-full bg-brand-500" /> Est. 1995 · 專業五金供應
             </span>
 
             <h1 class="hero-el mt-6 font-display text-[2.7rem] font-bold leading-[1.05] tracking-tight text-steel-900 sm:text-6xl lg:text-[4.1rem]">
