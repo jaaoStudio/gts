@@ -69,7 +69,7 @@ export const productMapper = {
 ### Mapper Responsibilities
 - Convert Directus file UUIDs to full URLs via `getAssetUrl()`.
 - Calculate derived fields (e.g., `displayPrice` from variants min price).
-- Normalize relational data (M2O, M2M category resolution).
+- Normalize relational data. **分類已全面改用 M2M**（每商品 `[父, 子]`）；主分類取「有 parent 的子分類葉節點」，M2O `category` 已棄用全空。批次維運/重歸類見 `directus-catalog-categorization`。
 - Extract tag badges.
 - Process gallery images.
 
