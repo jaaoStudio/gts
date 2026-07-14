@@ -187,6 +187,9 @@ export const productMapper = {
      * 將單一產品資料轉換
      */
     mapProduct(item) {
+        // TODO(主標籤): 卡片小標目前取 tags[0]，而 tags 查詢未排序，
+        // 顯示哪顆 Tag 取決於 Directus junction 順序、不可預測。
+        // 若要「指定主標籤」，需在 tag 關聯加 sort 欄位或 is_primary 旗標再依此挑選。
         const firstTag = item.tags && item.tags.length > 0 && item.tags[0].tags_id
             ? item.tags[0].tags_id
             : null
