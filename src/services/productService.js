@@ -4,7 +4,11 @@ import directus, { getAssetUrl } from '../utils/directus'
 // 1. 抽取共用欄位，未來五金行商品要加欄位只要改這裡
 const LIST_FIELDS = [
     'id', 'name', 'slug', 'short_description', 'description', 'image',
-    'category.name', 'tags.tags_id.name', 'tags.tags_id.color', 'variants.*'
+    'category.name',
+    // 分類已全面改用 M2M，列表也需帶出，並取 parent 以辨識子分類(葉節點)
+    'categories.categories_id.id', 'categories.categories_id.name',
+    'categories.categories_id.slug', 'categories.categories_id.parent',
+    'tags.tags_id.name', 'tags.tags_id.color', 'variants.*'
 ];
 
 // 詳情頁需要的額外完整欄位
@@ -223,7 +227,10 @@ export const productMapper = {
             .map(c => c.categories_id)
             .filter(c => c !== null)
 
-        const primaryCategory = item.category || (m2mCategories.length > 0 ? m2mCategories[0] : null)
+        // 主分類優先取「子分類」(有 parent 的葉節點)，讓卡片/標籤顯示最精確的分類；
+        // 其次退回 M2O，再退回第一個 M2M 分類
+        const leafCategory = m2mCategories.find(c => c && c.parent)
+        const primaryCategory = leafCategory || item.category || (m2mCategories.length > 0 ? m2mCategories[0] : null)
 
         return {
             id: item.id,
