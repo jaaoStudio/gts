@@ -21,7 +21,7 @@
             </h1>
 
             <p class="hero-el mt-6 max-w-md text-base leading-relaxed text-steel-500 sm:text-lg">
-              從電動工具到水電材料，嚴選耐用品項。
+              精選各式手工具、耗材。
             </p>
 
             <div class="hero-el mt-9 flex flex-wrap items-center gap-3">

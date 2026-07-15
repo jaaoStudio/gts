@@ -56,8 +56,7 @@
         </div>
 
         <p class="text-center text-xs leading-relaxed text-steel-400">
-          點擊登入即表示您同意本站服務條款。<br />
-          我們不會取得您的 Google 密碼。
+          點擊登入即表示您同意本站服務條款。
         </p>
       </div>
 
