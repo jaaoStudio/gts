@@ -4,11 +4,14 @@
       class="pointer-events-auto mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full border border-white/60 bg-white/75 px-2 pl-3 shadow-[0_10px_40px_-16px_rgba(16,17,21,0.28)] ring-1 ring-steel-900/[0.05] backdrop-blur-xl sm:h-16 sm:pl-4"
     >
       <!-- Logo -->
-      <router-link to="/" class="group flex flex-shrink-0 items-center gap-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-steel-900 text-brand-500 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:rotate-[-8deg]">
-          <PhWrench :size="20" weight="fill" />
-        </span>
-        <span class="font-display text-lg font-bold tracking-tight text-steel-900">GTS</span>
+      <router-link to="/" class="group flex flex-shrink-0 items-center" :aria-label="`${settingsStore.siteName} 首頁`">
+        <img
+          v-if="settingsStore.logo"
+          :src="settingsStore.logo"
+          :alt="settingsStore.siteName"
+          class="h-8 w-auto transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.03]"
+        />
+        <span v-else class="font-display text-lg font-bold tracking-tight text-steel-900">{{ settingsStore.siteName }}</span>
       </router-link>
 
       <!-- Desktop nav -->
@@ -252,14 +255,16 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCategoryStore } from '../stores/category'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
 import {
-  PhWrench, PhCaretDown, PhMagnifyingGlass, PhUser, PhUserCircle,
+  PhCaretDown, PhMagnifyingGlass, PhUser, PhUserCircle,
   PhSignOut, PhShoppingCartSimple,
 } from '@phosphor-icons/vue'
 
 const router = useRouter()
 const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
 const searchQuery = ref('')
 const mobileMenuOpen = ref(false)
@@ -273,6 +278,7 @@ const linkDelay = (i) => ({ '--d': `${i * 45}ms` })
 
 onMounted(() => {
   categoryStore.fetchCategories()
+  settingsStore.fetchSettings()
   authStore.init()
   document.addEventListener('click', handleClickOutside)
 })
