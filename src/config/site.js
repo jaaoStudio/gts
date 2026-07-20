@@ -5,7 +5,7 @@ import logo from '@/assets/gts-lockup-horizontal-light.svg'
 import logoDark from '@/assets/gts-lockup-horizontal-dark.svg'
 
 export const site = {
-  name: 'GTS 金同心實業',
+  name: '金同心實業',
   logo,      // 淺底深墨（navbar 白玻璃底用）
   logoDark,  // 深底淺墨（深色背景用）
 }

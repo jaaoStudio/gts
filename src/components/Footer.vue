@@ -94,7 +94,6 @@
 import { computed } from 'vue'
 import { useCategoryStore } from '../stores/category'
 import { PhPhoneCall, PhFacebookLogo, PhInstagramLogo, PhYoutubeLogo } from '@phosphor-icons/vue'
-import lockupStacked from '@/assets/gts-lockup-stacked-dark.svg'
 import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
 
 const categoryStore = useCategoryStore()
