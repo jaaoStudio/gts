@@ -1,22 +1,19 @@
 import { readSingleton } from '@directus/sdk'
-import directus, { getAssetUrl } from '../utils/directus'
+import directus from '../utils/directus'
 
 /**
- * 網站設定服務 - 讀取 Directus 的 site_settings 單例
+ * 網站設定服務 - 讀取 Directus 的 site_settings 單例。
+ * 識別類（logo / favicon / 站名）已本地化，見 config/site.js；此處只取會變動的設定。
  */
 export const settingsService = {
     async getSettings() {
         const data = await directus.request(
             readSingleton('site_settings', {
-                fields: ['site_name', 'logo', 'logo_dark', 'favicon', 'line_id'],
+                fields: ['line_id'],
             })
         )
 
         return {
-            siteName: data?.site_name || 'GTS',
-            logo: data?.logo ? getAssetUrl(data.logo) : null,
-            logoDark: data?.logo_dark ? getAssetUrl(data.logo_dark) : null,
-            favicon: data?.favicon ? getAssetUrl(data.favicon) : null,
             lineId: data?.line_id || null,
         }
     },

@@ -7,16 +7,12 @@
       <!-- Top: call line -->
       <div class="flex flex-col gap-8 border-b border-white/10 pb-12 md:flex-row md:items-end md:justify-between">
         <div>
-          <div class="flex items-center gap-2.5">
-            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-steel-950">
-              <PhWrench :size="22" weight="fill" />
-            </span>
-            <span class="font-display text-2xl font-bold tracking-tight text-white">GTS</span>
-          </div>
-          <p class="mt-5 max-w-sm text-sm leading-relaxed text-steel-400">
+          <img :src="horizontal" alt="GTS 金同心實業" class="h-24 w-auto" />
+                  <p class="mt-5 max-w-sm text-sm leading-relaxed text-steel-400">
             在地深耕近三十年，為您提供專業、耐用的五金工具。品質嚴格把關，現貨穩定供應。
           </p>
         </div>
+
         <a
           href="tel:0800123456"
           class="group inline-flex w-max items-center gap-3 rounded-full bg-white py-2 pl-6 pr-2 font-display text-base font-semibold text-steel-950 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 hover:text-white active:scale-[0.98]"
@@ -97,7 +93,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useCategoryStore } from '../stores/category'
-import { PhWrench, PhPhoneCall, PhFacebookLogo, PhInstagramLogo, PhYoutubeLogo } from '@phosphor-icons/vue'
+import { PhPhoneCall, PhFacebookLogo, PhInstagramLogo, PhYoutubeLogo } from '@phosphor-icons/vue'
+import lockupStacked from '@/assets/gts-lockup-stacked-dark.svg'
+import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
 
 const categoryStore = useCategoryStore()
 const topCategories = computed(() => categoryStore.categoryTree.slice(0, 5))

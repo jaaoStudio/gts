@@ -3,7 +3,13 @@
 金同心實業有限公司（五金行）· 英文品牌 **GTS**
 
 ## 核心概念
-**同心圓 × 六角螺帽** —— 「同心」化為同心圓，外框取六角螺帽，一眼是五金、也是「金同心」。橘色中心點是唯一的重音。
+**「同」字為體，橘方為心——同、心合一，即「同心」。**
+
+符號取「同」字幾何重構：外框化為圓肩拱門，是五金行的騎樓、是店面的立面、是每天推開的那道門；中間唯一的實心橘方，是「同」的心，也是「同心」二字的直譯。名字不是貼上去的，是畫出來的。
+
+- **拱門即店面、即入口** — 線條連續不斷，一如老店數十年不打烊。
+- **橘色方心** — 全圖唯一的顏色與實心，工業橘落在門內正中，是招牌燈、是顧客上門的目的地。
+- **秩序** — 老招牌的信任 × 現代的線條秩序：看得懂的一眼認出「同」，看不懂的也記得那顆橘。
 
 ## 顏色
 | 用途 | Hex |
@@ -12,36 +18,43 @@
 | 強調 · 深橘 | `#ea580c` |
 | 鋼黑 | `#101115` |
 | 主文字 · 鋼灰 | `#1a1b1f` |
-| 次要文字 · 中灰 | `#6c6f7a` |
+| 副標 · 中灰（淺底用） | `#6c6f7a` |
+| 副標 · 中灰（深底用） | `#9a9da8` |
 | 淺底 | `#f7f7f8` |
 
+> 副標於深底原為 `#6c6f7a`（對比 3.8:1，未達 AA），已改 `#9a9da8`（≈ 6.95:1，達 AA）。淺底維持 `#6c6f7a`（≈ 4.75:1，達 AA）。
+
 ## 字型
-- **Geist**（GTS 字標，weight 600 / SemiBold）— 開源 OFL，見 `fonts/Geist-SemiBold.ttf`
-- **Noto Sans TC**（金同心實業，Medium）— 開源 OFL，公司名子集見 `fonts/NotoSansTC-Medium-subset.ttf`；完整字型可在 Google Fonts 下載
+**jf open（W 2.1）Regular** — 主標「金同心實業」與副標「GTS HARDWARE」皆用此字型，僅提供 Regular 一種字重。
 
-## 怎麼改（重點！）
-所有 `.svg` 都是**向量檔**，可直接拖進 **Figma**、或用 **Illustrator / Inkscape（免費）** 開啟編輯。
+（lockup 檔內文字已轉外框，可直接使用、不依賴系統字型。）
 
-- **要改文字** → 用 `gts-logo-editable*.svg`（文字是真的可編輯文字）。先把 `fonts/` 裡兩個字型**安裝到系統**，繪圖軟體才會用對字型。
-- **要當最終檔用** → 用 `gts-logo.svg`（文字已轉外框，到哪都顯示一致、不依賴字型）。
-- 顏色、位置、間距都能在軟體裡自由調整。
+## Lockup 排印規格
+單一字重（皆 Regular），主／副層級不靠粗細，改由 **字級 × 字距 × 顏色** 三者承擔。
+
+| | 橫式 Horizontal | 直式 Stacked |
+|---|---|---|
+| 主標 Wordmark | 62 px | 52 px |
+| 副標 Tagline | 20 px | 20 px |
+| 字級比 Ratio | 3.1× | 2.6× |
+| 副標字距 Letter-spacing | 0.24 em | 0.28 em（置中） |
+| 主副 Baseline gap | ≈ 20 px | ≈ 17 px |
+
+**規則（新增鎖定變體一律依此推算，不另立新值）：**
+- 副標字距 = 使其光學寬度 ≈ 主標寬度所需之值（主標較寬 → 字距較小，較窄 → 較大）。
+- 主副 baseline 間距 = 主標字級 × 0.32（橫式 ≈ 20 px、直式 ≈ 17 px）。
 
 ## 檔案清單
+八個 `.svg` 向量檔，兩兩成對：`-light` = 淺色背景用（深墨）、`-dark` = 深色背景用（淺墨）。可直接拖進 Figma / Illustrator / Inkscape 編輯。
+
 | 檔案 | 說明 |
 |---|---|
-| `gts-logo.svg` / `-white.svg` | **完整 lockup**（符號＋GTS＋金同心實業）· 文字已外框 · 深/淺 |
-| `gts-logo-editable.svg` / `-white.svg` | 完整 lockup · **文字可編輯**（需安裝 fonts/）· 內嵌字型 |
-| `gts-logo-compact.svg` / `-white.svg` | 符號＋GTS（無中文）· 適合 navbar / 小尺寸 |
-| `gts-mark.svg` / `-white.svg` | 純符號 · 透明底 |
-| `gts-icon-orange.svg` | app icon · 橘底白 mark（**網站 favicon 用這個**）|
-| `gts-icon-dark.svg` | app icon · 黑底白 mark＋橘中心點（社群大頭貼建議）|
-| `gts-icon-light.svg` | app icon · 淺底鋼灰 mark＋橘中心點 |
-| `*.png` | 對應的透明 PNG（相容/預覽用）|
-| `preview-white.png` / `preview-dark.png` | 完整 lockup 在白底/深底的樣子 |
-| `fonts/` | Geist SemiBold + Noto Sans TC 子集 |
+| `gts-logomark-light.svg` / `-dark.svg` | 純符號「同」· 適合小尺寸 / navbar |
+| `gts-lockup-horizontal-light.svg` / `-dark.svg` | 橫式完整 lockup（符號＋GTS＋金同心實業） |
+| `gts-lockup-stacked-light.svg` / `-dark.svg` | 直式堆疊 lockup |
+| `gts-appicon-light.svg` / `-dark.svg` | app icon / 網站 favicon（含底磚） |
 
-## 符號建構規格
-- 六角螺帽：`polygon` 描邊，stroke-width 6.5
-- 同心圓：`circle` r=27，stroke-width 6.5
-- 軸心橘點：`circle` r=10.5，fill `#f97316`
-- 在 100×100 座標系中央（螺帽含邊約佔 4–96）
+## 符號建構規格（512 座標系）
+- **拱門外框**：連續描邊，圓肩過渡，stroke-width 30.72、圓端收尾
+- **中橫**：「同」的橫畫，同寬描邊
+- **橘方心**：圓角矩形，fill `#f97316`，落於門內正中

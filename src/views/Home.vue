@@ -16,7 +16,7 @@
             </span>
 
             <h1 class="hero-el mt-6 font-display text-[2.7rem] font-bold leading-[1.05] tracking-tight text-steel-900 sm:text-6xl lg:text-[4.1rem]">
-              五金與工具，<br />
+              五金工具，<br />
               選對<span class="text-brand-500">一次到位</span>。
             </h1>
 
