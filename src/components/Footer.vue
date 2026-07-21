@@ -28,7 +28,7 @@
       </div>
 
       <!-- Middle -->
-      <div class="grid grid-cols-2 gap-x-6 gap-y-10 py-12 md:grid-cols-4">
+      <div class="grid grid-cols-2 gap-x-6 gap-y-10 py-12 md:grid-cols-3">
         <div>
           <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">商品分類</h3>
           <ul class="mt-5 space-y-3">
@@ -46,48 +46,26 @@
         <div>
           <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">客戶服務</h3>
           <ul class="mt-5 space-y-3">
-            <li v-for="item in service" :key="item">
-              <a href="#" class="text-sm text-steel-400 transition-colors hover:text-white">{{ item }}</a>
+            <li v-for="item in service" :key="item.to">
+              <router-link :to="item.to" class="text-sm text-steel-400 transition-colors hover:text-white">{{ item.label }}</router-link>
             </li>
           </ul>
         </div>
 
-        <div class="col-span-2">
-          <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">訂閱新品與優惠</h3>
-          <p class="mt-5 text-sm text-steel-400">留下 Email，第一時間掌握新品上架與專屬優惠資訊。</p>
-          <form class="mt-4 flex max-w-md gap-2" @submit.prevent>
-            <input
-              type="email"
-              required
-              placeholder="you@example.com"
-              class="min-w-0 flex-1 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-white placeholder-steel-500 focus:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            />
-            <button class="flex-shrink-0 rounded-full bg-brand-500 px-6 py-3 font-display text-sm font-semibold text-white transition-all duration-300 hover:bg-brand-600 active:scale-[0.98]">
-              訂閱
-            </button>
-          </form>
-          <div class="mt-6 flex items-center gap-3">
-            <a href="#" aria-label="Facebook" class="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-steel-400 transition-colors hover:border-white/25 hover:text-white">
-              <PhFacebookLogo :size="18" weight="fill" />
-            </a>
-            <a href="#" aria-label="Instagram" class="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-steel-400 transition-colors hover:border-white/25 hover:text-white">
-              <PhInstagramLogo :size="18" weight="regular" />
-            </a>
-            <a href="#" aria-label="YouTube" class="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-steel-400 transition-colors hover:border-white/25 hover:text-white">
-              <PhYoutubeLogo :size="18" weight="fill" />
-            </a>
-          </div>
+        <div>
+          <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">資訊</h3>
+          <ul class="mt-5 space-y-3">
+            <li v-for="item in legal" :key="item.to">
+              <router-link :to="item.to" class="text-sm text-steel-400 transition-colors hover:text-white">{{ item.label }}</router-link>
+            </li>
+          </ul>
         </div>
       </div>
 
       <!-- Bottom -->
       <div class="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 md:flex-row">
         <p class="font-mono text-xs text-steel-500">© {{ year }} GTS Hardware. All rights reserved.</p>
-        <div class="flex gap-6">
-          <a href="#" class="text-xs text-steel-500 transition-colors hover:text-steel-300">隱私權政策</a>
-          <a href="#" class="text-xs text-steel-500 transition-colors hover:text-steel-300">服務條款</a>
-          <a href="#" class="text-xs text-steel-500 transition-colors hover:text-steel-300">網站地圖</a>
-        </div>
+        <p class="font-mono text-xs text-steel-500">金同心實業有限公司</p>
       </div>
     </div>
   </footer>
@@ -96,13 +74,22 @@
 <script setup>
 import { computed } from 'vue'
 import { useCategoryStore } from '../stores/category'
-import { PhPhoneCall, PhFacebookLogo, PhInstagramLogo, PhYoutubeLogo } from '@phosphor-icons/vue'
+import { PhPhoneCall } from '@phosphor-icons/vue'
 import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
 import LineButton from './LineButton.vue'
 
 const categoryStore = useCategoryStore()
 const topCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
 
-const service = ['聯絡我們', '常見問題', '運送與退貨', '保固資訊', '訂單查詢']
+const service = [
+  { label: '聯絡我們', to: '/contact' },
+  { label: '常見問題', to: '/faq' },
+  { label: '運送與退貨', to: '/shipping' },
+  { label: '保固資訊', to: '/warranty' },
+]
+const legal = [
+  { label: '隱私權政策', to: '/privacy' },
+  { label: '服務條款', to: '/terms' },
+]
 const year = new Date().getFullYear()
 </script>

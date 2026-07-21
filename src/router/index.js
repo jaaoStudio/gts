@@ -27,6 +27,42 @@ const routes = [
         meta: { title: '商品｜金同心實業' } // ProductDetail 載入後會用實際商品名覆蓋
     },
     {
+        path: '/contact',
+        name: 'Contact',
+        component: () => import('../views/Contact.vue'),
+        meta: { title: '聯絡我們｜金同心實業' }
+    },
+    {
+        path: '/faq',
+        name: 'Faq',
+        component: () => import('../views/Faq.vue'),
+        meta: { title: '常見問題｜金同心實業' }
+    },
+    {
+        path: '/shipping',
+        name: 'Shipping',
+        component: () => import('../views/Shipping.vue'),
+        meta: { title: '運送與退貨｜金同心實業' }
+    },
+    {
+        path: '/warranty',
+        name: 'Warranty',
+        component: () => import('../views/Warranty.vue'),
+        meta: { title: '保固資訊｜金同心實業' }
+    },
+    {
+        path: '/privacy',
+        name: 'Privacy',
+        component: () => import('../views/Privacy.vue'),
+        meta: { title: '隱私權政策｜金同心實業' }
+    },
+    {
+        path: '/terms',
+        name: 'Terms',
+        component: () => import('../views/Terms.vue'),
+        meta: { title: '服務條款｜金同心實業' }
+    },
+    {
         path: '/login',
         name: 'Login',
         component: () => import('../views/AdminLogin.vue'),
