@@ -8,7 +8,7 @@
         <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-60" />
         <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[36rem] w-[36rem] rounded-full bg-brand-500/10 blur-[120px]" />
 
-        <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-28 sm:px-8 lg:grid-cols-12 lg:pb-28 lg:pt-32">
+        <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-20 sm:px-8 lg:grid-cols-12 lg:pb-24 lg:pt-24">
           <!-- Copy -->
           <div class="lg:col-span-6">
             <span class="hero-el inline-flex items-center gap-2 rounded-full border border-steel-200 bg-white/70 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-steel-500 backdrop-blur">
@@ -35,7 +35,7 @@
                 </span>
               </router-link>
               <a
-                href="tel:0800123456"
+                href="tel:0426580936"
                 class="inline-flex items-center gap-2 rounded-full border border-steel-300 px-6 py-3.5 font-display text-base font-semibold text-steel-800 transition-colors duration-300 hover:border-steel-900 hover:bg-white"
               >
                 <PhPhoneCall :size="18" weight="bold" /> 電話詢價
@@ -43,36 +43,9 @@
             </div>
           </div>
 
-          <!-- Showcase: real featured product -->
+          <!-- Showcase: draggable 3D ring of featured products -->
           <div class="hero-el lg:col-span-6">
-            <div class="relative ml-auto max-w-md">
-              <!-- Double-bezel frame -->
-              <div class="rounded-[2rem] bg-white/60 p-2 shadow-[0_40px_80px_-30px_rgba(16,17,21,0.4)] ring-1 ring-steel-900/[0.06] backdrop-blur">
-                <div class="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-steel-100">
-                  <template v-if="hero">
-                    <img :src="hero.image || heroPlaceholder" :alt="hero.name" class="h-full w-full object-cover" />
-                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-steel-950/70 to-transparent p-5">
-                      <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/70">{{ hero.category?.name || '精選' }}</p>
-                      <p class="mt-1 font-display text-lg font-semibold text-white">{{ hero.name }}</p>
-                    </div>
-                  </template>
-                  <div v-else class="h-full w-full animate-pulse bg-steel-200" />
-                </div>
-              </div>
-
-              <!-- Floating price chip -->
-              <div v-if="hero" class="absolute -left-4 bottom-20 rounded-2xl border border-steel-100 bg-white/95 px-4 py-3 shadow-xl backdrop-blur">
-                <p class="text-[11px] text-steel-400">參考價</p>
-                <p class="font-mono text-xl font-bold tracking-tight text-steel-900">
-                  {{ hero.price > 0 ? `NT$${hero.price.toLocaleString()}` : '詢價' }}
-                </p>
-              </div>
-              <!-- Floating quality chip -->
-              <div class="absolute -right-3 top-8 flex items-center gap-2 rounded-full border border-steel-100 bg-white/95 px-4 py-2 shadow-xl backdrop-blur">
-                <PhShieldCheck :size="18" weight="fill" class="text-brand-500" />
-                <span class="text-sm font-medium text-steel-800">原廠正品</span>
-              </div>
-            </div>
+            <HeroProductRing :products="ringProducts" />
           </div>
         </div>
 
@@ -219,6 +192,7 @@ import { useAuthStore } from '../stores/auth'
 import { gsap } from 'gsap'
 import Navbar from '../components/Navbar.vue'
 import ProductCard from '../components/ProductCard.vue'
+import HeroProductRing from '../components/HeroProductRing.vue'
 import Footer from '../components/Footer.vue'
 import {
   PhArrowRight, PhPhoneCall, PhShieldCheck, PhStack,
@@ -230,9 +204,8 @@ const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
 
 const heroRef = ref(null)
-const heroPlaceholder = 'https://picsum.photos/seed/gts-hero/900/1100'
 
-const hero = computed(() => productStore.products[0] || null)
+const ringProducts = computed(() => productStore.products.slice(0, 4))
 const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
 
 const values = [
