@@ -14,10 +14,10 @@
         </div>
 
         <a
-          href="tel:0800123456"
+          href="tel:0426580936"
           class="group inline-flex w-max items-center gap-3 rounded-full bg-white py-2 pl-6 pr-2 font-display text-base font-semibold text-steel-950 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 hover:text-white active:scale-[0.98]"
         >
-          撥打 0800-123-456
+          撥打 04-26580936
           <span class="flex h-9 w-9 items-center justify-center rounded-full bg-steel-100 text-steel-900 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-steel-950 group-hover:text-white">
             <PhPhoneCall :size="18" weight="bold" />
           </span>

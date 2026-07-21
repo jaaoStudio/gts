@@ -115,7 +115,7 @@
             <!-- Contact CTAs -->
             <div class="mt-6 flex flex-col gap-3 sm:flex-row">
               <a
-                href="tel:0800123456"
+                href="tel:0426580936"
                 class="group flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98]"
               >
                 <PhPhoneCall :size="20" weight="bold" /> 電話詢價
