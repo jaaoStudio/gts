@@ -13,15 +13,18 @@
           </p>
         </div>
 
-        <a
-          href="tel:0426580936"
-          class="group inline-flex w-max items-center gap-3 rounded-full bg-white py-2 pl-6 pr-2 font-display text-base font-semibold text-steel-950 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 hover:text-white active:scale-[0.98]"
-        >
-          撥打 04-26580936
-          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-steel-100 text-steel-900 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-steel-950 group-hover:text-white">
-            <PhPhoneCall :size="18" weight="bold" />
-          </span>
-        </a>
+        <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+          <a
+            href="tel:0426580936"
+            class="group inline-flex w-max items-center gap-3 rounded-full bg-white py-2 pl-6 pr-2 font-display text-base font-semibold text-steel-950 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 hover:text-white active:scale-[0.98]"
+          >
+            撥打 04-26580936
+            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-steel-100 text-steel-900 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-steel-950 group-hover:text-white">
+              <PhPhoneCall :size="18" weight="bold" />
+            </span>
+          </a>
+          <LineButton :floating="false" />
+        </div>
       </div>
 
       <!-- Middle -->
@@ -95,6 +98,7 @@ import { computed } from 'vue'
 import { useCategoryStore } from '../stores/category'
 import { PhPhoneCall, PhFacebookLogo, PhInstagramLogo, PhYoutubeLogo } from '@phosphor-icons/vue'
 import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
+import LineButton from './LineButton.vue'
 
 const categoryStore = useCategoryStore()
 const topCategories = computed(() => categoryStore.categoryTree.slice(0, 5))

@@ -11,22 +11,26 @@ const routes = [
     {
         path: '/',
         name: 'Home',
-        component: Home
+        component: Home,
+        meta: { title: '金同心實業｜專業五金工具供應' }
     },
     {
         path: '/products',
         name: 'Products',
-        component: Products
+        component: Products,
+        meta: { title: '所有商品｜金同心實業' }
     },
     {
         path: '/product/:slug',
         name: 'ProductDetail',
-        component: ProductDetail
+        component: ProductDetail,
+        meta: { title: '商品｜金同心實業' } // ProductDetail 載入後會用實際商品名覆蓋
     },
     {
         path: '/login',
         name: 'Login',
-        component: () => import('../views/AdminLogin.vue')
+        component: () => import('../views/AdminLogin.vue'),
+        meta: { title: '會員登入｜金同心實業' }
     },
     {
         path: '/admin/callback',
@@ -37,13 +41,13 @@ const routes = [
         path: '/account',
         name: 'Account',
         component: () => import('../views/Account.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, title: '會員專區｜金同心實業' }
     },
     {
         path: '/admin',
         name: 'Admin',
         component: () => import('../views/Admin.vue'),
-        meta: { requiresAuth: true, requiresAdmin: true }
+        meta: { requiresAuth: true, requiresAdmin: true, title: '管理後台｜金同心實業' }
     }
 ]
 
@@ -75,6 +79,11 @@ router.beforeEach(async (to) => {
             return '/account'
         }
     }
+})
+
+// 套用每頁標題（ProductDetail 會在載入商品後自行覆蓋為商品名）
+router.afterEach((to) => {
+    if (to.meta?.title) document.title = to.meta.title
 })
 
 export default router

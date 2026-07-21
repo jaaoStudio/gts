@@ -12,6 +12,13 @@ export const useSettingsStore = defineStore('settings', {
 
     getters: {
         lineId: (s) => s.settings?.lineId || null,
+        // 組出加好友連結：完整網址（lin.ee / line.me）直接用，否則當官方帳號 @id
+        lineUrl: (s) => {
+            const id = s.settings?.lineId
+            if (!id) return null
+            if (/^https?:\/\//.test(id)) return id
+            return `https://line.me/R/ti/p/@${String(id).replace(/^@/, '')}`
+        },
     },
 
     actions: {

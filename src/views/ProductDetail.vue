@@ -121,7 +121,8 @@
                 <PhPhoneCall :size="20" weight="bold" /> 電話詢價
               </a>
               <a
-                href="https://line.me/ti/p/~your-line-id"
+                v-if="settingsStore.lineUrl"
+                :href="settingsStore.lineUrl"
                 target="_blank"
                 rel="noopener"
                 class="flex flex-1 items-center justify-center gap-2.5 rounded-full border border-steel-300 px-6 py-4 font-display text-base font-semibold text-steel-800 transition-colors duration-300 hover:border-[#06C755] hover:text-[#06C755]"
@@ -149,15 +150,18 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { setMeta } from '../utils/seo'
 import { useRoute } from 'vue-router'
 import { productService } from '../services/productService'
 import { useCategoryStore } from '../stores/category'
+import { useSettingsStore } from '../stores/settings'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes } from '@phosphor-icons/vue'
 
 const route = useRoute()
 const categoryStore = useCategoryStore()
+const settingsStore = useSettingsStore()
 
 const product = ref(null)
 const loading = ref(true)
@@ -215,6 +219,13 @@ const fetchProduct = async (slug) => {
   try {
     const data = await productService.getProductBySlug(slug)
     product.value = data
+    if (data?.name) {
+      const title = `${data.name}｜金同心實業`
+      document.title = title
+      setMeta('og:title', title, 'property')
+      setMeta('og:description', data.short_description || '專業五金工具與耗材供應。', 'property')
+      if (data.image) setMeta('og:image', data.image, 'property')
+    }
     if (data?.image) activeImage.value = data.image
     if (publishedVariants.value.length > 0) selectedVariant.value = publishedVariants.value[0]
   } catch (err) {
