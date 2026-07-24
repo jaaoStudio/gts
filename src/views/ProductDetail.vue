@@ -80,7 +80,7 @@
             <div class="mt-7 rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6">
               <p class="text-xs text-steel-400">價格</p>
               <p class="mt-1 font-mono text-4xl font-bold tracking-tight text-steel-900">
-                {{ selectedVariant ? `NT$${selectedVariant.price.toLocaleString()}` : priceDisplay }}
+                {{ selectedVariant ? formatPrice(selectedVariant.price) : priceDisplay }}
               </p>
 
               <!-- Variants -->
@@ -95,7 +95,7 @@
                     :class="selectedVariant?.id === variant.id ? 'border-brand-500 bg-brand-50' : 'border-steel-200 hover:border-steel-400'"
                   >
                     <span class="block font-display text-sm font-semibold text-steel-900">{{ variant.spec_name }}</span>
-                    <span class="block font-mono text-xs text-steel-500">NT${{ variant.price.toLocaleString() }}</span>
+                    <span class="block font-mono text-xs text-steel-500">{{ formatPrice(variant.price) }}</span>
                   </button>
                 </div>
               </div>
@@ -178,10 +178,11 @@ const galleryImages = computed(() => {
   return [...new Set(imgs)]
 })
 
-const productTags = computed(() => {
-  if (!product.value?.tags) return []
-  return product.value.tags.map((t) => t.tags_id).filter((tag) => tag !== null)
-})
+// mapProduct 已把標籤攤平成 tag 物件陣列（id/name/color）
+const productTags = computed(() => product.value?.tags || [])
+
+// 變體價格可能為 null（mapProduct 保留原值），統一格式化避免 null.toLocaleString() 崩潰
+const formatPrice = (p) => (p != null ? `NT$${p.toLocaleString()}` : '詢價')
 
 const publishedVariants = computed(() => {
   if (!product.value?.variants) return []

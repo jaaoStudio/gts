@@ -222,6 +222,12 @@ export const productMapper = {
 
         const mainImage = item.image ? getAssetUrl(item.image) : null
 
+        // 攤平商品標籤（junction → tag 物件），供詳情頁顯示多標籤。
+        // 卡片用的主標籤仍走 badge/badgeColor（見上方 firstTag）。
+        const tags = (item.tags || [])
+            .map(t => t.tags_id)
+            .filter(t => t !== null && t !== undefined)
+
         // 處理分類：優先使用主分類 (M2O)，如果沒有則使用多對多關聯的第一個分類
         const m2mCategories = (item.categories || [])
             .map(c => c.categories_id)
@@ -245,6 +251,7 @@ export const productMapper = {
             categories: m2mCategories,
             badge: firstTag ? firstTag.name : null,
             badgeColor: firstTag ? firstTag.color : null,
+            tags: tags,
             variants: variants
         }
     },
