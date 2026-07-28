@@ -13,6 +13,13 @@ RUN npm ci
 # 複製源代碼
 COPY . .
 
+# VITE 變數：CI 環境沒有 .env（未被 git 追蹤），改由 build args 注入，
+# Vite 於 build 時讀取 process env 的 VITE_* 並烘進 dist。
+ARG VITE_DIRECTUS_URL=/api
+ARG VITE_DIRECTUS_PUBLIC_URL
+ENV VITE_DIRECTUS_URL=$VITE_DIRECTUS_URL
+ENV VITE_DIRECTUS_PUBLIC_URL=$VITE_DIRECTUS_PUBLIC_URL
+
 # 構建應用 (Vue.js 項目通常使用 npm run build)
 RUN npm run build
 

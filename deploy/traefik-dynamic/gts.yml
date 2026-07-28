@@ -1,0 +1,11 @@
+# 複製到 VM 的 /opt/traefik/dynamic/gts.yml
+# deploy.sh / rollback.sh 只會改 service 那行的 blue<->green，Traefik 自動 reload。
+http:
+  routers:
+    gts:
+      rule: "Host(`gts.jaao.tw`)"
+      entryPoints:
+        - websecure
+      service: gts-frontend-blue@docker   # ← deploy.sh 會切這行 blue/green
+      tls:
+        certResolver: cf
