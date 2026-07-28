@@ -1,24 +1,26 @@
 import { defineStore } from 'pinia'
 import directus from '../utils/directus'
-import { readMe, readItems, logout } from '@directus/sdk'
-import axios from "axios";
+import { readMe, readItems } from '@directus/sdk'
 import { customerService } from '../services/customerService'
 
 /**
  * 認證狀態管理
- * 使用 Directus SSO (Google OAuth) 進行認證
+ * 使用 Directus SSO (Google OAuth) + session 模式：
+ * credential 為 Directus 設定的 httpOnly session cookie，前端不持有 access token，
+ * 登入狀態以「是否取得到 user」為準（token 不在 JS/localStorage）。
  */
 export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null,
         customer: null,
-        accessToken: localStorage.getItem('auth_access_token') || null,
+        initialized: false, // init() 是否已跑過（冪等，避免各元件重複觸發）
         loading: false,
         error: null,
     }),
 
     getters: {
-        isAuthenticated: (state) => !!state.accessToken,
+        // session 模式：以是否取得到 user 判斷登入態
+        isAuthenticated: (state) => !!state.user,
         isAdmin: (state) => state.user?.role?.admin_access === true,
         /** 根據角色回傳登入後應導向的路由 */
         accountRoute: (state) =>
@@ -44,23 +46,16 @@ export const useAuthStore = defineStore('auth', {
             return `${publicUrl}/auth/login/google?redirect=${encodeURIComponent(callbackUrl)}`
         },
 
+        /**
+         * SSO 導回：Directus 已在 redirect 時設好 session cookie，
+         * 這裡直接抓 user；抓得到即代表 session 有效。
+         */
         async handleCallback() {
             this.loading = true
             this.error = null
-
             try {
-                const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
-                const response = await axios.post(`${publicUrl}/auth/refresh`, {}, {
-                    withCredentials: true,
-                })
-
-                const accessToken = response.data.data.access_token
-
-                await directus.setToken(accessToken)
-
-                this._saveTokens(accessToken)
-
-                await this.fetchCurrentUser()
+                await this.fetchCurrentUser({ force: true })
+                if (!this.user) throw new Error('no active session after callback')
                 return true
             } catch (err) {
                 console.error('SSO callback error:', err)
@@ -72,24 +67,25 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
-        async fetchCurrentUser() {
-            if (this.user && this.customer) return this.user;
+        async fetchCurrentUser({ force = false } = {}) {
+            if (!force && this.user && this.customer) return this.user
 
-            this.loading = true;
+            this.loading = true
             try {
                 const userData = await directus.request(readMe({
                     fields: ['*', 'role.*']
-                }));
+                }))
 
-                this.user = userData;
-                await this.fetchCustomerProfile(this.user.id);
-                return this.user;
+                this.user = userData
+                await this.fetchCustomerProfile(this.user.id)
+                return this.user
             } catch (err) {
-                console.error('Fetch user error:', err);
-                this.clearAuth();
-                return null;
+                // 未登入 / session 失效 → 視為登出狀態（正常情況，不需噴錯）
+                this.user = null
+                this.customer = null
+                return null
             } finally {
-                this.loading = false;
+                this.loading = false
             }
         },
 
@@ -98,18 +94,18 @@ export const useAuthStore = defineStore('auth', {
                 const customers = await directus.request(readItems('customers', {
                     filter: { user_id: { _eq: userId } },
                     limit: 1
-                }));
+                }))
 
-                this.customer = customers.length > 0 ? customers[0] : null;
-                return this.customer;
+                this.customer = customers.length > 0 ? customers[0] : null
+                return this.customer
             } catch (err) {
-                this.customer = null;
-                return null;
+                this.customer = null
+                return null
             }
         },
 
         /**
-         * 更新會員資料（Token 過期時會自動刷新並重試一次）
+         * 更新會員資料（session cookie 由瀏覽器自動夾帶；SDK autoRefresh 會先嘗試刷新 session）
          * @param {object} data - 要更新的欄位
          * @returns {Promise<{success: boolean, error?: string, needLogin?: boolean}>}
          */
@@ -121,26 +117,13 @@ export const useAuthStore = defineStore('auth', {
                 this.customer = { ...this.customer, ...updated }
                 return { success: true }
             } catch (err) {
-                // Token 過期 → 嘗試靜默刷新並重試
-                if (err?.response?.status === 401 || err?.response?.status === 403) {
-                    try {
-                        const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
-                        const res = await axios.post(`${publicUrl}/auth/refresh`, {}, { withCredentials: true })
-                        const newToken = res.data.data.access_token
-                        await directus.setToken(newToken)
-                        this._saveTokens(newToken)
-
-                        // 用新 token 重試儲存
-                        const updated = await customerService.updateProfile(this.customer.id, data)
-                        this.customer = { ...this.customer, ...updated }
-                        return { success: true }
-                    } catch (refreshErr) {
-                        console.warn('Token refresh failed during save:', refreshErr.message)
-                        this.clearAuth()
-                        return { success: false, error: '登入已過期，請重新登入', needLogin: true }
-                    }
+                const code = err?.errors?.[0]?.extensions?.code
+                const authError = code === 'INVALID_CREDENTIALS' || code === 'TOKEN_EXPIRED' || code === 'FORBIDDEN'
+                if (authError) {
+                    // session 失效（autoRefresh 也救不回）→ 導去重新登入
+                    this.clearAuth()
+                    return { success: false, error: '登入已過期，請重新登入', needLogin: true }
                 }
-
                 console.error('Update customer error:', err)
                 return { success: false, error: '儲存失敗，請稍後再試' }
             }
@@ -148,8 +131,8 @@ export const useAuthStore = defineStore('auth', {
 
         async logout() {
             try {
-                // 使用 SDK 原生的登出
-                await directus.request(logout());
+                // session 模式：logout 讓 Directus 清除 server 端 session 並過期 cookie
+                await directus.logout()
             } catch (err) {
                 console.error('Logout error:', err)
             } finally {
@@ -157,43 +140,21 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
-        _saveTokens(accessToken) {
-            this.accessToken = accessToken
-            localStorage.setItem('auth_access_token', accessToken)
-        },
-
         clearAuth() {
-            this.accessToken = null
             this.user = null
             this.customer = null
-            localStorage.removeItem('auth_access_token')
-            directus.setToken(null)
         },
+
         async init() {
-            if (!this.accessToken) return
+            // 冪等：只在首次進入點跑一次；各元件 onMounted 再呼叫也不會重打
+            if (this.initialized) return
 
             this.loading = true
             try {
-                // 1. 先嘗試用 localStorage 的現有 token
-                await directus.setToken(this.accessToken)
-                await this.fetchCurrentUser()
-            } catch (firstErr) {
-                // 2. Token 過期，嘗試用 cookie 刷新
-                try {
-                    const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
-                    const response = await axios.post(`${publicUrl}/auth/refresh`, {}, {
-                        withCredentials: true,
-                    })
-                    const newToken = response.data.data.access_token
-                    await directus.setToken(newToken)
-                    this._saveTokens(newToken)
-                    await this.fetchCurrentUser()
-                } catch (refreshErr) {
-                    // 3. 兩種方式都失敗，才清除登入狀態
-                    console.warn('Auth init failed:', refreshErr.message)
-                    this.clearAuth()
-                }
+                // session cookie 由瀏覽器夾帶；抓得到 user 即已登入，抓不到即匿名
+                await this.fetchCurrentUser({ force: true })
             } finally {
+                this.initialized = true
                 this.loading = false
             }
         },
