@@ -169,7 +169,7 @@ const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
 const activeImage = ref('')
-const heroPlaceholder = 'https://picsum.photos/seed/gts-product/900/900'
+import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const galleryImages = computed(() => {
   if (!product.value) return []

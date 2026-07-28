@@ -33,10 +33,9 @@
 
 <script setup>
 import { PhArrowUpRight } from '@phosphor-icons/vue'
+import placeholder from '@/assets/product-placeholder.svg'
 
 defineProps({
   product: { type: Object, required: true },
 })
-
-const placeholder = 'https://picsum.photos/seed/gts-tool/800/1000'
 </script>

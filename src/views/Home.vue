@@ -146,7 +146,7 @@
 
           <template v-if="!authStore.isAuthenticated">
             <h2 class="relative mx-auto max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              加入會員，解鎖專屬優惠優惠
+              加入會員，解鎖專屬優惠
             </h2>
             <p class="relative mx-auto mt-4 max-w-md text-steel-300">
               Google 帳號一鍵登入，掌握到貨通知與會員專屬優惠。
@@ -185,7 +185,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useProductStore } from '../stores/product'
 import { useCategoryStore } from '../stores/category'
 import { useAuthStore } from '../stores/auth'
@@ -204,6 +204,7 @@ const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
 
 const heroRef = ref(null)
+let heroCtx // gsap.context，於 onUnmounted 還原
 
 const ringProducts = computed(() => productStore.products.slice(0, 4))
 const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
@@ -221,7 +222,7 @@ onMounted(() => {
   authStore.init()
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  const ctx = gsap.context(() => {
+  heroCtx = gsap.context(() => {
     gsap.from('.hero-el', {
       opacity: 0,
       y: 28,
@@ -231,7 +232,7 @@ onMounted(() => {
       stagger: 0.09,
     })
   }, heroRef.value)
-  // cleanup on unmount
-  heroRef.value?.addEventListener?.('destroy', () => ctx.revert())
 })
+
+onUnmounted(() => heroCtx?.revert())
 </script>
