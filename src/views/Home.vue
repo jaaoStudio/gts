@@ -6,7 +6,7 @@
       <!-- ===================== HERO ===================== -->
       <section ref="heroRef" class="relative">
         <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-60" />
-        <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[36rem] w-[36rem] rounded-full bg-brand-500/10 blur-[120px]" />
+        <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[22rem] w-[22rem] rounded-full bg-brand-500/10 blur-[80px] sm:h-[36rem] sm:w-[36rem] sm:blur-[120px]" />
 
         <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-20 sm:px-8 lg:grid-cols-12 lg:pb-24 lg:pt-24">
           <!-- Copy -->
@@ -165,7 +165,7 @@
             <h2 class="relative mx-auto max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
               歡迎回來，{{ authStore.userName }}
             </h2>
-            <p class="relative mx-auto mt-4 max-w-md text-steel-300">感謝支持，探索更多好料吧。</p>
+            <p class="relative mx-auto mt-4 max-w-md text-steel-300">今天想買點什麼呢？</p>
             <router-link
               to="/products"
               class="relative mt-9 inline-flex items-center gap-3 rounded-full bg-brand-500 py-2.5 pl-6 pr-2.5 font-display text-base font-semibold text-white transition-all duration-300 hover:bg-brand-600 active:scale-[0.98]"
