@@ -7,6 +7,12 @@
     <title>金同心實業｜專業五金工具供應</title>
     <meta name="description" content="金同心實業（GTS）— 專業五金工具與耗材供應。原廠正品、現貨快速出貨，歡迎電話或 LINE 詢價。" />
 
+    <!-- 提前對後端做 DNS/TCP/TLS 握手。實測冷連線 TTFB 1160ms、暖連線 390ms，
+         握手本身就吃掉約 780ms，比整趟跨洲往返還貴。SSO 導向前先暖好，
+         Google 回跳時就少付這筆。crossorigin 是必要的：auth 一律帶 credentials，
+         沒有它會另開一條 anonymous 連線，等於白暖。 -->
+    <link rel="preconnect" href="https://gts-core.jaao.tw" crossorigin />
+
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="金同心實業" />
