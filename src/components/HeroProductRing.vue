@@ -83,12 +83,16 @@ let rotation = 0               // current ring rotation, degrees
 let proxy                      // detached element Draggable drives via type:"x"
 let autoCall                   // gsap.delayedCall handle for autoplay
 let hovering = false
+let visible = true             // ring inside the viewport (IntersectionObserver)
 const AUTO_INTERVAL = 3.4      // seconds each card is shown
 const AUTO_RESUME = 5          // idle before autoplay resumes after interaction
 
 function layout() {
   const n = cards.length
-  if (!n) return
+  // Never let a non-finite rotation reach gsap.set: it renders "translate(NaNpx…)",
+  // the browser rejects the whole transform, and GSAP's cached matrix stays poisoned
+  // so every later (valid) write is dropped too — the ring freezes for good.
+  if (!n || !Number.isFinite(rotation)) return
   for (let i = 0; i < n; i++) {
     const a = (i * STEP + rotation) * DEG2RAD
     const sin = Math.sin(a)
@@ -113,9 +117,26 @@ function syncActive() {
 }
 
 function fromProxy() {
-  rotation = gsap.getProperty(proxy, 'x') * DEG_PER_PX
+  const px = proxy ? gsap.getProperty(proxy, 'x') : NaN
+  // A rapid press during an in-flight throw can leave Draggable's x as NaN.
+  // Re-seat the proxy on the last good rotation instead of propagating it.
+  if (!Number.isFinite(px)) { recover(); return }
+  rotation = px * DEG_PER_PX
   layout()
   syncActive()
+}
+
+// Re-seats proxy/Draggable after a NaN and wipes any transform GSAP may already
+// have cached, so a poisoned card can always come back.
+function recover() {
+  if (!Number.isFinite(rotation)) rotation = 0
+  if (proxy) gsap.set(proxy, { x: rotation / DEG_PER_PX })
+  draggable?.update()
+  if (cards.length) {
+    gsap.set(cards, { clearProps: 'all' })
+    gsap.set(cards, { xPercent: -50, yPercent: -50 })
+  }
+  layout()
 }
 
 // Autoplay: slowly advance one card at a time; pauses on hover / drag
@@ -129,7 +150,10 @@ function stopAuto() {
 }
 function autoAdvance() {
   if (!proxy) return
-  const targetX = (Math.round(gsap.getProperty(proxy, 'x') / SNAP_PX) - 1) * SNAP_PX
+  const px = gsap.getProperty(proxy, 'x')
+  // Tweening to a NaN target would write NaN straight back into the proxy.
+  if (!Number.isFinite(px)) { recover(); scheduleAuto(); return }
+  const targetX = (Math.round(px / SNAP_PX) - 1) * SNAP_PX
   gsap.to(proxy, {
     x: targetX,
     duration: 1.0,
@@ -138,15 +162,21 @@ function autoAdvance() {
     onComplete: () => { draggable && draggable.update(); scheduleAuto() },
   })
 }
-// Only the front card reacts: it stops floating while hovered (others keep floating)
+// Only the front card reacts: it stops floating while hovered (others keep floating).
+// Touch devices synthesise mouseenter but often never send the matching mouseleave,
+// which would strand `hovering` at true and kill autoplay for good — so only honour
+// hover on devices that actually have a hovering pointer.
+const canHover = typeof window !== 'undefined' &&
+  window.matchMedia('(hover: hover)').matches
+
 function onCardEnter(i) {
-  if (i !== activeIndex.value) return
+  if (!canHover || i !== activeIndex.value) return
   hovering = true
   stopAuto()
   bobTweens[i]?.pause()
 }
 function onCardLeave(i) {
-  if (i !== activeIndex.value) return
+  if (!canHover || i !== activeIndex.value) return
   hovering = false
   bobTweens[i]?.resume()
   scheduleAuto()
@@ -193,7 +223,16 @@ function init() {
       minimumMovement: 6,
       cursor: 'grab',
       activeCursor: 'grabbing',
-      onPress() { stopAuto(); gsap.killTweensOf(proxy) },
+      // killTweensOf drops autoAdvance's onComplete, so its draggable.update()
+      // never runs and Draggable keeps a stale start position. Re-sync here.
+      onPress() {
+        stopAuto()
+        gsap.killTweensOf(proxy)
+        // killTweensOf drops autoAdvance's onComplete (and its update()), so
+        // re-sync here — but only from a sane position.
+        if (Number.isFinite(gsap.getProperty(proxy, 'x'))) this.update()
+        else recover()
+      },
       onDrag: fromProxy,
       onThrowUpdate: fromProxy,
       onThrowComplete() { syncActive(); scheduleAuto(AUTO_RESUME) },
@@ -203,14 +242,27 @@ function init() {
     scheduleAuto()
   }, scene.value)
 
-  ro = new ResizeObserver(() => { computeRadius(); layout() })
+  ro = new ResizeObserver(() => { computeRadius(); layout(); draggable?.update() })
   ro.observe(scene.value)
 
   // Pause the endless float + autoplay while the hero is scrolled out of view,
   // so mobile GPUs aren't burning frames on an invisible ring.
   io = new IntersectionObserver(
-    ([entry]) => {
+    (entries) => {
+      // A fast flick delivers several entries in one batch; only the last one
+      // reflects the current state. Reading entries[0] leaves the ring stuck in
+      // the stale "off-screen" branch — paused and never re-synced.
+      const entry = entries[entries.length - 1]
+      visible = entry.isIntersecting
       if (entry.isIntersecting) {
+        // Re-entry self-heal: while the ring was off-screen the mobile URL bar may
+        // have resized the viewport and Draggable's cached hit area / start position
+        // can be stale, which left the ring unable to track the finger. Recompute the
+        // layout and re-sync Draggable so a scroll-away never strands the carousel.
+        hovering = false
+        computeRadius()
+        layout()
+        draggable?.update()
         bobTweens.forEach((t) => t.resume())
         scheduleAuto(AUTO_RESUME)
       } else {
