@@ -53,9 +53,13 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
 
       - name: Deploy (blue-green switch)
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: ~/gts-web/deploy.sh ${{ github.sha }}
+        # 自己 ssh，不依賴第三方 action（私鑰只在本步驟指令內使用）
+        env:
+          SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "$VM_USER@$VM_HOST" "~/gts-web/deploy.sh $GIT_SHA"
