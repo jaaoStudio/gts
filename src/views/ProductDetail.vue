@@ -159,6 +159,7 @@ import { useSettingsStore } from '../stores/settings'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes } from '@phosphor-icons/vue'
+import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
 const categoryStore = useCategoryStore()
@@ -169,7 +170,6 @@ const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
 const activeImage = ref('')
-import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const galleryImages = computed(() => {
   if (!product.value) return []

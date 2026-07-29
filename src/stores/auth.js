@@ -118,11 +118,14 @@ export const useAuthStore = defineStore('auth', {
                 return { success: true }
             } catch (err) {
                 const code = err?.errors?.[0]?.extensions?.code
-                const authError = code === 'INVALID_CREDENTIALS' || code === 'TOKEN_EXPIRED' || code === 'FORBIDDEN'
-                if (authError) {
-                    // session 失效（autoRefresh 也救不回）→ 導去重新登入
+                // session 失效（autoRefresh 也救不回）→ 導去重新登入
+                if (code === 'INVALID_CREDENTIALS' || code === 'TOKEN_EXPIRED') {
                     this.clearAuth()
                     return { success: false, error: '登入已過期，請重新登入', needLogin: true }
+                }
+                // FORBIDDEN = session 有效但無權限修改此資料,重登也沒用,不清登入狀態
+                if (code === 'FORBIDDEN') {
+                    return { success: false, error: '沒有權限修改此資料' }
                 }
                 console.error('Update customer error:', err)
                 return { success: false, error: '儲存失敗，請稍後再試' }

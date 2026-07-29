@@ -219,7 +219,7 @@ const values = [
 onMounted(() => {
   productStore.fetchFeaturedProducts()
   categoryStore.fetchCategories()
-  authStore.init()
+  // auth 初始化已由 main.js 於 mount 前完成,此處不需再呼叫
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   heroCtx = gsap.context(() => {
