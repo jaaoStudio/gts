@@ -12,7 +12,7 @@
     <div v-else>
       <div
         ref="scene"
-        class="relative mx-auto h-[400px] w-full max-w-md touch-pan-y select-none sm:h-[440px]"
+        class="relative mx-auto h-[400px] w-full max-w-md touch-none select-none sm:h-[440px]"
         role="group"
         aria-roledescription="carousel"
         aria-label="精選商品，可拖曳旋轉"
@@ -249,6 +249,15 @@ onUnmounted(destroy)
 </script>
 
 <style scoped>
+/* iOS WebKit holds touch events during pan-y direction disambiguation, so a
+   slow horizontal drag doesn't reach GSAP until the finger lifts. Handing the
+   whole gesture to JS (touch-action: none) makes the ring track the finger from
+   the first pixel — including the front card, which is a clickable link. */
+.ring-card,
+.ring-card :deep(a) {
+  touch-action: none;
+}
+
 /* Hover zoom lives on an element without will-change, so it re-rasterizes
    sharp at rest (no GPU upscale blur). */
 .card-zoom {
