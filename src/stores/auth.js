@@ -1,23 +1,26 @@
 import { defineStore } from 'pinia'
 import directus from '../utils/directus'
-import { readMe, readItems, logout } from '@directus/sdk'
-import axios from "axios";
+import { readMe, readItems } from '@directus/sdk'
+import { customerService } from '../services/customerService'
 
 /**
  * 認證狀態管理
- * 使用 Directus SSO (Google OAuth) 進行認證
+ * 使用 Directus SSO (Google OAuth) + session 模式：
+ * credential 為 Directus 設定的 httpOnly session cookie，前端不持有 access token，
+ * 登入狀態以「是否取得到 user」為準（token 不在 JS/localStorage）。
  */
 export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null,
         customer: null,
-        accessToken: localStorage.getItem('auth_access_token') || null,
+        initialized: false, // init() 是否已跑過（冪等，避免各元件重複觸發）
         loading: false,
         error: null,
     }),
 
     getters: {
-        isAuthenticated: (state) => !!state.accessToken,
+        // session 模式：以是否取得到 user 判斷登入態
+        isAuthenticated: (state) => !!state.user,
         isAdmin: (state) => state.user?.role?.admin_access === true,
         /** 根據角色回傳登入後應導向的路由 */
         accountRoute: (state) =>
@@ -38,32 +41,21 @@ export const useAuthStore = defineStore('auth', {
 
     actions: {
         getGoogleLoginUrl() {
-            const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL || 'https://gts-core.jaao.tw'
+            const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL
             const callbackUrl = `${window.location.origin}/admin/callback`
             return `${publicUrl}/auth/login/google?redirect=${encodeURIComponent(callbackUrl)}`
         },
 
+        /**
+         * SSO 導回：Directus 已在 redirect 時設好 session cookie，
+         * 這裡直接抓 user；抓得到即代表 session 有效。
+         */
         async handleCallback() {
             this.loading = true
             this.error = null
-
             try {
-                // 1. 保留你原本的邏輯：去 Public URL 拿 Cookie 換 Token
-                const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL || 'https://gts-core.jaao.tw'
-                const response = await axios.post(`${publicUrl}/auth/refresh`, {}, {
-                    withCredentials: true,
-                })
-
-                const accessToken = response.data.data.access_token
-
-                // 2. 將拿到的 Token 餵給 SDK 接管！
-                await directus.setToken(accessToken)
-
-                // 3. 備份到 localStorage (維持你原本的習慣)
-                this._saveTokens(accessToken)
-
-                // 4. 去抓使用者資料
-                await this.fetchCurrentUser()
+                await this.fetchCurrentUser({ force: true })
+                if (!this.user) throw new Error('no active session after callback')
                 return true
             } catch (err) {
                 console.error('SSO callback error:', err)
@@ -75,24 +67,25 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
-        async fetchCurrentUser() {
-            if (this.user && this.customer) return this.user;
+        async fetchCurrentUser({ force = false } = {}) {
+            if (!force && this.user && this.customer) return this.user
 
-            this.loading = true;
+            this.loading = true
             try {
                 const userData = await directus.request(readMe({
                     fields: ['*', 'role.*']
-                }));
+                }))
 
-                this.user = userData;
-                await this.fetchCustomerProfile(this.user.id);
-                return this.user;
+                this.user = userData
+                await this.fetchCustomerProfile(this.user.id)
+                return this.user
             } catch (err) {
-                console.error('Fetch user error:', err);
-                this.clearAuth();
-                return null;
+                // 未登入 / session 失效 → 視為登出狀態（正常情況，不需噴錯）
+                this.user = null
+                this.customer = null
+                return null
             } finally {
-                this.loading = false;
+                this.loading = false
             }
         },
 
@@ -101,20 +94,48 @@ export const useAuthStore = defineStore('auth', {
                 const customers = await directus.request(readItems('customers', {
                     filter: { user_id: { _eq: userId } },
                     limit: 1
-                }));
+                }))
 
-                this.customer = customers.length > 0 ? customers[0] : null;
-                return this.customer;
+                this.customer = customers.length > 0 ? customers[0] : null
+                return this.customer
             } catch (err) {
-                this.customer = null;
-                return null;
+                this.customer = null
+                return null
+            }
+        },
+
+        /**
+         * 更新會員資料（session cookie 由瀏覽器自動夾帶；SDK autoRefresh 會先嘗試刷新 session）
+         * @param {object} data - 要更新的欄位
+         * @returns {Promise<{success: boolean, error?: string, needLogin?: boolean}>}
+         */
+        async updateCustomerProfile(data) {
+            if (!this.customer?.id) return { success: false, error: '找不到會員資料' }
+
+            try {
+                const updated = await customerService.updateProfile(this.customer.id, data)
+                this.customer = { ...this.customer, ...updated }
+                return { success: true }
+            } catch (err) {
+                const code = err?.errors?.[0]?.extensions?.code
+                // session 失效（autoRefresh 也救不回）→ 導去重新登入
+                if (code === 'INVALID_CREDENTIALS' || code === 'TOKEN_EXPIRED') {
+                    this.clearAuth()
+                    return { success: false, error: '登入已過期，請重新登入', needLogin: true }
+                }
+                // FORBIDDEN = session 有效但無權限修改此資料,重登也沒用,不清登入狀態
+                if (code === 'FORBIDDEN') {
+                    return { success: false, error: '沒有權限修改此資料' }
+                }
+                console.error('Update customer error:', err)
+                return { success: false, error: '儲存失敗，請稍後再試' }
             }
         },
 
         async logout() {
             try {
-                // 使用 SDK 原生的登出
-                await directus.request(logout());
+                // session 模式：logout 讓 Directus 清除 server 端 session 並過期 cookie
+                await directus.logout()
             } catch (err) {
                 console.error('Logout error:', err)
             } finally {
@@ -122,29 +143,22 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
-        _saveTokens(accessToken) {
-            this.accessToken = accessToken
-            localStorage.setItem('auth_access_token', accessToken)
-        },
-
         clearAuth() {
-            this.accessToken = null
             this.user = null
             this.customer = null
-            localStorage.removeItem('auth_access_token')
-            // 同步清除 SDK 內的 Token
-            directus.setToken(null)
         },
+
         async init() {
-            // 網頁重新整理時，把 localStorage 的 token 塞回 SDK
-            if (this.accessToken) {
-                await directus.setToken(this.accessToken)
-                this.loading = true
-                try {
-                    await this.fetchCurrentUser()
-                } finally {
-                    this.loading = false
-                }
+            // 冪等：只在首次進入點跑一次；各元件 onMounted 再呼叫也不會重打
+            if (this.initialized) return
+
+            this.loading = true
+            try {
+                // session cookie 由瀏覽器夾帶；抓得到 user 即已登入，抓不到即匿名
+                await this.fetchCurrentUser({ force: true })
+            } finally {
+                this.initialized = true
+                this.loading = false
             }
         },
     }

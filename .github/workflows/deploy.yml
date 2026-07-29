@@ -1,0 +1,65 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.agents/**'
+      - '.claude/**'
+      - 'docs/**'
+      - 'deploy/**'          # VM 端腳本改動不需要重 build（需手動同步到 VM）
+
+env:
+  # Harbor 沿用 boss-timing 那組（HARBOR_URL/USER/PASSWORD secrets）
+  IMAGE: ${{ secrets.HARBOR_URL }}/gts/gts_web_store
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Login to Harbor
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ secrets.HARBOR_URL }}
+          username: ${{ secrets.HARBOR_USER }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: Dockerfile
+          # ⚠️ 新 VM 若是 ARM 改成 linux/arm64（VM 上跑 `uname -m`：aarch64→arm64、x86_64→amd64）
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            VITE_DIRECTUS_URL=/api
+            VITE_DIRECTUS_PUBLIC_URL=${{ secrets.VITE_DIRECTUS_PUBLIC_URL }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
+
+      - name: Deploy (blue-green switch)
+        # 自己 ssh，不依賴第三方 action（私鑰只在本步驟指令內使用）
+        env:
+          SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "$VM_USER@$VM_HOST" "~/gts-web/deploy.sh $GIT_SHA"

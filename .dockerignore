@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.env
+.env.*
+*.local
+.claude
+.agents
+docs
+deploy
+npm-debug.log*
+.DS_Store

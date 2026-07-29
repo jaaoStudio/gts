@@ -1,0 +1,42 @@
+# gts 前端藍綠部署（放在 VM 的 ~/gts-web/）
+# 兩個 slot 同時常駐，Traefik 的 dynamic 檔決定流量指向哪個 @docker service。
+# blue/green 的 nginx 會把 /api 反代到 directus_app:8055，
+# 所以三者（traefik / blue / green / directus_app）都必須在同一個 traefik-net。
+services:
+  gts_web_store_blue:
+    image: ${REMOTE_REGISTRY_IP}/gts/gts_web_store:${BLUE_TAG}
+    container_name: gts_web_store_blue
+    restart: always
+    networks:
+      - traefik-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
+      - "traefik.http.services.gts-frontend-blue.loadbalancer.server.port=80"
+
+  gts_web_store_green:
+    image: ${REMOTE_REGISTRY_IP}/gts/gts_web_store:${GREEN_TAG}
+    container_name: gts_web_store_green
+    restart: always
+    networks:
+      - traefik-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
+      - "traefik.http.services.gts-frontend-green.loadbalancer.server.port=80"
+
+networks:
+  traefik-net:
+    external: true

@@ -1,75 +1,95 @@
 <template>
-  <footer class="bg-slate-900 text-white pt-16 pb-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-        <!-- Brand -->
+  <footer class="relative overflow-hidden bg-steel-950 text-steel-300">
+    <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-40" />
+    <div class="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-brand-500/10 blur-[100px]" />
+
+    <div class="relative mx-auto max-w-6xl px-5 pb-10 pt-20 sm:px-8">
+      <!-- Top: call line -->
+      <div class="flex flex-col gap-8 border-b border-white/10 pb-12 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 class="text-2xl font-bold mb-6 bg-gradient-to-r from-brand-primary to-brand-accent bg-clip-text text-transparent">GTS</h2>
-          <p class="text-slate-400 mb-6">
-            自 1995 年以來，為專業人士和 DIY 愛好者提供頂級工具和五金。
+          <img :src="horizontal" alt="GTS 金同心實業" class="h-24 w-auto" />
+                  <p class="mt-5 max-w-sm text-sm leading-relaxed text-steel-400">
+            在地深耕近三十年，為您提供專業、耐用的五金工具。品質嚴格把關，現貨穩定供應。
           </p>
-          <div class="flex space-x-4">
-            <a href="#" class="text-slate-400 hover:text-white transition-colors">
-              <span class="sr-only">Facebook</span>
-              <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clip-rule="evenodd" /></svg>
-            </a>
-            <a href="#" class="text-slate-400 hover:text-white transition-colors">
-              <span class="sr-only">Instagram</span>
-              <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772 4.902 4.902 0 011.772-1.153c.636-.247 1.363-.416 2.427-.465 1.067-.047 1.408-.06 3.808-.06h.63zm2.595 14.595a2.595 2.595 0 100-5.19 2.595 2.595 0 000 5.19zm-1.25-5.19a1.25 1.25 0 112.5 0 1.25 1.25 0 01-2.5 0zm-3.94-3.115a4.905 4.905 0 01-4.905 4.905 4.905 4.905 0 01-4.905-4.905 4.905 4.905 0 014.905-4.905 4.905 4.905 0 014.905 4.905zm-1.25 0a3.655 3.655 0 10-7.31 0 3.655 3.655 0 007.31 0z" clip-rule="evenodd" /></svg>
-            </a>
-            <a href="#" class="text-slate-400 hover:text-white transition-colors">
-              <span class="sr-only">Twitter</span>
-              <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" /></svg>
-            </a>
-          </div>
         </div>
 
-        <!-- Links -->
-        <div>
-          <h3 class="text-lg font-bold mb-6 text-white">商品分類</h3>
-          <ul class="space-y-4">
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">電動工具</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">手動工具</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">水電材料</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">電氣設備</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">園藝用品</a></li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 class="text-lg font-bold mb-6 text-white">客戶服務</h3>
-          <ul class="space-y-4">
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">聯絡我們</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">常見問題</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">運送與退貨</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">保固資訊</a></li>
-            <li><a href="#" class="text-slate-400 hover:text-brand-primary transition-colors">訂單查詢</a></li>
-          </ul>
-        </div>
-
-        <!-- Newsletter -->
-        <div>
-          <h3 class="text-lg font-bold mb-6 text-white">訂閱電子報</h3>
-          <p class="text-slate-400 mb-4">訂閱我們的電子報，獲取最新優惠和新品資訊。</p>
-          <form class="space-y-4" @submit.prevent>
-            <input type="email" placeholder="輸入您的電子郵件" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-brand-primary text-white placeholder-slate-500" />
-            <button class="w-full px-4 py-3 bg-brand-primary hover:bg-orange-600 text-white font-bold rounded-lg transition-colors">
-              訂閱
-            </button>
-          </form>
+        <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+          <a
+            href="tel:0426580936"
+            class="group inline-flex w-max items-center gap-3 rounded-full bg-white py-2 pl-6 pr-2 font-display text-base font-semibold text-steel-950 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 hover:text-white active:scale-[0.98]"
+          >
+            撥打 04-26580936
+            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-steel-100 text-steel-900 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-steel-950 group-hover:text-white">
+              <PhPhoneCall :size="18" weight="bold" />
+            </span>
+          </a>
+          <LineButton :floating="false" />
         </div>
       </div>
-      
-      <div class="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-        <p class="text-slate-500 text-sm">
-          &copy; {{ new Date().getFullYear() }} GTS. All rights reserved.
-        </p>
-        <div class="flex space-x-6 mt-4 md:mt-0">
-          <a href="#" class="text-slate-500 hover:text-white text-sm">隱私權政策</a>
-          <a href="#" class="text-slate-500 hover:text-white text-sm">服務條款</a>
-          <a href="#" class="text-slate-500 hover:text-white text-sm">網站地圖</a>
+
+      <!-- Middle -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-10 py-12 md:grid-cols-3">
+        <div>
+          <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">商品分類</h3>
+          <ul class="mt-5 space-y-3">
+            <li v-for="cat in topCategories" :key="cat.id">
+              <router-link :to="{ path: '/products', query: { category: cat.slug } }" class="text-sm text-steel-400 transition-colors hover:text-white">
+                {{ cat.name }}
+              </router-link>
+            </li>
+            <li>
+              <router-link to="/products" class="text-sm text-brand-400 transition-colors hover:text-brand-300">查看全部 →</router-link>
+            </li>
+          </ul>
         </div>
+
+        <div>
+          <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">客戶服務</h3>
+          <ul class="mt-5 space-y-3">
+            <li v-for="item in service" :key="item.to">
+              <router-link :to="item.to" class="text-sm text-steel-400 transition-colors hover:text-white">{{ item.label }}</router-link>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">資訊</h3>
+          <ul class="mt-5 space-y-3">
+            <li v-for="item in legal" :key="item.to">
+              <router-link :to="item.to" class="text-sm text-steel-400 transition-colors hover:text-white">{{ item.label }}</router-link>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Bottom -->
+      <div class="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 md:flex-row">
+        <p class="font-mono text-xs text-steel-500">© {{ year }} GTS Hardware. All rights reserved.</p>
+        <p class="font-mono text-xs text-steel-500">金同心實業有限公司</p>
       </div>
     </div>
   </footer>
 </template>
+
+<script setup>
+import { computed } from 'vue'
+import { useCategoryStore } from '../stores/category'
+import { PhPhoneCall } from '@phosphor-icons/vue'
+import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
+import LineButton from './LineButton.vue'
+
+const categoryStore = useCategoryStore()
+const topCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
+
+const service = [
+  { label: '聯絡我們', to: '/contact' },
+  { label: '常見問題', to: '/faq' },
+  { label: '運送與退貨', to: '/shipping' },
+  { label: '保固資訊', to: '/warranty' },
+]
+const legal = [
+  { label: '隱私權政策', to: '/privacy' },
+  { label: '服務條款', to: '/terms' },
+]
+const year = new Date().getFullYear()
+</script>

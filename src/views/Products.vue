@@ -1,191 +1,174 @@
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-900">
+  <div class="min-h-[100dvh] bg-steel-50">
     <Navbar />
-    
-    <main class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      <div class="flex flex-col lg:flex-row gap-8">
-        <!-- Sidebar (Desktop) -->
-        <aside class="w-full lg:w-64 flex-shrink-0 hidden lg:block">
-          <div class="sticky top-24 space-y-8">
-            <!-- Categories -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-              <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4">商品分類</h3>
-              <ul class="space-y-3">
-                <li>
-                  <router-link 
-                    to="/products" 
-                    class="block text-sm font-medium transition-colors"
-                    :class="!categorySlug ? 'text-brand-primary' : 'text-slate-600 dark:text-slate-400 hover:text-brand-primary'"
-                  >
-                    所有商品
-                  </router-link>
-                </li>
-                
-                <li v-for="cat in categoryTree" :key="cat.id">
-                  <!-- Parent -->
-                  <router-link 
-                    :to="{ path: '/products', query: { category: cat.slug } }"
-                    class="block text-sm font-medium transition-colors"
-                    :class="categorySlug === cat.slug ? 'text-brand-primary' : 'text-slate-600 dark:text-slate-400 hover:text-brand-primary'"
-                  >
-                    {{ cat.name }}
-                  </router-link>
 
-                  <!-- Children -->
-                  <ul v-if="cat.children && cat.children.length > 0" class="mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-700 pl-3">
-                    <li v-for="child in cat.children" :key="child.id">
-                      <router-link 
-                        :to="{ path: '/products', query: { category: child.slug } }"
-                        class="block text-sm transition-colors"
-                        :class="categorySlug === child.slug ? 'text-brand-primary font-medium' : 'text-slate-500 dark:text-slate-500 hover:text-brand-primary'"
-                      >
-                        {{ child.name }}
-                      </router-link>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-            </div>
+    <main class="mx-auto max-w-6xl px-5 pb-24 pt-24 sm:px-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <nav class="flex flex-wrap items-center gap-1.5 font-mono text-xs text-steel-400">
+          <router-link to="/" class="transition-colors hover:text-brand-600">首頁</router-link>
+          <PhCaretRight :size="12" weight="bold" />
+          <router-link to="/products" class="transition-colors hover:text-brand-600" :class="{ 'text-steel-900': !categorySlug && !searchKeyword }">所有商品</router-link>
+          <template v-if="categorySlug">
+            <template v-for="(crumb, index) in breadcrumbs" :key="crumb.id">
+              <PhCaretRight :size="12" weight="bold" />
+              <router-link :to="{ path: '/products', query: { category: crumb.slug } }" class="transition-colors hover:text-brand-600" :class="{ 'text-steel-900': index === breadcrumbs.length - 1 }">
+                {{ crumb.name }}
+              </router-link>
+            </template>
+          </template>
+          <template v-else-if="searchKeyword">
+            <PhCaretRight :size="12" weight="bold" />
+            <span class="text-steel-900">搜尋結果</span>
+          </template>
+        </nav>
+
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-4">
+          <h1 class="font-display text-3xl font-bold tracking-tight text-steel-900 sm:text-4xl">
+            <span v-if="categorySlug">{{ currentCategory }}</span>
+            <span v-else-if="searchKeyword">搜尋：<span class="text-brand-500">{{ searchKeyword }}</span></span>
+            <span v-else>所有商品</span>
+          </h1>
+          <button
+            v-if="categorySlug || searchKeyword"
+            @click="clearFilters"
+            class="inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm text-steel-600 transition-colors hover:border-steel-900 hover:text-steel-900"
+          >
+            <PhX :size="14" weight="bold" /> 清除篩選
+          </button>
+        </div>
+        <p v-if="productStore.totalItems > 0" class="mt-2 font-mono text-sm text-steel-500">共 {{ productStore.totalItems }} 件商品</p>
+      </div>
+
+      <!-- Mobile category pills -->
+      <div class="mb-6 -mx-5 flex gap-2 overflow-x-auto px-5 scrollbar-hide lg:hidden">
+        <router-link
+          to="/products"
+          class="flex-shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors"
+          :class="!categorySlug ? 'border-steel-900 bg-steel-900 text-white' : 'border-steel-200 bg-white text-steel-600'"
+        >
+          全部
+        </router-link>
+        <router-link
+          v-for="cat in categoryTree"
+          :key="cat.id"
+          :to="{ path: '/products', query: { category: cat.slug } }"
+          class="flex-shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors"
+          :class="categorySlug === cat.slug ? 'border-steel-900 bg-steel-900 text-white' : 'border-steel-200 bg-white text-steel-600'"
+        >
+          {{ cat.name }}
+        </router-link>
+      </div>
+
+      <div class="flex flex-col gap-10 lg:flex-row">
+        <!-- Sidebar -->
+        <aside class="hidden w-60 flex-shrink-0 lg:block">
+          <div class="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto scrollbar-hide rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6">
+            <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-400">商品分類</h3>
+            <ul class="mt-5 space-y-1">
+              <li>
+                <router-link
+                  to="/products"
+                  class="block rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                  :class="!categorySlug ? 'bg-brand-50 text-brand-700' : 'text-steel-600 hover:bg-steel-50 hover:text-steel-900'"
+                >
+                  所有商品
+                </router-link>
+              </li>
+              <li v-for="cat in categoryTree" :key="cat.id">
+                <router-link
+                  :to="{ path: '/products', query: { category: cat.slug } }"
+                  class="block rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                  :class="categorySlug === cat.slug ? 'bg-brand-50 text-brand-700' : 'text-steel-700 hover:bg-steel-50 hover:text-steel-900'"
+                >
+                  {{ cat.name }}
+                </router-link>
+                <ul v-if="cat.children?.length" class="ml-3 mt-1 space-y-0.5 border-l border-steel-200 pl-3">
+                  <li v-for="child in cat.children" :key="child.id">
+                    <router-link
+                      :to="{ path: '/products', query: { category: child.slug } }"
+                      class="block rounded-lg px-3 py-1.5 text-[13px] transition-colors"
+                      :class="categorySlug === child.slug ? 'text-brand-600 font-medium' : 'text-steel-500 hover:text-brand-600'"
+                    >
+                      {{ child.name }}
+                    </router-link>
+                  </li>
+                </ul>
+              </li>
+            </ul>
           </div>
         </aside>
 
-        <!-- Main Content -->
-        <div class="flex-1">
-          <!-- Breadcrumb / Filter Info -->
-          <div class="mb-8">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-4 flex-wrap">
-              <router-link to="/" class="hover:text-brand-primary transition-colors">首頁</router-link>
-              <span>›</span>
-              <router-link 
-                to="/products" 
-                class="hover:text-brand-primary transition-colors"
-                :class="{ 'text-slate-900 dark:text-white font-medium': !categorySlug && !searchKeyword }"
-              >
-                所有商品
-              </router-link>
-              
-              <template v-if="categorySlug">
-                <template v-for="(crumb, index) in breadcrumbs" :key="crumb.id">
-                  <span>›</span>
-                  <router-link 
-                    :to="{ path: '/products', query: { category: crumb.slug } }"
-                    class="hover:text-brand-primary transition-colors"
-                    :class="{ 'text-slate-900 dark:text-white font-medium': index === breadcrumbs.length - 1 }"
-                  >
-                    {{ crumb.name }}
-                  </router-link>
-                </template>
-              </template>
-              
-              <template v-else-if="searchKeyword">
-                <span>›</span>
-                <span class="text-slate-900 dark:text-white font-medium">搜尋與「{{ searchKeyword }}」相關的結果</span>
-              </template>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                <span v-if="categorySlug">{{ currentCategory }}</span>
-                <span v-else-if="searchKeyword">搜尋：{{ searchKeyword }}</span>
-                <span v-else>所有商品</span>
-              </h1>
-              
-              <!-- Clear filters -->
-              <button 
-                v-if="categorySlug || searchKeyword"
-                @click="clearFilters"
-                class="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-brand-primary border border-slate-300 dark:border-slate-700 rounded-lg transition-colors"
-              >
-                清除篩選
-              </button>
-            </div>
-
-            <p v-if="productStore.totalItems > 0" class="mt-3 text-slate-600 dark:text-slate-400">
-              共 {{ productStore.totalItems }} 件商品
-            </p>
+        <!-- Content -->
+        <div class="min-w-0 flex-1">
+          <!-- Loading -->
+          <div v-if="productStore.loading" class="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
+            <div v-for="i in 6" :key="i" class="aspect-[3/4] animate-pulse rounded-[1.6rem] bg-steel-100" />
           </div>
-          
-          <div v-if="productStore.loading" class="flex justify-center items-center h-64">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
-          </div>
-          
-          <div v-else-if="productStore.error" class="text-center text-red-500 py-10">
+
+          <!-- Error -->
+          <div v-else-if="productStore.error" class="rounded-2xl border border-steel-200 bg-white py-20 text-center text-steel-500">
             {{ productStore.error }}
           </div>
-          
-          <div v-else-if="productStore.products.length === 0" class="text-center py-16">
-            <svg class="w-24 h-24 mx-auto text-slate-300 dark:text-slate-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">找不到商品</h3>
-            <p class="text-slate-600 dark:text-slate-400 mb-6">
-              <span v-if="searchKeyword">搜尋「{{ searchKeyword }}」沒有找到相關商品</span>
+
+          <!-- Empty -->
+          <div v-else-if="productStore.products.length === 0" class="rounded-[1.5rem] border border-dashed border-steel-300 py-20 text-center">
+            <PhPackage :size="56" weight="thin" class="mx-auto text-steel-300" />
+            <h3 class="mt-4 font-display text-xl font-semibold text-steel-900">找不到商品</h3>
+            <p class="mt-2 text-steel-500">
+              <span v-if="searchKeyword">「{{ searchKeyword }}」沒有符合的結果</span>
               <span v-else-if="categorySlug">此分類目前沒有商品</span>
               <span v-else>目前沒有可顯示的商品</span>
             </p>
-            <router-link 
-              to="/products" 
-              class="inline-block px-6 py-3 bg-brand-primary text-white rounded-lg hover:bg-orange-600 transition-colors"
-            >
+            <router-link to="/products" class="mt-6 inline-block rounded-full bg-steel-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-500">
               瀏覽所有商品
             </router-link>
           </div>
-          
+
+          <!-- Grid -->
           <div v-else>
-            <!-- 商品列表 -->
-            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8 mb-12">
-              <ProductCard 
-                v-for="product in productStore.products" 
-                :key="product.id" 
-                :product="product" 
-              />
+            <div class="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
+              <div v-for="(product, i) in productStore.products" :key="product.id" v-reveal="{ delay: (i % 3) * 0.05 }">
+                <ProductCard :product="product" />
+              </div>
             </div>
 
-            <!-- 分頁控制 -->
-            <div v-if="productStore.totalPages > 1" class="flex flex-col items-center gap-6 mt-16">
-              <div class="flex items-center gap-4">
+            <!-- Pagination -->
+            <div v-if="productStore.totalPages > 1" class="mt-14 flex flex-col items-center gap-4">
+              <div class="flex items-center gap-2">
                 <button
                   @click="goToPage(productStore.currentPage - 1)"
                   :disabled="!productStore.hasPrevPage"
-                  class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-900 dark:text-white"
+                  class="flex h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="上一頁"
                 >
-                  上一頁
+                  <PhCaretLeft :size="16" weight="bold" />
                 </button>
-
-                <div class="flex gap-2">
-                  <button
-                    v-for="page in visiblePages"
-                    :key="page"
-                    @click="goToPage(page)"
-                    :class="[
-                      'px-4 py-2 rounded-lg transition-colors',
-                      page === productStore.currentPage
-                        ? 'bg-brand-primary text-white'
-                        : 'bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white'
-                    ]"
-                  >
-                    {{ page }}
-                  </button>
-                </div>
-
+                <button
+                  v-for="page in visiblePages"
+                  :key="page"
+                  @click="goToPage(page)"
+                  class="h-10 min-w-10 rounded-full px-3 font-mono text-sm font-medium transition-colors"
+                  :class="page === productStore.currentPage ? 'bg-steel-900 text-white' : 'border border-steel-200 bg-white text-steel-700 hover:border-steel-900'"
+                >
+                  {{ page }}
+                </button>
                 <button
                   @click="goToPage(productStore.currentPage + 1)"
                   :disabled="!productStore.hasNextPage"
-                  class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-900 dark:text-white"
+                  class="flex h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="下一頁"
                 >
-                  下一頁
+                  <PhCaretRight :size="16" weight="bold" />
                 </button>
               </div>
-
-              <div class="text-center text-sm text-slate-600 dark:text-slate-400">
-                第 {{ productStore.currentPage }} / {{ productStore.totalPages }} 頁
-              </div>
+              <p class="font-mono text-xs text-steel-400">第 {{ productStore.currentPage }} / {{ productStore.totalPages }} 頁</p>
             </div>
           </div>
         </div>
       </div>
     </main>
-    
+
     <Footer />
   </div>
 </template>
@@ -198,17 +181,16 @@ import { useCategoryStore } from '../stores/category'
 import Navbar from '../components/Navbar.vue'
 import ProductCard from '../components/ProductCard.vue'
 import Footer from '../components/Footer.vue'
+import { PhCaretRight, PhCaretLeft, PhX, PhPackage } from '@phosphor-icons/vue'
 
 const route = useRoute()
 const router = useRouter()
 const productStore = useProductStore()
 const categoryStore = useCategoryStore()
 
-// Current filters from URL
 const categorySlug = computed(() => route.query.category || '')
 const searchKeyword = computed(() => route.query.search || '')
 
-// Look up category name by slug (using store getter)
 const currentCategory = computed(() => {
   if (!categorySlug.value) return ''
   return categoryStore.getCategoryNameBySlug(categorySlug.value)
@@ -221,48 +203,40 @@ const breadcrumbs = computed(() => {
   return categoryStore.getCategoryBreadcrumb(categorySlug.value)
 })
 
-// 計算要顯示的頁碼（最多顯示 5 個）
 const visiblePages = computed(() => {
   const current = productStore.currentPage
   const total = productStore.totalPages
   const delta = 2
-  
-  let pages = []
+  const pages = []
   for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) {
     pages.push(i)
   }
-  
   return pages
 })
 
-// Fetch products based on filters
 const fetchFilteredProducts = async (page = 1) => {
   await productStore.fetchProducts(page, {
     categorySlug: categorySlug.value,
-    keyword: searchKeyword.value
+    keyword: searchKeyword.value,
   })
 }
 
-// Page navigation
 const goToPage = (page) => {
   if (page >= 1 && page <= productStore.totalPages) {
     fetchFilteredProducts(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
 
-// Clear all filters
 const clearFilters = () => {
   router.push('/products')
 }
 
-// Watch for URL query changes
 watch(() => [route.query.category, route.query.search], () => {
   fetchFilteredProducts(1)
 }, { immediate: false })
 
-// Initial fetch
 onMounted(async () => {
-  // Ensure categories are loaded (will use cache if already loaded)
   await categoryStore.fetchCategories()
   fetchFilteredProducts(1)
 })

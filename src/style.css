@@ -1,69 +1,139 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ============================================================
+   GTS Hardware - Design System (Tailwind v4 @theme tokens)
+   Aesthetic: premium industrial · steel neutrals · locked orange accent
+   ============================================================ */
+@theme {
+  /* Typography */
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  --font-display: "Space Grotesk Variable", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+
+  /* Locked accent - industrial orange */
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+
+  /* Steel canvas neutrals (cool graphite) */
+  --color-steel-50: #f7f7f8;
+  --color-steel-100: #ededf0;
+  --color-steel-200: #d9dade;
+  --color-steel-300: #b8bac1;
+  --color-steel-400: #8f929c;
+  --color-steel-500: #6c6f7a;
+  --color-steel-600: #54565f;
+  --color-steel-700: #3f4048;
+  --color-steel-800: #2a2b31;
+  --color-steel-900: #1a1b1f;
+  --color-steel-950: #101115;
+
+  /* Legacy tokens kept for Account/Admin backward-compat */
+  --color-brand-primary: #f97316;
+  --color-brand-secondary: #1a1b1f;
+  --color-brand-accent: #ea580c;
+
+  /* Motion */
+  --ease-industrial: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  width: 100%;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    color-scheme: light;
   }
 
-  a:hover {
-    color: #747bff;
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
 
-  button {
-    background-color: #f9f9f9;
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-steel-50);
+    color: var(--color-steel-900);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-500);
+    color: #fff;
+  }
+
+  /* Steel scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--color-steel-100); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-steel-300);
+    border-radius: 999px;
+    border: 2px solid var(--color-steel-100);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-steel-400); }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Fine engineering grid texture for section backgrounds */
+  .bg-blueprint {
+    background-image:
+      linear-gradient(to right, rgba(16, 17, 21, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(16, 17, 21, 0.04) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  /* Document prose for content pages (privacy / terms / faq / shipping / warranty) */
+  .doc { color: var(--color-steel-600); }
+  .doc > :first-child { margin-top: 0; }
+  .doc h2 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+    color: var(--color-steel-900);
+    margin: 2.25rem 0 0.6rem;
+  }
+  .doc h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--color-steel-800);
+    margin: 1.5rem 0 0.4rem;
+  }
+  .doc p { line-height: 1.75; margin: 0 0 1rem; }
+  .doc ul { list-style: disc; padding-left: 1.25rem; margin: 0 0 1rem; }
+  .doc li { margin-bottom: 0.4rem; line-height: 1.7; }
+  .doc a { color: var(--color-brand-600); text-decoration: underline; }
+  .doc strong { color: var(--color-steel-900); font-weight: 600; }
+}
+
+/* Respect reduced motion globally */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

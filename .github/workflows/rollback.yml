@@ -1,0 +1,19 @@
+name: Rollback
+
+on:
+  workflow_dispatch:   # 手動觸發：GitHub → Actions → Rollback → Run workflow
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rollback to previous slot
+        # 自己 ssh，不依賴第三方 action（私鑰只在本步驟指令內使用）
+        env:
+          SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "$VM_USER@$VM_HOST" "~/gts-web/rollback.sh"

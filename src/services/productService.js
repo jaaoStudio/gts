@@ -4,7 +4,11 @@ import directus, { getAssetUrl } from '../utils/directus'
 // 1. 抽取共用欄位，未來五金行商品要加欄位只要改這裡
 const LIST_FIELDS = [
     'id', 'name', 'slug', 'short_description', 'description', 'image',
-    'category.name', 'tags.tags_id.name', 'tags.tags_id.color', 'variants.*'
+    'category.name',
+    // 分類已全面改用 M2M，列表也需帶出，並取 parent 以辨識子分類(葉節點)
+    'categories.categories_id.id', 'categories.categories_id.name',
+    'categories.categories_id.slug', 'categories.categories_id.parent',
+    'tags.tags_id.name', 'tags.tags_id.color', 'variants.*'
 ];
 
 // 詳情頁需要的額外完整欄位
@@ -187,6 +191,9 @@ export const productMapper = {
      * 將單一產品資料轉換
      */
     mapProduct(item) {
+        // TODO(主標籤): 卡片小標目前取 tags[0]，而 tags 查詢未排序，
+        // 顯示哪顆 Tag 取決於 Directus junction 順序、不可預測。
+        // 若要「指定主標籤」，需在 tag 關聯加 sort 欄位或 is_primary 旗標再依此挑選。
         const firstTag = item.tags && item.tags.length > 0 && item.tags[0].tags_id
             ? item.tags[0].tags_id
             : null
@@ -215,12 +222,21 @@ export const productMapper = {
 
         const mainImage = item.image ? getAssetUrl(item.image) : null
 
+        // 攤平商品標籤（junction → tag 物件），供詳情頁顯示多標籤。
+        // 卡片用的主標籤仍走 badge/badgeColor（見上方 firstTag）。
+        const tags = (item.tags || [])
+            .map(t => t.tags_id)
+            .filter(t => t !== null && t !== undefined)
+
         // 處理分類：優先使用主分類 (M2O)，如果沒有則使用多對多關聯的第一個分類
         const m2mCategories = (item.categories || [])
             .map(c => c.categories_id)
             .filter(c => c !== null)
 
-        const primaryCategory = item.category || (m2mCategories.length > 0 ? m2mCategories[0] : null)
+        // 主分類優先取「子分類」(有 parent 的葉節點)，讓卡片/標籤顯示最精確的分類；
+        // 其次退回 M2O，再退回第一個 M2M 分類
+        const leafCategory = m2mCategories.find(c => c && c.parent)
+        const primaryCategory = leafCategory || item.category || (m2mCategories.length > 0 ? m2mCategories[0] : null)
 
         return {
             id: item.id,
@@ -235,6 +251,7 @@ export const productMapper = {
             categories: m2mCategories,
             badge: firstTag ? firstTag.name : null,
             badgeColor: firstTag ? firstTag.color : null,
+            tags: tags,
             variants: variants
         }
     },
