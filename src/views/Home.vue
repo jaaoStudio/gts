@@ -6,7 +6,7 @@
       <!-- ===================== HERO ===================== -->
       <section ref="heroRef" class="relative">
         <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-60" />
-        <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[36rem] w-[36rem] rounded-full bg-brand-500/10 blur-[120px]" />
+        <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[22rem] w-[22rem] rounded-full bg-brand-500/10 blur-[80px] sm:h-[36rem] sm:w-[36rem] sm:blur-[120px]" />
 
         <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-20 sm:px-8 lg:grid-cols-12 lg:pb-24 lg:pt-24">
           <!-- Copy -->

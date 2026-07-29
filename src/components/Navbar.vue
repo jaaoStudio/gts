@@ -1,7 +1,7 @@
 <template>
   <div class="pointer-events-none sticky top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
     <nav
-      class="pointer-events-auto mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full border border-white/60 bg-white/75 px-2 pl-20 shadow-[0_10px_40px_-16px_rgba(16,17,21,0.28)] ring-1 ring-steel-900/[0.05] backdrop-blur-xl sm:h-16 sm:pl-4"
+      class="pointer-events-auto mx-auto flex h-14 max-w-6xl items-center gap-2 rounded-full border border-white/60 bg-white/80 px-2 shadow-[0_10px_40px_-16px_rgba(16,17,21,0.28)] ring-1 ring-steel-900/[0.05] backdrop-blur-md sm:h-16 sm:bg-white/75 sm:pl-4 sm:backdrop-blur-xl"
     >
       <!-- Logo -->
       <router-link to="/" class="group flex flex-shrink-0 items-center" :aria-label="`${site.name} 首頁`">
@@ -137,14 +137,8 @@
           aria-label="選單"
         >
           <span class="relative block h-4 w-5">
-            <span
-              class="absolute left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-              :class="mobileMenuOpen ? 'top-1/2 -translate-y-1/2 rotate-45' : 'top-0.5'"
-            />
-            <span
-              class="absolute bottom-0.5 left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-              :class="mobileMenuOpen ? 'bottom-1/2 translate-y-1/2 -rotate-45' : ''"
-            />
+            <span class="absolute left-0 top-0.5 block h-0.5 w-5 rounded-full bg-current" />
+            <span class="absolute bottom-0.5 left-0 block h-0.5 w-5 rounded-full bg-current" />
           </span>
         </button>
       </div>
@@ -179,8 +173,20 @@
       leave-to-class="opacity-0"
     >
       <div v-if="mobileMenuOpen" class="pointer-events-auto fixed inset-0 top-0 z-40 lg:hidden">
-        <div class="absolute inset-0 bg-steel-50/85 backdrop-blur-2xl" @click="mobileMenuOpen = false" />
+        <div class="absolute inset-0 bg-steel-50/95 backdrop-blur-md sm:bg-steel-50/85 sm:backdrop-blur-2xl" @click="mobileMenuOpen = false" />
         <div class="relative flex h-[100dvh] flex-col overflow-y-auto px-6 pb-10 pt-24">
+          <!-- Close -->
+          <button
+            @click="closeMobile"
+            class="absolute right-3 top-5 flex h-10 w-10 items-center justify-center text-steel-700 transition-colors hover:text-steel-900 sm:right-5 sm:top-7"
+            aria-label="關閉選單"
+          >
+            <span class="relative block h-4 w-5">
+              <span class="close-bar close-bar-top" />
+              <span class="close-bar close-bar-bottom" />
+            </span>
+          </button>
+
           <router-link
             to="/products"
             @click="closeMobile"
@@ -316,7 +322,34 @@ async function handleLogout() {
 </script>
 
 <style scoped>
+/* Close button: two bars that rest as an X. On open they animate from a
+   horizontal (hamburger) pose into the cross — same feel as the old morph,
+   even though the button now lives on the overlay layer. */
+.close-bar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 2px;
+  width: 20px;
+  margin-top: -1px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+.close-bar-top { transform: rotate(45deg); }
+.close-bar-bottom { transform: rotate(-45deg); }
+
 @media (prefers-reduced-motion: no-preference) {
+  .close-bar-top { animation: close-top 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+  .close-bar-bottom { animation: close-bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+  @keyframes close-top {
+    from { transform: translateY(-3px) rotate(0deg); }
+    to   { transform: translateY(0) rotate(45deg); }
+  }
+  @keyframes close-bottom {
+    from { transform: translateY(3px) rotate(0deg); }
+    to   { transform: translateY(0) rotate(-45deg); }
+  }
+
   .mobile-link {
     opacity: 0;
     transform: translateY(1rem);

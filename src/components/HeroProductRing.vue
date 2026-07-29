@@ -76,6 +76,7 @@ const RADIUS_Y = 34            // vertical tilt (front lower, back higher)
 let ctx                        // gsap.context for cleanup
 let draggable
 let ro                         // ResizeObserver
+let io                         // IntersectionObserver — pause GPU work when off-screen
 let cards = []                 // .ring-card elements
 let bobTweens = []             // per-card up/down float tweens (paused on hover)
 let rotation = 0               // current ring rotation, degrees
@@ -204,10 +205,27 @@ function init() {
 
   ro = new ResizeObserver(() => { computeRadius(); layout() })
   ro.observe(scene.value)
+
+  // Pause the endless float + autoplay while the hero is scrolled out of view,
+  // so mobile GPUs aren't burning frames on an invisible ring.
+  io = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        bobTweens.forEach((t) => t.resume())
+        scheduleAuto(AUTO_RESUME)
+      } else {
+        bobTweens.forEach((t) => t.pause())
+        stopAuto()
+      }
+    },
+    { threshold: 0.01 }
+  )
+  io.observe(scene.value)
 }
 
 function destroy() {
   stopAuto()
+  io?.disconnect(); io = null
   ro?.disconnect(); ro = null
   draggable?.kill(); draggable = null
   ctx?.revert(); ctx = null
