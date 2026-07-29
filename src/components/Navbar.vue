@@ -275,7 +275,7 @@ const linkDelay = (i) => ({ '--d': `${i * 45}ms` })
 
 onMounted(() => {
   categoryStore.fetchCategories()
-  authStore.init()
+  // auth 初始化已由 main.js 於 mount 前完成,此處不需再呼叫
   document.addEventListener('click', handleClickOutside)
 })
 
