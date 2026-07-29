@@ -87,4 +87,5 @@ docker push $IMG:<tag> && docker push $IMG:latest
 - 前端 Vue 3 SPA(Vite build → nginx),後端 Directus 11 + Postgres + Redis;領域詞彙見 `CONTEXT.md`。
 - 網域:`gts.jaao.tw`(+ apex `jaao.tw`)= 前端;`gts-core.jaao.tw` = Directus 後台/API。全開 Cloudflare 橘雲。
 - Directus 認證用 session 模式(`AUTH_GOOGLE_MODE=session` + cookie 三項 + `CACHE_AUTO_PURGE=true`)。
+  - **CSRF**:前端走 `/api` 與 Directus 同源,`SESSION_COOKIE_SAMESITE=Lax`(勿用 `None`,否則 cookie 被跨站夾帶開啟 CSRF 面向);`SESSION_COOKIE_SECURE=true`。
 - VM 架構 x86_64 → workflow `platforms: linux/amd64`(換 ARM 機才要改)。
