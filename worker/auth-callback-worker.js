@@ -92,7 +92,11 @@ function spinnerPage(nextUrl) {
     <meta http-equiv="refresh" content="0;url=${escapeHtml(nextUrl)}">
     <title>登入中｜金同心實業</title>
     <style>
-        :root { color-scheme: light; --ease: cubic-bezier(0.32, 0.72, 0, 1); }
+        :root {
+            color-scheme: light;
+            --ease: cubic-bezier(0.32, 0.72, 0, 1);       /* 一次性位移：強 ease-out */
+            --ease-cycle: cubic-bezier(0.37, 0, 0.63, 1); /* 循環呼吸：對稱 sine ease-in-out */
+        }
         * { box-sizing: border-box; }
         body {
             margin: 0; min-height: 100dvh; position: relative; overflow: hidden;
@@ -125,11 +129,17 @@ function spinnerPage(nextUrl) {
         .mark .stroke-2 { animation-delay: .18s; }
         .mark .chip {
             transform-box: fill-box; transform-origin: center; opacity: 0;
-            animation: pop .3s var(--ease) .42s both, breathe 2.2s var(--ease) .72s infinite;
+            animation: pop .3s var(--ease) .42s both, breathe 2.6s var(--ease-cycle) .72s infinite;
+        }
+        /* 從橘點擴散的訊號光暈:讓畫面不是單一元素獨舞,也呼應「連線建立中」 */
+        .mark .halo {
+            transform-box: fill-box; transform-origin: center; opacity: 0;
+            animation: halo 2.6s var(--ease) .9s infinite;
         }
         @keyframes draw   { to { stroke-dashoffset: 0; } }
         @keyframes pop    { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
-        @keyframes breathe{ 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.9); } }
+        @keyframes breathe{ 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .72; transform: scale(.94); } }
+        @keyframes halo   { 0% { opacity: .28; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(2.5); } }
 
         .label {
             margin-top: 22px; font-size: 13px; font-weight: 500; color: #6c6f7a;
@@ -157,6 +167,7 @@ function spinnerPage(nextUrl) {
         @media (prefers-reduced-motion: reduce) {
             .mark .stroke { stroke-dashoffset: 0; animation: none; }
             .mark .chip { opacity: 1; animation: none; }
+            .mark .halo { display: none; }
             .bar span { width: 100%; animation: none; opacity: .5; }
         }
     </style>
@@ -166,6 +177,7 @@ function spinnerPage(nextUrl) {
         <svg class="mark" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="金同心實業">
             <path class="stroke" pathLength="1" d="M133 419.56V184.04C133 122.6 163.72 91.8799 225.16 91.8799H286.6C348.04 91.8799 378.76 122.6 378.76 184.04V419.56" stroke="#101115" stroke-width="30.72" stroke-linecap="round"/>
             <path class="stroke stroke-2" pathLength="1" d="M204.68 204.52H307.08" stroke="#101115" stroke-width="30.72" stroke-linecap="round"/>
+            <path class="halo" d="M271.24 271.08H240.52C229.209 271.08 220.04 280.249 220.04 291.56V322.28C220.04 333.591 229.209 342.76 240.52 342.76H271.24C282.551 342.76 291.72 333.591 291.72 322.28V291.56C291.72 280.249 282.551 271.08 271.24 271.08Z" fill="#F97316"/>
             <path class="chip" d="M271.24 271.08H240.52C229.209 271.08 220.04 280.249 220.04 291.56V322.28C220.04 333.591 229.209 342.76 240.52 342.76H271.24C282.551 342.76 291.72 333.591 291.72 322.28V291.56C291.72 280.249 282.551 271.08 271.24 271.08Z" fill="#F97316"/>
         </svg>
 

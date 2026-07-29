@@ -12,6 +12,7 @@
         <svg class="block h-[76px] w-[76px]" viewBox="0 0 512 512" fill="none" role="img" aria-label="金同心實業">
           <path d="M133 419.56V184.04C133 122.6 163.72 91.8799 225.16 91.8799H286.6C348.04 91.8799 378.76 122.6 378.76 184.04V419.56" stroke="#101115" stroke-width="30.72" stroke-linecap="round" />
           <path d="M204.68 204.52H307.08" stroke="#101115" stroke-width="30.72" stroke-linecap="round" />
+          <path class="halo" d="M271.24 271.08H240.52C229.209 271.08 220.04 280.249 220.04 291.56V322.28C220.04 333.591 229.209 342.76 240.52 342.76H271.24C282.551 342.76 291.72 333.591 291.72 322.28V291.56C291.72 280.249 282.551 271.08 271.24 271.08Z" fill="#F97316" />
           <path class="chip" d="M271.24 271.08H240.52C229.209 271.08 220.04 280.249 220.04 291.56V322.28C220.04 333.591 229.209 342.76 240.52 342.76H271.24C282.551 342.76 291.72 333.591 291.72 322.28V291.56C291.72 280.249 282.551 271.08 271.24 271.08Z" fill="#F97316" />
         </svg>
 
@@ -70,10 +71,21 @@ onMounted(async () => {
 /* ⚠️ animation 一律用 class 在這裡宣告，別用 Tailwind 的 [animation:name_...] arbitrary：
    scoped style 會把 @keyframes 改名加 hash，只改寫同一個 style block 內的引用，
    全域產生的 utility 會找不到改名後的 keyframes，動畫直接不跑。 */
+/* ⚠️ 循環動態(呼吸/光暈)一律用對稱的 sine ease-in-out，別用設計系統那條
+   --ease-industrial cubic-bezier(0.32,0.72,0,1)——那是強 ease-out，適合
+   一次性位移；用在來回循環上每半個週期都會衝出去再急煞，中點會頓一下。 */
 .chip {
   transform-box: fill-box;
   transform-origin: center;
-  animation: breathe 2.2s cubic-bezier(0.32, 0.72, 0, 1) infinite;
+  animation: breathe 2.6s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+/* 從橘點擴散的訊號光暈：讓畫面不是單一元素獨舞，也呼應「連線建立中」 */
+.halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: halo 2.6s cubic-bezier(0.32, 0.72, 0, 1) infinite;
 }
 
 .bar-fill {
@@ -82,7 +94,12 @@ onMounted(async () => {
 
 @keyframes breathe {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(0.9); }
+  50% { opacity: 0.72; transform: scale(0.94); }
+}
+
+@keyframes halo {
+  0% { opacity: 0.28; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(2.5); }
 }
 
 @keyframes sweep {
@@ -92,6 +109,7 @@ onMounted(async () => {
 
 @media (prefers-reduced-motion: reduce) {
   .chip { animation: none; }
+  .halo { display: none; }
   .bar-fill { width: 100%; animation: none; opacity: 0.5; }
 }
 </style>
