@@ -124,11 +124,13 @@
           </transition>
         </div>
 
-        <!-- Cart -->
+        <!-- Cart (暫時隱藏,購物車功能完成後再啟用) -->
+        <!--
         <button class="relative flex h-10 w-10 items-center justify-center rounded-full text-steel-600 transition-colors hover:bg-steel-100 hover:text-steel-900" aria-label="購物車">
           <PhShoppingCartSimple :size="20" weight="regular" />
           <span class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 font-mono text-[10px] font-bold text-white">0</span>
         </button>
+        -->
 
         <!-- Hamburger -->
         <button

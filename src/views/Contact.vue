@@ -16,7 +16,7 @@
         <div>
           <p class="font-display text-sm font-semibold text-steel-900">電話</p>
           <p class="mt-1 font-mono text-lg font-bold tracking-tight text-steel-900">04-26580936</p>
-          <p class="mt-1 text-sm text-steel-500">來電詢價最快</p>
+          <p class="mt-1 text-sm text-steel-500">直接跟老闆叫貨</p>
         </div>
       </a>
 
@@ -29,7 +29,7 @@
         </span>
         <div class="min-w-0">
           <p class="font-display text-sm font-semibold text-steel-900">LINE</p>
-          <p class="mt-1 text-sm text-steel-500">加好友即時詢問、傳圖對規格</p>
+          <p class="mt-1 text-sm text-steel-500">加入我們的官方帳號，與我們聯繫</p>
           <div class="mt-3">
             <LineButton :floating="false" />
             <p v-if="!settingsStore.lineUrl" class="text-sm text-steel-400">LINE 帳號準備中</p>

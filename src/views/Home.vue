@@ -165,7 +165,7 @@
             <h2 class="relative mx-auto max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
               歡迎回來，{{ authStore.userName }}
             </h2>
-            <p class="relative mx-auto mt-4 max-w-md text-steel-300">感謝支持，探索更多好料吧。</p>
+            <p class="relative mx-auto mt-4 max-w-md text-steel-300">今天想買點什麼呢？</p>
             <router-link
               to="/products"
               class="relative mt-9 inline-flex items-center gap-3 rounded-full bg-brand-500 py-2.5 pl-6 pr-2.5 font-display text-base font-semibold text-white transition-all duration-300 hover:bg-brand-600 active:scale-[0.98]"
