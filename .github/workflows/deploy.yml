@@ -6,7 +6,6 @@ on:
       - main
     paths-ignore:
       - '**.md'
-      - '.agents/**'
       - '.claude/**'
       - 'docs/**'
       - 'deploy/**'          # VM 端腳本改動不需要重 build（需手動同步到 VM）
