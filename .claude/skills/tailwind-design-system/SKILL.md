@@ -9,6 +9,30 @@ description: premium-industrial 設計系統：Tailwind v4 @theme token、字體
 > **token 實值的 single source of truth 是 `src/style.css` 的 `@theme` 區塊。**
 > 本 skill 記的是「現況長什麼樣、實務上怎麼寫」，與上面兩者衝突時以它們為準。
 
+## 出處與適用範圍
+
+這套設計語言不是憑空長出來的：它源自全域 skill **`design-taste-frontend`**（anti-slop 前端設計方法論）
+加上專案自身的風格決定。要**調整視覺**時，把那份 skill 一起讀。
+
+**可移植到本專案的部分**：Section 4（設計工程指令）、Section 9（AI tells 禁用清單）、
+Section 14（Pre-Flight Check）。現況中可直接對應的痕跡：
+Geist 而非 Inter（4.1）、Phosphor 且不手繪 SVG（3.C / 9.E）、單一鎖定 accent（4.2）、
+`min-h-[100dvh]` 不用 `h-screen`（3.E）、全域 `prefers-reduced-motion`（6.B）、
+統一圓角系統（4.4）。
+
+**不適用的部分**：該 skill 的技術棧假設是 React / Next + Motion（`motion/react`），
+本專案是 **Vue 3 + GSAP + 自製 `v-reveal`**。故其 Section 3.A/3.B、
+5.A–5.C 的 canonical skeleton、Section 12 Block Library 一律略過。
+
+**已知且刻意的覆寫** ⚠️：該 skill 的 6.C 寫「Dark mode mandatory，不得只出 light-only」，
+但本專案是 **light-only 鎖定**——這是 ADR 0002 第 1 點的明確暫定決策，
+**不是疏漏，不要「順手補上 `dark:`」**。日後導入明暗模式時要回到 `@theme` 做語意化 token，
+屆時另開 ADR。
+
+**現況與該 skill 有出入、但屬既有設計決定**：EYEBROW RESTRAINT（最多每 3 個 section 1 個）
+在本站可能超標（`PageShell` 每個內容頁固定帶一個，`Navbar`/`Home`/`Products` 各 1）。
+要改是設計決策，先問過再動。
+
 ## Tailwind v4 CSS-first
 
 - **TailwindCSS ^4.3**，插件 `@tailwindcss/vite`。
