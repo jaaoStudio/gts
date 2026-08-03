@@ -8,6 +8,8 @@ status: accepted
 
 前台採用 **Directus 內建 Google SSO**:前端把使用者導向 `${VITE_DIRECTUS_PUBLIC_URL}/auth/login/google?redirect=<origin>/admin/callback`,Google 認證後 Directus 種下 refresh cookie 並把瀏覽器導回前台的 `/admin/callback`;前台在該頁打 `POST /auth/refresh`(`withCredentials`)把 cookie 換成 access token 存進 `localStorage`,再依 `role.admin_access` 導向 `/admin` 或 `/account`。
 
+> **2026-07-29 更新(機制已變,決策不變)**:認證已改為 **Directus session 模式**(`AUTH_GOOGLE_MODE=session`)。credential 是 httpOnly session cookie,**前端不再持有 access token,也不再打 `/auth/refresh`**——`/admin/callback` 直接 `readMe()`,抓得到 user 即代表 session 有效(`authStore.handleCallback()`)。上段的 `localStorage` 描述僅存為歷史。改動原因:token 不進 JS 可免疫 XSS 竊取。SSO 導向、Worker double-tap、下方所有 gotchas 均不受影響。
+
 Directus 後端部署在**德國** VM,掛在 Cloudflare(`gts-core.jaao.tw`)後面。為了遮住這段跨洲延遲,前面架了一個 **Cloudflare Worker**(原始碼:`worker/auth-callback-worker.js`),攔截 `GET /auth/login/google/callback` 做 **double-tap**:第一次請求(網址尾端沒有 `_edge=1` 旗標)由 Worker 在邊緣**立刻**回一頁輕量 spinner,並把瀏覽器導向「同一組 OAuth 參數 + 尾端附加 `&_edge=1`」;第二次(帶旗標)Worker 用字串把旗標切掉、再 `fetch` 給德國的 Directus 處理。
 
 ## Context
