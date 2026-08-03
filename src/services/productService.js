@@ -198,7 +198,14 @@ export const productMapper = {
             ? item.tags[0].tags_id
             : null
 
+        // 下架的規格不進前台：既不顯示在規格選擇器，也不參與最低價計算。
+        // 用「排除 draft/archived」而非「只留 published」，避免 status 為空的舊資料被誤砍。
+        // 注意：Directus 的 Public 與 customer access 兩個 policy 都已帶 status=published filter，
+        // 訪客與註冊顧客本來就讀不到 draft；讀得到的只有 Administrator/AI_agent。
+        // 故此處為預防性質：(1) 自家 admin 帳號登入前台時，所見與客人一致；
+        // (2) 不再隱性依賴「policy 剛好有設 filter」，日後權限被改動也不會外洩下架規格。
         const variants = (item.variants || [])
+            .filter(v => v.status !== 'draft' && v.status !== 'archived')
             .map(v => ({
                 ...v,
                 image: v.variant_image ? getAssetUrl(v.variant_image) : null
