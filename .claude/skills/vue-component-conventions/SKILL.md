@@ -1,78 +1,102 @@
 ---
 name: Vue Component Conventions
-description: Coding standards for Vue 3 SFC components in the GTS Web Store project.
+description: Vue 3 SFC 撰寫慣例：結構、狀態流、命名、樣式與動畫。新增或修改任何 .vue 元件時使用。
 ---
 
 # Vue Component Conventions
 
-## SFC Structure
+> 視覺 token 與 UI pattern 見 skill `tailwind-design-system`；本篇只管元件寫法。
 
-All components use `<script setup>` syntax (Composition API). The order within a `.vue` file is:
+## SFC 結構
+
+一律 `<script setup>`（Composition API），順序：
 
 ```
-<template> → <script setup> → <style scoped> (optional)
+<template> → <script setup> → <style scoped>（少用，見下方樣式段）
 ```
 
-## Template Rules
+**不使用 Options API**（Pinia store 例外，store 用 options 風格）。
 
-1. **Root wrapper**: Each page view wraps content in `<div class="min-h-screen bg-slate-50 dark:bg-slate-900">`.
-2. **Layout composition**: Pages include `<Navbar />` at top, `<Footer />` at bottom.
-3. **Loading state**: Use a spinning div:
+## Template 規則
+
+1. **頁面骨架**：內容頁（法務 / FAQ / 聯絡類）**直接用 `components/PageShell.vue`**，
+   它已含 Navbar + 標題區 + Footer，不要自己拼。
+   店面頁自行組裝時根容器用 `min-h-[100dvh] bg-steel-50`（**不是 `min-h-screen`**，
+   避免 iOS Safari 網址列造成跳動）。
+2. **狀態流**：一律 `v-if="loading"` → `v-else-if="error"` → `v-else`。
+3. **Loading 用 skeleton，不要轉圈 spinner**。骨架要貼合最終版面的形狀：
    ```html
-   <div v-if="store.loading" class="flex justify-center items-center h-64">
-     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+   <div v-if="productStore.loading" class="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
+     <div v-for="i in 6" :key="i" class="aspect-[3/4] animate-pulse rounded-[1.6rem] bg-steel-100" />
    </div>
    ```
-4. **Error state**: Red text centered:
+4. **Error 用中性卡片，不是紅字**（紅色保留給表單驗證等真正的錯誤語意）：
    ```html
-   <div v-else-if="store.error" class="text-center text-red-500 py-10">
-     {{ store.error }}
+   <div v-else-if="productStore.error"
+        class="rounded-2xl border border-steel-200 bg-white py-20 text-center text-steel-500">
+     {{ productStore.error }}
    </div>
    ```
-5. **Container**: Use `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8` for page content width.
-6. **Conditional rendering flow**: Always follow `v-if="loading"` → `v-else-if="error"` → `v-else` pattern.
+5. **容器寬度**：店面區塊 `mx-auto max-w-6xl px-5 sm:px-8`；內容頁由 `PageShell` 決定（`max-w-3xl`）。
+6. **區塊註解**：用 HTML 註解標示段落（`<!-- Hero -->`、`<!-- Featured -->`、`<!-- Mobile Menu -->`）。
 
-## Script Setup Rules
+## Script Setup 規則
 
-1. **Imports order**: Vue APIs → Vue Router → Pinia stores → Components → Services/utils
+1. **import 順序**：Vue API → Vue Router → Pinia store → 元件 → service/utils → 圖示
    ```js
    import { ref, computed, onMounted } from 'vue'
-   import { useRouter } from 'vue-router'
+   import { useRoute, useRouter } from 'vue-router'
    import { useProductStore } from '../stores/product'
-   import Navbar from '../components/Navbar.vue'
+   import ProductCard from '../components/ProductCard.vue'
+   import { setMeta } from '../utils/seo'
+   import { PhArrowUpRight } from '@phosphor-icons/vue'
    ```
-2. **Store instantiation**: Use `const xxxStore = useXxxStore()` at top level.
-3. **Props**: Use `defineProps({ ... })` with type and required.
-4. **No `<script>` block**: Never use Options API in components — only `<script setup>`.
+2. **Store**：`const xxxStore = useXxxStore()` 放在頂層。
+3. **Props**：`defineProps({ ... })`，標明 type 與 required/default。
+4. **元件不直接呼叫 Directus** — 走 store → service。詳見 skill `directus-service-layer`。
+5. **rich-text 一律先消毒**：Directus 來的 HTML 要 `DOMPurify.sanitize()` 後才 `v-html`，防 stored XSS
+   （見 `ProductDetail.vue`）。
 
-## Component Naming
+## 命名
 
-| Type | Location | Naming |
+| 類型 | 位置 | 命名 |
 |---|---|---|
-| Page view | `src/views/` | PascalCase (e.g., `ProductDetail.vue`) |
-| Shared component | `src/components/` | PascalCase (e.g., `ProductCard.vue`) |
+| 頁面 | `src/views/` | PascalCase（`ProductDetail.vue`）|
+| 共用元件 | `src/components/` | PascalCase（`ProductCard.vue`）|
 
-## Styling
+## 樣式
 
-- **Primary method**: TailwindCSS utility classes directly in templates.
-- **Scoped styles**: Only used when CSS animations are needed (e.g., `HeroParallax.vue`).
-- **Dark mode**: Always include `dark:` variant classes alongside light classes.
-- **Responsive**: Use `sm:`, `md:`, `lg:` breakpoint prefixes (mobile-first).
-- **Transitions**: Add `transition-colors duration-300` or `transition-all duration-300` on interactive elements.
-- **Hover effects**: Use `hover:` and `group-hover:` for card interactions.
+- **主要方法**：Tailwind utility 直接寫在 template。
+- **不寫 `dark:`** — 全站 light 鎖定（ADR 0002）。這是刻意決策，不是待補。
+- **不寫死 hex**，用 `brand-*` / `steel-*` token。
+- **`<style scoped>` 少用**：僅在 Tailwind 表達不了的 keyframes / 複雜選擇器時才開。
+- **響應式**：mobile-first，用 `sm:` `md:` `lg:`。
+- **過場**：互動元素 `transition-colors duration-300` 或 `transition-all duration-300`；
+  卡片類用 `ease-[cubic-bezier(0.32,0.72,0,1)]`（= `--ease-industrial`）。
+- **hover**：卡片整體互動用 `group` + `group-hover:`。
 
-## Routing Navigation
+## 圖示
 
-- Use `<router-link :to="...">` for declarative nav.
-- Use `router.push()` / `router.replace()` for programmatic nav.
-- Use query params for filters: `{ path: '/products', query: { category: slug } }`.
-
-## Section Comments
-
-Use HTML comments to label template sections:
-```html
-<!-- Features Section -->
-<!-- CTA Section -->
-<!-- Desktop Menu -->
-<!-- Mobile Menu -->
+只用 **Phosphor**（`@phosphor-icons/vue`），具名 import：
+```js
+import { PhArrowUpRight, PhMagnifyingGlass } from '@phosphor-icons/vue'
 ```
+`<PhArrowUpRight :size="18" weight="bold" />`。**不手繪 SVG icon**，不混用其他圖示庫。
+
+## 進場動畫
+
+用全域 directive **`v-reveal`**（`src/directives/reveal.js`，IntersectionObserver + failsafe）：
+
+```html
+<section v-reveal> ... </section>
+```
+
+- **不要為進場效果引入 GSAP ScrollTrigger** — 曾因觸發座標算錯導致區塊永久卡在 `opacity:0`（ADR 0002 第 6 點）。
+- GSAP 保留給真正的複雜動畫（如 `HeroProductRing`）。
+  ⚠️ 寫入 transform 前務必驗 `isFinite`：NaN 進 transform 會讓元素永久凍結且不自癒。
+
+## 路由導航
+
+- 宣告式：`<router-link :to="...">`
+- 程式式：`router.push()` / `router.replace()`
+- 篩選走 query：`{ path: '/products', query: { category: slug } }`
