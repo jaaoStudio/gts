@@ -17,8 +17,29 @@ description: Directus 商品分類的批次維運與重歸類手法。整批改�
 - 每個商品掛剛好 **2 筆：`[父分類, 子分類]`**（父父分類頁與子分類頁都能出現）。
 - 前端主分類取「有 parent 的葉節點（子分類）」；breadcrumb 取最長路徑。
 
+### 批次建立商品前必讀（2026-08 起）
+
+- **`products.slug` 已改為自動產生，欄位設為 readonly**。Flow「商品 slug 自動產生」
+  （`action` 型、`items.create` on `products`）會在建立後補上 `p-<數字>`，沿用既有 668 筆的格式。
+  - **自己帶 slug 時不會被覆蓋**（Flow 判斷有值就原樣寫回），批次匯入可繼續自訂。
+  - `meta.required` 已關閉（DB 本來就 nullable），`is_unique = true` 仍在，撞號會被 DB 擋下。
+  - 要手動改某筆 slug，得先去 Data Model 取消 readonly。改 slug 會讓既有連結失效。
+  - ⚠️ 該 Flow 原本寫成 `filter` 型並靠回傳值改 payload —— **在 Directus 11.5.1 無效**
+    （實測無條件回傳固定值也不生效）。改用 `action` + `item-update` 兩段式才成功。
+- **`products.stock` 欄位已刪除**（2026-08-03）。庫存只住在 `product_variants.stock`，
+  且該欄為 REQUIRED，缺貨填 `0`、不能留空。
+- 建立商品的必填：`name`、`description`、`image`（`slug` 已免填）。
+  另外 `status` 預設 `draft`，不改成 `published` 不會上架。
+
 ## 直接打 API 的連線守則（踩過的坑）
-連線：`https://gts-core.jaao.tw`，token 在專案 `.env` 的 `DIRECTUS_AI_AGENT_TOKEN`（**只放非 VITE_ 前綴、被 gitignore 的變數**；VITE_ 會被打包進前端＝公開）。
+連線：`https://gts-core.jaao.tw`。token 有**兩個位置、變數名不同**，別搞混：
+
+| 位置 | 變數名 | 用途 |
+|---|---|---|
+| 專案根 `.env` | `DIRECTUS_AI_AGENT_TOKEN` | Python 批次腳本 |
+| `.claude/skills/directus-schema-fetcher/.env` | `DIRECTUS_AI_TOKEN` | `fetch_schema.sh`、`setup-shopkeeper-role.sh` |
+
+兩者皆被 gitignore。**只放非 `VITE_` 前綴的變數**——`VITE_` 會被打包進前端＝公開。
 
 ```python
 import json, urllib.request
@@ -60,5 +81,18 @@ api("PATCH", f"/items/products/{pid}", body)
 - 頂層分類夠用，別加頂層；問題在子分類肥瘦不均。肥的（≥40 筆、混多種購買意圖）才細分，空的合併/刪。
 - 「電動工具」大分類商品極少 —— 此店本質是**手工具/配件/耗材**店。
 - 「雜項五金」保留真雜項（密碼鎖/磁鐵/延長線/LED燈泡/電池）即可，別硬塞。
+
+## 角色與權限（2026-08 起）
+
+Directus 有三個非系統角色：`Administrator`、`customer`（前台註冊會員）、`AI_agnet`，
+以及新增的 **`店務`** —— 給店內人員做日常商品維護。
+
+- 建立/補齊用 `.claude/skills/directus-schema-fetcher/setup-shopkeeper-role.sh`（冪等，可重跑）。
+- 該 policy `admin_access = false`：**改不了 schema、權限、系統設定**，這是它與 Administrator 的關鍵差別。
+- 可寫：`products`（不含 delete，下架改 status）、`product_variants`、三個 junction、`directus_files`。
+- 只讀：`categories`、`tags` —— 能掛既有分類/標籤，但**不能改分類樹**。新分類由管理者建
+  （分類 slug 要有意義的英文，且分類樹＝網站導覽的資訊架構）。
+- **Public 與 customer access 兩個 policy 都帶 `status=published` filter**，
+  所以訪客與註冊會員都讀不到 draft 的商品與規格。
 
 相關記憶：`category-taxonomy`。
