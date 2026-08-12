@@ -118,6 +118,51 @@ export const productService = {
     },
 
     /**
+     * 取每個分類最新幾張商品圖，供首頁分類卡做預覽拼貼。
+     *
+     * 刻意併發數個小查詢，而不是「一次撈一大包再前端分組」：後者要嘛撈太少
+     * 讓冷門分類開天窗，要嘛為了保險撈上百筆、傳一堆用不到的資料。這裡分類
+     * 數量由呼叫端固定（首頁只有 5 張卡），不是會無限膨脹的 N+1。
+     *
+     * 分類為 M2M 且每商品都掛 [父, 子]，故用父分類 id 直接就能撈到整個分支。
+     *
+     * @returns {Promise<Record<string, Array<{id,name,image}>>>} 以分類 id 為鍵
+     */
+    async getCategoryPreviews(categoryIds = [], limit = 3) {
+        if (!categoryIds.length) return {}
+
+        const results = await Promise.all(
+            categoryIds.map((id) =>
+                directus.request(readItems('products', {
+                    filter: {
+                        _and: [
+                            BASE_FILTER,
+                            { categories: { categories_id: { id: { _eq: id } } } },
+                            { image: { _nnull: true } },   // 沒主圖的商品不進預覽，免得拼貼出現佔位圖
+                        ]
+                    },
+                    fields: ['id', 'name', 'image'],
+                    sort: ['-date_created'],
+                    limit,
+                })).catch((err) => {
+                    // 單一分類撈失敗不該讓整區塊消失，該卡退回無圖樣式即可
+                    console.error(`Failed to fetch previews for category ${id}:`, err)
+                    return []
+                })
+            )
+        )
+
+        return categoryIds.reduce((acc, id, i) => {
+            acc[id] = (results[i] || []).map((p) => ({
+                id: p.id,
+                name: p.name,
+                image: getAssetUrl(p.image),
+            }))
+            return acc
+        }, {})
+    },
+
+    /**
      * 獲取所有分類 (需確保分類也是發布狀態)
      */
     async getCategories() {

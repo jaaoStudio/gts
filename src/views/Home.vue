@@ -128,6 +128,25 @@
           >
             <div v-if="i === 0" class="pointer-events-none absolute inset-0 bg-blueprint opacity-30" />
             <div v-if="i === 0" class="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-brand-500/20 blur-3xl" />
+
+            <!--
+              分類商品預覽：右側單張商品圖，左緣以斜角遮罩溶進卡片，填掉原本的留白。
+              置於文字節點之前 —— 文字帶 relative 會疊在上層，加上遮罩左段全透明，
+              分類名稱在任何斷點都壓得住圖。
+            -->
+            <div
+              v-if="previewFor(cat.id)"
+              class="pointer-events-none absolute inset-y-0 right-0 overflow-hidden"
+              :class="i === 0 ? 'w-[56%]' : 'w-[62%]'"
+            >
+              <img
+                :src="previewFor(cat.id).image"
+                :alt="previewFor(cat.id).name"
+                loading="lazy"
+                draggable="false"
+                class="mask-diagonal-fade h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.06]"
+              />
+            </div>
             <span
               :class="[
                 'relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors',
@@ -219,6 +238,9 @@ let heroCtx // gsap.context，於 onUnmounted 還原（含 SplitText 切散的 D
 const ringProducts = computed(() => productStore.products.slice(0, 4))
 const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
 
+// 分類卡右側的商品圖；尚未載入或該分類沒有商品時回 null，卡片自動退回無圖樣式
+const previewFor = (categoryId) => (categoryStore.previews[categoryId] || [])[0] || null
+
 const values = [
   { icon: PhMedal, label: '原廠正品', sub: '嚴選品牌供應' },
   { icon: PhTruck, label: '快速出貨', sub: '現貨商品盡速安排寄出' },
@@ -228,7 +250,10 @@ const values = [
 
 onMounted(() => {
   productStore.fetchFeaturedProducts()
-  categoryStore.fetchCategories()
+  // 分類到齊後才知道要撈哪幾個分類的預覽圖，故串在後面
+  categoryStore.fetchCategories().then(() => {
+    categoryStore.fetchCategoryPreviews(bentoCategories.value.map((c) => c.id))
+  })
   // auth 初始化已由 main.js 於 mount 前完成,此處不需再呼叫
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
