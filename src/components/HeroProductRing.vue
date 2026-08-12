@@ -1,15 +1,26 @@
 <template>
-  <div class="relative w-full">
-    <!-- Skeleton while products load -->
-    <div v-if="!products.length" class="mx-auto aspect-[4/5] w-[190px] animate-pulse rounded-[1.4rem] bg-steel-200" />
+  <!--
+    高度預先鎖定：商品是非同步載入的，skeleton(238px) → ring(418px) 的高度跳動
+    會把底下的 Value strip 整段往下推。min-h 讓容器在資料到達前就佔好 ring 的
+    最終高度（scene 400 + 指示點 18），載入前後版面完全不動。
+    用 min-h 而非 h：reduced-motion 分支是 2×2 靜態 grid，比 ring 高，需要能長高。
+  -->
+  <div class="relative flex w-full items-center justify-center min-h-[418px] sm:min-h-[458px]">
+    <!-- Skeleton while products load — 形狀貼合各自最終版面，避免切換時再跳一次 -->
+    <template v-if="!products.length">
+      <div v-if="reduced" class="mx-auto grid w-full max-w-md grid-cols-2 gap-4">
+        <div v-for="i in 4" :key="i" class="aspect-[204/295] animate-pulse rounded-[1.5rem] bg-steel-200" />
+      </div>
+      <div v-else class="mx-auto aspect-[4/5] w-[204px] animate-pulse rounded-[1.5rem] bg-steel-200 sm:w-[232px]" />
+    </template>
 
     <!-- Reduced-motion fallback: static grid, no 3D / no float / no drag -->
-    <div v-else-if="reduced" class="mx-auto grid max-w-md grid-cols-2 gap-4">
+    <div v-else-if="reduced" class="mx-auto grid w-full max-w-md grid-cols-2 gap-4">
       <HeroRingCard v-for="p in products" :key="p.id" :product="p" />
     </div>
 
     <!-- 3D poker-card ring -->
-    <div v-else>
+    <div v-else ref="stage" class="w-full">
       <div
         ref="scene"
         class="relative mx-auto h-[400px] w-full max-w-md touch-none select-none sm:h-[440px]"
@@ -64,6 +75,7 @@ const reduced = ref(
 )
 
 const scene = ref(null)
+const stage = ref(null)        // scene + 指示點的外層，進場動畫掛在這
 const activeIndex = ref(0)
 
 const DEG2RAD = Math.PI / 180
@@ -199,6 +211,15 @@ function init() {
     gsap.set(cards, { xPercent: -50, yPercent: -50 })
     computeRadius()
     layout()
+
+    // 進場：整組浮上來，卡片再一張一張透出。
+    // Home 的 .hero-el 進場在 onMounted 就播完了，但商品是非同步來的 —— 等資料到
+    // 位時那段動畫早已結束，ring 只會硬生生「跳出來」。所以進場得由 init() 觸發。
+    // 只動 .card-zoom 的 opacity：layout() 每幀改寫 .ring-card 的 opacity/scale，
+    // 而 .card-zoom 的 transform 屬於 CSS hover，兩邊都不碰 opacity，不會打架。
+    const zooms = cards.map((el) => el.querySelector('.card-zoom')).filter(Boolean)
+    if (stage.value) gsap.from(stage.value, { opacity: 0, y: 22, duration: 0.85, ease: 'power3.out' })
+    if (zooms.length) gsap.from(zooms, { opacity: 0, duration: 0.55, stagger: 0.09, delay: 0.12, ease: 'power2.out' })
 
     // Idle up/down float on each card's inner wrapper (independent of ring transform)
     bobTweens = cards.map((el, i) => {
