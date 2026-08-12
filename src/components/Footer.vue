@@ -5,7 +5,7 @@
 
     <div class="relative mx-auto max-w-6xl px-5 pb-10 pt-20 sm:px-8">
       <!-- Top: call line -->
-      <div class="flex flex-col gap-8 border-b border-white/10 pb-12 md:flex-row md:items-end md:justify-between">
+      <div v-reveal class="flex flex-col gap-8 border-b border-white/10 pb-12 md:flex-row md:items-end md:justify-between">
         <div>
           <img :src="horizontal" alt="GTS 金同心實業" class="h-24 w-auto" />
                   <p class="mt-5 max-w-sm text-sm leading-relaxed text-steel-400">
@@ -29,7 +29,7 @@
 
       <!-- Middle -->
       <div class="grid grid-cols-2 gap-x-6 gap-y-10 py-12 md:grid-cols-3">
-        <div>
+        <div v-reveal="{ y: 18 }">
           <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">商品分類</h3>
           <ul class="mt-5 space-y-3">
             <li v-for="cat in topCategories" :key="cat.id">
@@ -43,7 +43,7 @@
           </ul>
         </div>
 
-        <div>
+        <div v-reveal="{ y: 18, delay: 0.07 }">
           <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">客戶服務</h3>
           <ul class="mt-5 space-y-3">
             <li v-for="item in service" :key="item.to">
@@ -52,7 +52,7 @@
           </ul>
         </div>
 
-        <div>
+        <div v-reveal="{ y: 18, delay: 0.14 }">
           <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-steel-500">資訊</h3>
           <ul class="mt-5 space-y-3">
             <li v-for="item in legal" :key="item.to">

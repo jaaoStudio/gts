@@ -4,7 +4,7 @@
 
     <main class="mx-auto max-w-6xl px-5 pb-24 pt-24 sm:px-8">
       <!-- Header -->
-      <div class="mb-8">
+      <div v-reveal class="mb-8">
         <nav class="flex flex-wrap items-center gap-1.5 font-mono text-xs text-steel-400">
           <router-link to="/" class="transition-colors hover:text-brand-600">首頁</router-link>
           <PhCaretRight :size="12" weight="bold" />

@@ -103,6 +103,13 @@
     background-size: 44px 44px;
   }
 
+  /* SplitText line reveal (src/utils/splitReveal.js).
+     mask:"lines" 產生的外層是 overflow:clip，行高很緊時（如 hero 的 leading-[1.05]）
+     中文標點與下緣會被切掉。給行一點 padding 讓遮罩長高，再從遮罩扣回等量 margin，
+     整體版面高度不變。這些元素由 SplitText 動態生成，拿不到 scoped 屬性，故寫在全域。 */
+  .line-reveal { padding-bottom: 0.1em; }
+  .line-reveal-mask { margin-bottom: -0.1em; }
+
   /* Document prose for content pages (privacy / terms / faq / shipping / warranty) */
   .doc { color: var(--color-steel-600); }
   .doc > :first-child { margin-top: 0; }

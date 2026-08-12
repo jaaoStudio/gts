@@ -15,7 +15,10 @@
               <span class="h-1.5 w-1.5 rounded-full bg-brand-500" /> Est. 1995 · 專業五金供應
             </span>
 
-            <h1 class="hero-el mt-6 font-display text-[2.7rem] font-bold leading-[1.05] tracking-tight text-steel-900 sm:text-6xl lg:text-[4.1rem]">
+            <h1
+              ref="heroTitleRef"
+              class="mt-6 font-display text-[2.7rem] font-bold leading-[1.05] tracking-tight text-steel-900 sm:text-6xl lg:text-[4.1rem]"
+            >
               五金工具，<br />
               選對<span class="text-brand-500">一次到位</span>。
             </h1>
@@ -52,7 +55,12 @@
         <!-- Value strip -->
         <div class="relative border-y border-steel-200 bg-white/60 backdrop-blur">
           <div class="mx-auto grid max-w-6xl grid-cols-2 divide-steel-200 px-5 sm:px-8 md:grid-cols-4 md:divide-x">
-            <div v-for="v in values" :key="v.label" class="flex items-center gap-3 py-5 md:justify-center">
+            <div
+              v-for="(v, i) in values"
+              :key="v.label"
+              v-reveal="{ delay: i * 0.06, y: 16 }"
+              class="flex items-center gap-3 py-5 md:justify-center"
+            >
               <component :is="v.icon" :size="24" weight="regular" class="text-brand-500" />
               <div>
                 <p class="font-display text-sm font-semibold text-steel-900">{{ v.label }}</p>
@@ -194,6 +202,7 @@ import Navbar from '../components/Navbar.vue'
 import ProductCard from '../components/ProductCard.vue'
 import HeroProductRing from '../components/HeroProductRing.vue'
 import Footer from '../components/Footer.vue'
+import { lineReveal } from '../utils/splitReveal'
 import {
   PhArrowRight, PhPhoneCall, PhShieldCheck, PhStack,
   PhTruck, PhMedal, PhHeadset,
@@ -204,7 +213,8 @@ const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
 
 const heroRef = ref(null)
-let heroCtx // gsap.context，於 onUnmounted 還原
+const heroTitleRef = ref(null)
+let heroCtx // gsap.context，於 onUnmounted 還原（含 SplitText 切散的 DOM）
 
 const ringProducts = computed(() => productStore.products.slice(0, 4))
 const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
@@ -231,6 +241,8 @@ onMounted(() => {
       ease: 'power3.out',
       stagger: 0.09,
     })
+    // 標題另外走逐行揭露；delay 0.12 讓它接在 eyebrow 之後、依閱讀順序出現
+    lineReveal(heroTitleRef.value, { delay: 0.12 })
   }, heroRef.value)
 })
 
