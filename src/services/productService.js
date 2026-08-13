@@ -166,10 +166,18 @@ export const productService = {
      * 獲取所有分類 (需確保分類也是發布狀態)
      */
     async getCategories() {
-        return await directus.request(readItems('categories', {
+        // ⚠️ fields 動到時務必同步 Directus 的 Public / customer access 兩個 policy：
+        // 這兩個 policy 的 categories read 是逐一列欄位而非 *，查一個沒開放的欄位
+        // 會讓「整個請求」回 FORBIDDEN，導覽選單、首頁 bento、Footer 分類會一起空掉。
+        const items = await directus.request(readItems('categories', {
             filter: { status: { _eq: 'published' } }, // 確保分類已發布
-            fields: ['id', 'name', 'slug', 'parent', 'sort'],
+            fields: ['id', 'name', 'slug', 'parent', 'sort', 'preview_image'],
             sort: ['sort']
+        }));
+
+        return items.map((c) => ({
+            ...c,
+            preview_image: c.preview_image ? getAssetUrl(c.preview_image) : null,
         }));
     },
 

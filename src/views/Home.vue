@@ -135,13 +135,13 @@
               分類名稱在任何斷點都壓得住圖。
             -->
             <div
-              v-if="previewFor(cat.id)"
+              v-if="previewFor(cat)"
               class="pointer-events-none absolute inset-y-0 right-0 overflow-hidden"
               :class="i === 0 ? 'w-[56%]' : 'w-[62%]'"
             >
               <img
-                :src="previewFor(cat.id).image"
-                :alt="previewFor(cat.id).name"
+                :src="previewFor(cat).image"
+                :alt="previewFor(cat).name"
                 loading="lazy"
                 draggable="false"
                 class="mask-diagonal-fade h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.06]"
@@ -238,8 +238,14 @@ let heroCtx // gsap.context，於 onUnmounted 還原（含 SplitText 切散的 D
 const ringProducts = computed(() => productStore.products.slice(0, 4))
 const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
 
-// 分類卡右側的商品圖；尚未載入或該分類沒有商品時回 null，卡片自動退回無圖樣式
-const previewFor = (categoryId) => (categoryStore.previews[categoryId] || [])[0] || null
+// 分類卡右側的圖，依序：後台指定的代表圖 → 該分類最新一件商品的主圖 → 都沒有就回
+// null，卡片自動退回純圖示樣式。分兩層是因為商品照多半是零售包裝照，構圖雜；
+// preview_image 讓人工挑一張乾淨的蓋過去，且可以只補幾個分類，不必一次到位。
+const previewFor = (cat) => {
+  if (cat.preview_image) return { image: cat.preview_image, name: cat.name }
+  const product = (categoryStore.previews[cat.id] || [])[0]
+  return product ? { image: product.image, name: product.name } : null
+}
 
 const values = [
   { icon: PhMedal, label: '原廠正品', sub: '嚴選品牌供應' },
@@ -250,9 +256,12 @@ const values = [
 
 onMounted(() => {
   productStore.fetchFeaturedProducts()
-  // 分類到齊後才知道要撈哪幾個分類的預覽圖，故串在後面
+  // 分類到齊後才知道要撈哪幾個分類的預覽圖，故串在後面。
+  // 已指定 preview_image 的分類不必再撈商品圖，省掉用不到的請求。
   categoryStore.fetchCategories().then(() => {
-    categoryStore.fetchCategoryPreviews(bentoCategories.value.map((c) => c.id))
+    categoryStore.fetchCategoryPreviews(
+      bentoCategories.value.filter((c) => !c.preview_image).map((c) => c.id)
+    )
   })
   // auth 初始化已由 main.js 於 mount 前完成,此處不需再呼叫
 
