@@ -52,13 +52,18 @@ export const productService = {
                     fields: LIST_FIELDS // 使用共用欄位
                 })),
                 directus.request(aggregate('products', {
-                    aggregate: { count: '*' },
+                    // ⚠️ 必須 countDistinct，不能用 count: '*'。
+                    // 分類是 M2M 且每商品都掛 [父, 子]，篩選父分類時 categoryIds 會同時
+                    // 含父與子，JOIN 後同一件商品命中多列，count(*) 數的是「列數」不是
+                    // 商品數 —— 工安防護實測 9 件被算成 18 件，連帶 totalPages 算出 2 頁、
+                    // 第 2 頁全空。countDistinct 對 id 去重才是真正的商品數。
+                    aggregate: { countDistinct: 'id' },
                     query: { filter: combinedFilter }
                 }))
             ]);
 
             // 注意：Directus aggregate 回傳的是陣列，需安全轉型
-            const totalCount = Number(countResult[0]?.count || 0);
+            const totalCount = Number(countResult[0]?.countDistinct?.id || 0);
 
             return {
                 data: productMapper.mapProducts(data), // readItems 直接回傳 data 陣列
