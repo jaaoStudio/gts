@@ -134,8 +134,16 @@
             </div>
 
             <!-- Pagination -->
-            <div v-if="productStore.totalPages > 1" class="mt-14 flex flex-col items-center gap-4">
-              <div class="flex items-center gap-2">
+            <nav v-if="productStore.totalPages > 1" class="mt-14 flex flex-col items-center gap-4" aria-label="分頁導覽">
+              <div class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+                <button
+                  @click="goToPage(1)"
+                  :disabled="!productStore.hasPrevPage"
+                  class="hidden h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  aria-label="第一頁"
+                >
+                  <PhCaretDoubleLeft :size="16" weight="bold" />
+                </button>
                 <button
                   @click="goToPage(productStore.currentPage - 1)"
                   :disabled="!productStore.hasPrevPage"
@@ -144,15 +152,26 @@
                 >
                   <PhCaretLeft :size="16" weight="bold" />
                 </button>
-                <button
-                  v-for="page in visiblePages"
-                  :key="page"
-                  @click="goToPage(page)"
-                  class="h-10 min-w-10 rounded-full px-3 font-mono text-sm font-medium transition-colors"
-                  :class="page === productStore.currentPage ? 'bg-steel-900 text-white' : 'border border-steel-200 bg-white text-steel-700 hover:border-steel-900'"
-                >
-                  {{ page }}
-                </button>
+
+                <!-- 以 index 當 key：省略號可能出現兩次，用值當 key 會重複 -->
+                <template v-for="(item, idx) in pageItems" :key="idx">
+                  <span
+                    v-if="item === ELLIPSIS"
+                    class="flex h-10 w-6 items-end justify-center pb-2 font-mono text-sm text-steel-400"
+                    aria-hidden="true"
+                  >…</span>
+                  <button
+                    v-else
+                    @click="goToPage(item)"
+                    class="h-10 min-w-10 rounded-full px-3 font-mono text-sm font-medium transition-colors"
+                    :class="item === productStore.currentPage ? 'bg-steel-900 text-white' : 'border border-steel-200 bg-white text-steel-700 hover:border-steel-900'"
+                    :aria-current="item === productStore.currentPage ? 'page' : undefined"
+                    :aria-label="`第 ${item} 頁`"
+                  >
+                    {{ item }}
+                  </button>
+                </template>
+
                 <button
                   @click="goToPage(productStore.currentPage + 1)"
                   :disabled="!productStore.hasNextPage"
@@ -161,9 +180,48 @@
                 >
                   <PhCaretRight :size="16" weight="bold" />
                 </button>
+                <button
+                  @click="goToPage(productStore.totalPages)"
+                  :disabled="!productStore.hasNextPage"
+                  class="hidden h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  aria-label="最後一頁"
+                >
+                  <PhCaretDoubleRight :size="16" weight="bold" />
+                </button>
               </div>
-              <p class="font-mono text-xs text-steel-400">第 {{ productStore.currentPage }} / {{ productStore.totalPages }} 頁</p>
-            </div>
+
+              <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+                <p class="font-mono text-xs text-steel-400">
+                  第 {{ productStore.currentPage }} / {{ productStore.totalPages }} 頁 · 共 {{ productStore.totalItems }} 件
+                </p>
+
+                <!-- 頁數多到出現省略號時才給跳頁框；頁數少時逐頁點就夠，多一個輸入框只是噪音 -->
+                <form
+                  v-if="productStore.totalPages > PAGE_WINDOW_MAX"
+                  @submit.prevent="submitJump"
+                  class="flex items-center gap-2 font-mono text-xs text-steel-500"
+                >
+                  <label for="jump-page">跳至</label>
+                  <input
+                    id="jump-page"
+                    v-model="jumpInput"
+                    type="number"
+                    min="1"
+                    :max="productStore.totalPages"
+                    inputmode="numeric"
+                    class="h-9 w-16 rounded-full border border-steel-200 bg-white px-3 text-center text-sm text-steel-900 transition-colors focus:border-steel-900 focus:outline-none"
+                    :aria-label="`跳至指定頁，1 到 ${productStore.totalPages}`"
+                  />
+                  <span>頁</span>
+                  <button
+                    type="submit"
+                    class="h-9 rounded-full bg-steel-900 px-4 font-display text-xs font-semibold text-white transition-colors hover:bg-brand-500"
+                  >
+                    前往
+                  </button>
+                </form>
+              </div>
+            </nav>
           </div>
         </div>
       </div>
@@ -174,14 +232,14 @@
 </template>
 
 <script setup>
-import { computed, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product'
 import { useCategoryStore } from '../stores/category'
 import Navbar from '../components/Navbar.vue'
 import ProductCard from '../components/ProductCard.vue'
 import Footer from '../components/Footer.vue'
-import { PhCaretRight, PhCaretLeft, PhX, PhPackage } from '@phosphor-icons/vue'
+import { PhCaretRight, PhCaretLeft, PhCaretDoubleLeft, PhCaretDoubleRight, PhX, PhPackage } from '@phosphor-icons/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -203,16 +261,59 @@ const breadcrumbs = computed(() => {
   return categoryStore.getCategoryBreadcrumb(categorySlug.value)
 })
 
-const visiblePages = computed(() => {
-  const current = productStore.currentPage
+// 分頁按鈕：首末頁永遠顯示，中間視窗跟著目前頁走，斷開處補省略號。
+// PAGE_WINDOW_MAX 是「不省略就全部列出」的上限，也是最多會出現的按鈕數：
+// 1 + … + (current-1, current, current+1) + … + total = 7 顆，寬度不會亂跳。
+const ELLIPSIS = '…'
+const PAGE_WINDOW_MAX = 7      // 桌機：不省略就全列出的上限，也是最多出現的項目數
+const PAGE_WINDOW_MIN = 5      // 手機：40px 按鈕排 7 顆會折行，收到 5 顆才排得下一列
+
+// 手機另用較窄的視窗。純視覺調整，故用 matchMedia 而非在 template 塞 hidden/block，
+// 後者會讓兩套按鈕同時存在於 DOM，鍵盤 Tab 與螢幕閱讀器都會讀到兩份。
+const isCompact = ref(false)
+let mq = null
+const onMqChange = (e) => { isCompact.value = e.matches }
+
+const pageItems = computed(() => {
   const total = productStore.totalPages
-  const delta = 2
-  const pages = []
-  for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) {
-    pages.push(i)
+  const current = productStore.currentPage
+  const max = isCompact.value ? PAGE_WINDOW_MIN : PAGE_WINDOW_MAX
+  if (total <= max) {
+    return Array.from({ length: total }, (_, i) => i + 1)
   }
-  return pages
+
+  const range = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
+  const edgeRun = max - 2   // 頭/尾形態的連續頁數（首或末頁 + 省略號佔掉 2 格）
+  const midRun = max - 4    // 中段形態的連續頁數（首末頁 + 兩個省略號佔掉 4 格）
+
+  // 靠近頭尾時把視窗往內展開，而不是讓它被邊界截短。
+  // 否則在第 1 頁只會得到「1 2 … 20」，看得到的頁數反而比停在中間時少。
+  // 三種形態的項目數都等於 max，按鈕列寬度不會隨翻頁跳動。
+  let items
+  if (current <= edgeRun - 1) {
+    items = [...range(1, edgeRun), ELLIPSIS, total]
+  } else if (current >= total - edgeRun + 2) {
+    items = [1, ELLIPSIS, ...range(total - edgeRun + 1, total)]
+  } else {
+    const before = Math.floor((midRun - 1) / 2)
+    items = [1, ELLIPSIS, ...range(current - before, current - before + midRun - 1), ELLIPSIS, total]
+  }
+
+  // 省略號只藏住一頁時直接把那頁印出來 —— 「1 … 3」比「1 2 3」還難用，且一樣寬
+  return items.map((it, i) =>
+    it === ELLIPSIS && items[i + 1] - items[i - 1] === 2 ? items[i - 1] + 1 : it
+  )
 })
+
+// 跳頁輸入框
+const jumpInput = ref('')
+const submitJump = () => {
+  const page = Number(jumpInput.value)
+  if (!Number.isInteger(page)) return
+  // 夾在有效範圍內：使用者打 999 就跳到最後一頁，而不是靜靜地什麼都沒發生
+  goToPage(Math.min(Math.max(page, 1), productStore.totalPages))
+  jumpInput.value = ''
+}
 
 const fetchFilteredProducts = async (page = 1) => {
   await productStore.fetchProducts(page, {
@@ -237,7 +338,14 @@ watch(() => [route.query.category, route.query.search], () => {
 }, { immediate: false })
 
 onMounted(async () => {
+  // Tailwind sm 斷點是 640px，這裡的 639px 對應「未達 sm」
+  mq = window.matchMedia('(max-width: 639px)')
+  isCompact.value = mq.matches
+  mq.addEventListener('change', onMqChange)
+
   await categoryStore.fetchCategories()
   fetchFilteredProducts(1)
 })
+
+onUnmounted(() => mq?.removeEventListener('change', onMqChange))
 </script>
