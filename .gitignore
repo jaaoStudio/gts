@@ -24,4 +24,4 @@ dist-ssr
 *.sln
 *.sw?
 .env.docker
-.agents/skills/**/.env
+.claude/skills/**/.env

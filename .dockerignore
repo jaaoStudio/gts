@@ -6,7 +6,6 @@ dist
 .env.*
 *.local
 .claude
-.agents
 docs
 deploy
 npm-debug.log*

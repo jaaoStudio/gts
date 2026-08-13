@@ -64,6 +64,20 @@ for h in gts.jaao.tw jaao.tw gts-core.jaao.tw; do
 3. **前端 nginx 啟動硬相依 `directus_app`**:`proxy_pass http://directus_app:8055` 在 nginx 啟動時就解析主機名,`directus_app` 不可解析(不在 traefik-net)→ nginx 起不來。所以 slot 與 directus_app 必須同在 `traefik-net`。
 4. **traefik-net 連線的脆弱點**:`directus_app` / `gts_store_frontend` 接 traefik-net 是**手動 `docker network connect`**、不在它們自己的 compose 裡。若 `docker compose down/up` 重建這些容器會掉連線 → Traefik 找不到後端 → 站掛。長久解:把 `traefik-net` 寫進它們的 compose。
 
+## image 組成(`Dockerfile` + `nginx/nginx.conf`)
+
+兩階段:`node:24-alpine` builder(`npm ci` → `npm run build`)→ `nginx:alpine`,
+把 `dist/` 複製到 `/usr/share/nginx/html`,`EXPOSE 80`。
+
+- **`VITE_*` 是 build-time 烘進靜態檔的**,不是 runtime 環境變數。Dockerfile 以
+  `ARG VITE_DIRECTUS_URL=/api` / `ARG VITE_DIRECTUS_PUBLIC_URL` 接,轉成 `ENV` 供 build 使用。
+  換後端網址**必須重 build image**,改容器環境變數沒有用。
+- `nginx/nginx.conf` 負責:靜態檔服務、SPA fallback(`try_files $uri $uri/ /index.html`)、
+  `/api` 反代到 `directus_app:8055`。只 `listen 80`(無 IPv6)——healthcheck 用 `127.0.0.1`,見上方雷區 2。
+- **根目錄的 `docker-compose.yml` 不是正式部署路徑**:它仍指向舊的
+  `${REMOTE_REGISTRY_IP}`、`9053:80`,屬本機/遺留用途。正式藍綠部署走 `deploy/docker-compose.yml`
+  + harbor image,由 CI 呼叫 `~/gts-web/deploy.sh`。
+
 ## 首次 bootstrap 一顆 image(不經 CI)
 
 本機已登入 harbor,可直接 build+push(複製 CI 的 build-args):

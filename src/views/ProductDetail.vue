@@ -190,6 +190,7 @@ const sanitizedDescription = computed(() =>
   product.value?.description ? DOMPurify.sanitize(product.value.description) : ''
 )
 
+// draft/archived 規格已在 productMapper.mapProduct 濾除，此處拿到的即是上架中的規格
 const publishedVariants = computed(() => {
   if (!product.value?.variants) return []
   return product.value.variants
