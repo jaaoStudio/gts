@@ -103,6 +103,24 @@
     background-size: 44px 44px;
   }
 
+  /* 斜角淡出遮罩：首頁分類卡右側的商品圖用。
+     以遮罩（而非疊一層漸層）淡出，圖片左緣才能真的變透明，
+     白底卡與深色卡可共用同一個 class，不必各自配底色。 */
+  .mask-diagonal-fade {
+    /* 左段不歸零，保留 0.12~0.2 的淡影，圖片是「溶進卡片」而不是被切掉一半。
+       上限壓在 0.2：文字區（小卡在 390px 時分類名稱止於約 28%）就落在這段，
+       再高就會干擾字。46% 之後迅速轉實，64% 起完全不透明。 */
+    -webkit-mask-image: linear-gradient(115deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.2) 28%, rgba(0, 0, 0, 0.62) 46%, #000 64%);
+    mask-image: linear-gradient(115deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.2) 28%, rgba(0, 0, 0, 0.62) 46%, #000 64%);
+  }
+
+  /* SplitText line reveal (src/utils/splitReveal.js).
+     mask:"lines" 產生的外層是 overflow:clip，行高很緊時（如 hero 的 leading-[1.05]）
+     中文標點與下緣會被切掉。給行一點 padding 讓遮罩長高，再從遮罩扣回等量 margin，
+     整體版面高度不變。這些元素由 SplitText 動態生成，拿不到 scoped 屬性，故寫在全域。 */
+  .line-reveal { padding-bottom: 0.1em; }
+  .line-reveal-mask { margin-bottom: -0.1em; }
+
   /* Document prose for content pages (privacy / terms / faq / shipping / warranty) */
   .doc { color: var(--color-steel-600); }
   .doc > :first-child { margin-top: 0; }

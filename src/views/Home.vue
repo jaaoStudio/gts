@@ -15,7 +15,10 @@
               <span class="h-1.5 w-1.5 rounded-full bg-brand-500" /> Est. 1995 · 專業五金供應
             </span>
 
-            <h1 class="hero-el mt-6 font-display text-[2.7rem] font-bold leading-[1.05] tracking-tight text-steel-900 sm:text-6xl lg:text-[4.1rem]">
+            <h1
+              ref="heroTitleRef"
+              class="mt-6 font-display text-[2.7rem] font-bold leading-[1.05] tracking-tight text-steel-900 sm:text-6xl lg:text-[4.1rem]"
+            >
               五金工具，<br />
               選對<span class="text-brand-500">一次到位</span>。
             </h1>
@@ -52,7 +55,12 @@
         <!-- Value strip -->
         <div class="relative border-y border-steel-200 bg-white/60 backdrop-blur">
           <div class="mx-auto grid max-w-6xl grid-cols-2 divide-steel-200 px-5 sm:px-8 md:grid-cols-4 md:divide-x">
-            <div v-for="v in values" :key="v.label" class="flex items-center gap-3 py-5 md:justify-center">
+            <div
+              v-for="(v, i) in values"
+              :key="v.label"
+              v-reveal="{ delay: i * 0.06, y: 16 }"
+              class="flex items-center gap-3 py-5 md:justify-center"
+            >
               <component :is="v.icon" :size="24" weight="regular" class="text-brand-500" />
               <div>
                 <p class="font-display text-sm font-semibold text-steel-900">{{ v.label }}</p>
@@ -120,6 +128,25 @@
           >
             <div v-if="i === 0" class="pointer-events-none absolute inset-0 bg-blueprint opacity-30" />
             <div v-if="i === 0" class="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-brand-500/20 blur-3xl" />
+
+            <!--
+              分類商品預覽：右側單張商品圖，左緣以斜角遮罩溶進卡片，填掉原本的留白。
+              置於文字節點之前 —— 文字帶 relative 會疊在上層，加上遮罩左段全透明，
+              分類名稱在任何斷點都壓得住圖。
+            -->
+            <div
+              v-if="previewFor(cat)"
+              class="pointer-events-none absolute inset-y-0 right-0 overflow-hidden"
+              :class="i === 0 ? 'w-[56%]' : 'w-[62%]'"
+            >
+              <img
+                :src="previewFor(cat).image"
+                :alt="previewFor(cat).name"
+                loading="lazy"
+                draggable="false"
+                class="mask-diagonal-fade h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.06]"
+              />
+            </div>
             <span
               :class="[
                 'relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors',
@@ -194,6 +221,7 @@ import Navbar from '../components/Navbar.vue'
 import ProductCard from '../components/ProductCard.vue'
 import HeroProductRing from '../components/HeroProductRing.vue'
 import Footer from '../components/Footer.vue'
+import { lineReveal } from '../utils/splitReveal'
 import {
   PhArrowRight, PhPhoneCall, PhShieldCheck, PhStack,
   PhTruck, PhMedal, PhHeadset,
@@ -204,10 +232,20 @@ const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
 
 const heroRef = ref(null)
-let heroCtx // gsap.context，於 onUnmounted 還原
+const heroTitleRef = ref(null)
+let heroCtx // gsap.context，於 onUnmounted 還原（含 SplitText 切散的 DOM）
 
 const ringProducts = computed(() => productStore.products.slice(0, 4))
 const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
+
+// 分類卡右側的圖，依序：後台指定的代表圖 → 該分類最新一件商品的主圖 → 都沒有就回
+// null，卡片自動退回純圖示樣式。分兩層是因為商品照多半是零售包裝照，構圖雜；
+// preview_image 讓人工挑一張乾淨的蓋過去，且可以只補幾個分類，不必一次到位。
+const previewFor = (cat) => {
+  if (cat.preview_image) return { image: cat.preview_image, name: cat.name }
+  const product = (categoryStore.previews[cat.id] || [])[0]
+  return product ? { image: product.image, name: product.name } : null
+}
 
 const values = [
   { icon: PhMedal, label: '原廠正品', sub: '嚴選品牌供應' },
@@ -218,7 +256,13 @@ const values = [
 
 onMounted(() => {
   productStore.fetchFeaturedProducts()
-  categoryStore.fetchCategories()
+  // 分類到齊後才知道要撈哪幾個分類的預覽圖，故串在後面。
+  // 已指定 preview_image 的分類不必再撈商品圖，省掉用不到的請求。
+  categoryStore.fetchCategories().then(() => {
+    categoryStore.fetchCategoryPreviews(
+      bentoCategories.value.filter((c) => !c.preview_image).map((c) => c.id)
+    )
+  })
   // auth 初始化已由 main.js 於 mount 前完成,此處不需再呼叫
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -231,6 +275,8 @@ onMounted(() => {
       ease: 'power3.out',
       stagger: 0.09,
     })
+    // 標題另外走逐行揭露；delay 0.12 讓它接在 eyebrow 之後、依閱讀順序出現
+    lineReveal(heroTitleRef.value, { delay: 0.12 })
   }, heroRef.value)
 })
 

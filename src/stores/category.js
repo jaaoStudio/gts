@@ -7,6 +7,9 @@ export const useCategoryStore = defineStore('category', {
         loading: false,
         loaded: false,
         error: null,
+        // 首頁分類卡的商品圖預覽，形如 { [categoryId]: [{ id, name, image }] }
+        previews: {},
+        previewsLoading: false,
     }),
 
     getters: {
@@ -134,10 +137,34 @@ export const useCategoryStore = defineStore('category', {
         },
 
         /**
+         * 載入指定分類的商品圖預覽（首頁分類卡用）。
+         * 只補尚未載入過的分類，重複進出首頁不會重打 API。
+         */
+        async fetchCategoryPreviews(categoryIds = []) {
+            const missing = categoryIds.filter((id) => id && !this.previews[id])
+            if (!missing.length || this.previewsLoading) return this.previews
+
+            this.previewsLoading = true
+            try {
+                // 卡片只放一張圖，多撈是浪費頻寬
+                const fetched = await productService.getCategoryPreviews(missing, 1)
+                this.previews = { ...this.previews, ...fetched }
+                return this.previews
+            } catch (err) {
+                // 預覽圖純屬裝飾，失敗就讓分類卡維持無圖樣式，不要影響整頁
+                console.error('Error loading category previews:', err)
+                return this.previews
+            } finally {
+                this.previewsLoading = false
+            }
+        },
+
+        /**
          * 強制重新載入分類（用於後台更新後刷新）
          */
         async refreshCategories() {
             this.loaded = false
+            this.previews = {}   // 分類重載後預覽圖也要跟著失效，否則會留著舊分類的圖
             return await this.fetchCategories()
         },
     },
