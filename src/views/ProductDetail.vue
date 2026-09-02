@@ -112,8 +112,35 @@
               </div>
             </div>
 
+            <!-- 線上購買：外部通路導流 -->
+            <div v-if="hasExternalChannel" class="mt-6">
+              <p class="mb-3 font-mono text-xs uppercase tracking-[0.16em] text-steel-500">線上購買</p>
+              <div class="flex flex-col gap-3 sm:flex-row">
+                <a
+                  v-if="product.iopenUrl"
+                  :href="product.iopenUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-brand-500 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-600 active:scale-[0.98]"
+                >
+                  <PhStorefront :size="20" weight="bold" /> 到 iOPEN Mall 購買
+                </a>
+                <a
+                  v-if="product.shopeeUrl"
+                  :href="product.shopeeUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full border border-steel-300 px-6 py-4 font-display text-base font-semibold text-steel-800 transition-colors duration-300 hover:border-[#EE4D2D] hover:text-[#EE4D2D]"
+                >
+                  <PhBagSimple :size="20" weight="bold" /> 到蝦皮購買
+                </a>
+              </div>
+              <p class="mt-2.5 text-sm text-steel-500">可線上刷卡與超商取貨，付款與出貨由平台處理。</p>
+            </div>
+
             <!-- Contact CTAs -->
-            <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+            <p v-if="hasExternalChannel" class="mt-6 mb-3 font-mono text-xs uppercase tracking-[0.16em] text-steel-500">或聯絡我們</p>
+            <div class="flex flex-col gap-3 sm:flex-row" :class="hasExternalChannel ? '' : 'mt-6'">
               <a
                 href="tel:0426580936"
                 class="group flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98]"
@@ -158,7 +185,7 @@ import { useCategoryStore } from '../stores/category'
 import { useSettingsStore } from '../stores/settings'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
-import { PhCaretRight, PhPhoneCall, PhSmileyXEyes } from '@phosphor-icons/vue'
+import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple } from '@phosphor-icons/vue'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
@@ -178,6 +205,9 @@ const galleryImages = computed(() => {
   if (product.value.gallery && Array.isArray(product.value.gallery)) imgs.push(...product.value.gallery)
   return [...new Set(imgs)]
 })
+
+// 外部通路連結只在詳情頁的 DETAIL_FIELDS 帶回，且已在 mapper 過濾過 scheme
+const hasExternalChannel = computed(() => !!(product.value?.iopenUrl || product.value?.shopeeUrl))
 
 // mapProduct 已把標籤攤平成 tag 物件陣列（id/name/color）
 const productTags = computed(() => product.value?.tags || [])

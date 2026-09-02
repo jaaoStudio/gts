@@ -18,7 +18,9 @@ const DETAIL_FIELDS = [
     'categories.categories_id.id', 'categories.categories_id.name', 'categories.categories_id.slug',
     'tags.tags_id.id',
     'variants.id', 'variants.spec_name', 'variants.price', 'variants.stock', 'variants.sku', 'variants.status', 'variants.variant_image',
-    'gallery.directus_files_id'
+    'gallery.directus_files_id',
+    // 外部通路導流：只有詳情頁用得到，不放進 LIST_FIELDS 以免列表 payload 變大
+    'iopen_url', 'shopee_url'
 ];
 
 // 2. 預設過濾條件：只顯示已上架的商品
@@ -241,6 +243,17 @@ export const productService = {
     }
 }
 
+// 外部通路連結由後台人工貼上，直接綁進 <a href> 前先擋掉 javascript: 等 scheme
+const safeExternalUrl = (url) => {
+    if (typeof url !== 'string' || !url.trim()) return null
+    try {
+        const parsed = new URL(url.trim())
+        return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null
+    } catch {
+        return null
+    }
+}
+
 /**
  * 產品資料轉換器
  */
@@ -317,7 +330,10 @@ export const productMapper = {
             badge: firstTag ? firstTag.name : null,
             badgeColor: firstTag ? firstTag.color : null,
             tags: tags,
-            variants: variants
+            variants: variants,
+            // 外部通路連結（僅詳情頁會帶回，列表為 undefined）
+            iopenUrl: safeExternalUrl(item.iopen_url),
+            shopeeUrl: safeExternalUrl(item.shopee_url)
         }
     },
 
