@@ -27,6 +27,12 @@ const routes = [
         meta: { title: '商品｜金同心實業' } // ProductDetail 載入後會用實際商品名覆蓋
     },
     {
+        path: '/order',
+        name: 'OrderForm',
+        component: () => import('../views/OrderForm.vue'),
+        meta: { title: '我的訂購單｜金同心實業' }
+    },
+    {
         path: '/contact',
         name: 'Contact',
         component: () => import('../views/Contact.vue'),

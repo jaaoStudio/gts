@@ -240,6 +240,26 @@ export const productService = {
     async getFilteredProducts({ page = 1, limit = 12, categoryIds = [], keyword = '', sort = '-date_created' } = {}) {
         const filter = this.buildFilter({ categoryIds, keyword })
         return await this.getProducts({ page, limit, filter, sort })
+    },
+
+    /**
+     * 依 id 批次取規格（含所屬商品的上架狀態），供訂購單重新驗證使用。
+     * 刻意不套 BASE_FILTER：下架的規格也要撈回來，才能告訴使用者「這項已下架」，
+     * 而不是靜默消失。查不到的 id 代表資料已被刪除。
+     * @param {Array<number>} ids
+     */
+    async getVariantsByIds(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return []
+
+        return directus.request(readItems('product_variants', {
+            filter: { id: { _in: ids } },
+            fields: [
+                'id', 'spec_name', 'sku', 'price', 'stock', 'status', 'variant_image',
+                'product_id.id', 'product_id.name', 'product_id.slug',
+                'product_id.status', 'product_id.image',
+            ],
+            limit: -1,
+        }))
     }
 }
 

@@ -112,6 +112,51 @@
               </div>
             </div>
 
+            <!-- 加入訂購單 -->
+            <div v-if="selectedVariant" class="mt-6">
+              <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="flex items-center gap-1 rounded-full border border-steel-200 p-1.5">
+                  <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center rounded-full text-steel-600 transition-colors hover:bg-steel-100 hover:text-steel-900 disabled:opacity-40"
+                    :disabled="quantity <= 1"
+                    aria-label="減少數量"
+                    @click="quantity--"
+                  >
+                    <PhMinus :size="14" weight="bold" />
+                  </button>
+                  <span class="min-w-10 text-center font-mono text-sm font-semibold text-steel-900">
+                    {{ quantity }}
+                  </span>
+                  <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center rounded-full text-steel-600 transition-colors hover:bg-steel-100 hover:text-steel-900"
+                    aria-label="增加數量"
+                    @click="quantity++"
+                  >
+                    <PhPlus :size="14" weight="bold" />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98]"
+                  @click="addToOrder"
+                >
+                  <PhPlusCircle :size="20" weight="bold" />
+                  {{ justAdded ? '已加入訂購單' : '加入訂購單' }}
+                </button>
+              </div>
+
+              <router-link
+                v-if="orderStore.count > 0"
+                to="/order"
+                class="mt-2.5 inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.16em] text-steel-500 transition-colors hover:text-brand-500"
+              >
+                訂購單已有 {{ orderStore.count }} 件 <PhArrowRight :size="12" weight="bold" />
+              </router-link>
+            </div>
+
             <!-- 線上購買：外部通路導流 -->
             <div v-if="hasExternalChannel" class="mt-6">
               <p class="mb-3 font-mono text-xs uppercase tracking-[0.16em] text-steel-500">線上購買</p>
@@ -176,21 +221,24 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
 import { useRoute } from 'vue-router'
 import { productService } from '../services/productService'
 import { useCategoryStore } from '../stores/category'
 import { useSettingsStore } from '../stores/settings'
+import { useOrderStore } from '../stores/order'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
-import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple } from '@phosphor-icons/vue'
+import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple,
+         PhPlus, PhMinus, PhPlusCircle, PhArrowRight } from '@phosphor-icons/vue'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
 const categoryStore = useCategoryStore()
 const settingsStore = useSettingsStore()
+const orderStore = useOrderStore()
 
 const product = ref(null)
 const loading = ref(true)
@@ -208,6 +256,24 @@ const galleryImages = computed(() => {
 
 // 外部通路連結只在詳情頁的 DETAIL_FIELDS 帶回，且已在 mapper 過濾過 scheme
 const hasExternalChannel = computed(() => !!(product.value?.iopenUrl || product.value?.shopeeUrl))
+
+const quantity = ref(1)
+const justAdded = ref(false)
+let addedTimer = null
+
+const addToOrder = () => {
+  if (!product.value || !selectedVariant.value) return
+
+  orderStore.add(product.value, selectedVariant.value, quantity.value)
+  quantity.value = 1
+
+  // 短暫回饋，不用 toast 元件（全站目前沒有）
+  justAdded.value = true
+  clearTimeout(addedTimer)
+  addedTimer = setTimeout(() => { justAdded.value = false }, 2000)
+}
+
+onBeforeUnmount(() => clearTimeout(addedTimer))
 
 // mapProduct 已把標籤攤平成 tag 物件陣列（id/name/color）
 const productTags = computed(() => product.value?.tags || [])

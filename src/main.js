@@ -18,6 +18,10 @@ app.use(pinia)
 app.use(router)
 app.directive('reveal', reveal)
 
+// 訂購單只讀 localStorage，同步且不會失敗，先還原好讓 Navbar 首次繪製就有正確數量
+import { useOrderStore } from './stores/order'
+useOrderStore().init()
+
 // 在 mount 前初始化認證狀態（只執行一次）
 import { useAuthStore } from './stores/auth'
 const authStore = useAuthStore()
