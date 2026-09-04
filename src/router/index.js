@@ -129,6 +129,13 @@ router.beforeEach(async (to) => {
         const { useAuthStore } = await import('../stores/auth')
         const authStore = useAuthStore()
 
+        // ⚠️ main.js 的 app.use(router) 會立刻觸發首次導航，那時 authStore.init()
+        // 還沒 resolve，isAuthenticated 一律是 false。少了這一行，任何以完整網址
+        // 直接開啟的受保護頁面都會被踢到 /login，AdminLogin 再把已登入的使用者
+        // replace 到 /account —— 結果就是「網址列打 /account/orders 卻跳到 /account」。
+        // init() 冪等（有 initialized 旗標），這裡再呼叫一次不會重打 API。
+        if (!authStore.initialized) await authStore.init()
+
         // 未登入 → 登入頁
         if (!authStore.isAuthenticated) {
             return '/login'

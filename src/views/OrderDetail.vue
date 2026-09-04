@@ -43,10 +43,18 @@
         >
           <h2 class="font-display text-lg font-semibold text-steel-900">匯款資訊</h2>
 
+          <!-- confirmed_total 為 null＝老闆手動改了狀態但沒按「確認報價」。
+               這時絕不能顯示 NT$0，客人會以為不用付錢。 -->
           <div class="mt-4 rounded-2xl bg-steel-50 px-5 py-4">
             <p class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">應付金額</p>
-            <p class="mt-1 font-mono text-3xl font-bold tracking-tight text-steel-900">
-              NT${{ (order.confirmed_total ?? 0).toLocaleString() }}
+            <p
+              v-if="order.confirmed_total != null"
+              class="mt-1 font-mono text-3xl font-bold tracking-tight text-steel-900"
+            >
+              NT${{ order.confirmed_total.toLocaleString() }}
+            </p>
+            <p v-else class="mt-1 leading-relaxed text-steel-600">
+              金額尚在確認中，請先不要匯款，我們會盡快與您聯絡。
             </p>
           </div>
 
@@ -68,14 +76,17 @@
             匯款資訊尚未設定，請直接與我們聯絡取得帳號。
           </p>
 
+          <!-- 對帳實際靠的是客人回報的末五碼＋銀行顯示的匯款人姓名（台灣現行為 X*X 遮罩），
+               所以備註只是輔助，不要寫成硬性要求。 -->
           <p class="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm leading-relaxed text-brand-800">
-            請於匯款備註填寫訂購單號
+            匯款備註可填單號
             <span class="font-mono font-bold">{{ order.order_number || `#${order.id}` }}</span>
-            ，我們才對得到您這一筆。
+            或您的姓名。
           </p>
 
-          <!-- 我已匯款：只寫入 payment_note，狀態一律由老闆對帳後推進 -->
-          <div class="mt-5 border-t border-steel-200 pt-5">
+          <!-- 我已匯款：只寫入 payment_note，狀態一律由老闆對帳後推進。
+               金額未確認時不顯示表單——不知道要付多少就不該回報已匯款。 -->
+          <div v-if="order.confirmed_total != null" class="mt-5 border-t border-steel-200 pt-5">
             <p v-if="order.payment_note" class="text-sm leading-relaxed text-steel-600">
               已收到您回報的帳號末五碼
               <span class="font-mono font-bold text-steel-900">{{ order.payment_note }}</span>，
