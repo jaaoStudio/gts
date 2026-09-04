@@ -23,12 +23,15 @@ export const orderService = {
     /**
      * 建立訂購單（含品項，nested create）。
      *
-     * ⚠️ 回傳的物件**不會有 order_number**：單號由 `items.create` 的 action flow
-     * 事後補上，而 action flow 不阻斷回應。呼叫端請改用 waitForOrderNumber()。
+     * ⚠️ **刻意不送 `customer`**：該欄位已從客戶端可寫清單移除（送了會 403），
+     * 改由 `items.create` 的 action flow 依登入帳號反查後補上。這樣客戶端
+     * 無從把訂單掛到別人名下——偽造在寫入端就被擋掉，不會產生需要清理的垃圾單。
+     *
+     * ⚠️ 回傳的物件**不會有 order_number**，也可能因 `customer` 尚未補上而
+     * 讀不回內容（HTTP 204）。單號請改用 waitForOrderNumber()。
      */
-    async createOrder({ customerId, contactName, contactPhone, contactAddress, note, items }) {
+    async createOrder({ contactName, contactPhone, contactAddress, note, items }) {
         return directus.request(createItem('orders', {
-            customer: customerId,
             contact_name: contactName || null,
             contact_phone: contactPhone || null,
             contact_address: contactAddress || null,
@@ -45,19 +48,51 @@ export const orderService = {
         }, { fields: ['id'] }))
     },
 
+    /** 目前自己看得到的最大訂單 id，送出前記錄，用來辨識新建的那一筆 */
+    async getLatestOrderId() {
+        try {
+            const [latest] = await directus.request(readItems('orders', {
+                fields: ['id'], sort: ['-id'], limit: 1,
+            }))
+            return latest?.id ?? 0
+        } catch {
+            return 0
+        }
+    },
+
     /**
-     * 輪詢等待 Flow 補上單號。取不到就回 null，由呼叫端改用 id 顯示，
-     * 不要因為單號還沒好就讓客人以為送出失敗。
+     * 輪詢等待新建的訂單「變成看得見」。
+     *
+     * 建立當下 `customer` 還是空的，讀取權限的 `customer.user_id = $CURRENT_USER`
+     * 不成立，所以連本人都讀不到（POST 會回 204、SDK 回 null，拿不到 id）。
+     * 等 action flow 補上 `customer` 與 `order_number` 後這筆才會出現，
+     * 因此改以「id 大於送出前的最大值」來辨識，而不是靠回傳的 id。
      */
-    async waitForOrderNumber(orderId, { attempts = 6, intervalMs = 400 } = {}) {
+    async waitForNewOrder(afterId, { attempts = 10, intervalMs = 500 } = {}) {
         for (let i = 0; i < attempts; i++) {
-            const order = await directus.request(
-                readItem('orders', orderId, { fields: ['order_number'] })
-            )
-            if (order?.order_number) return order.order_number
+            try {
+                const [latest] = await directus.request(readItems('orders', {
+                    fields: ['id', 'order_number'], sort: ['-id'], limit: 1,
+                }))
+                if (latest && latest.id > afterId) return latest
+            } catch {
+                // 尚未補完 customer，這次讀不到是預期內的
+            }
             await new Promise((resolve) => setTimeout(resolve, intervalMs))
         }
         return null
+    },
+
+    /** 供完成頁重試單號用（此時訂單已可見） */
+    async getOrderNumber(orderId) {
+        try {
+            const order = await directus.request(
+                readItem('orders', orderId, { fields: ['order_number'] })
+            )
+            return order?.order_number ?? null
+        } catch {
+            return null
+        }
     },
 
     async getMyOrders() {

@@ -57,12 +57,8 @@ const route = useRoute()
 const orderNumber = ref(null)
 
 onMounted(async () => {
-  // 單號由 items.create 的 action flow 事後補上，此頁再輪詢一次。
-  // 取不到也不擋——訂單確實已建立，客人可從「我的訂購單」看到。
-  try {
-    orderNumber.value = await orderService.waitForOrderNumber(route.params.id)
-  } catch (err) {
-    console.error('Error fetching order number:', err)
-  }
+  // 單號由 items.create 的 action flow 補上，通常送出頁輪詢時就已取得；
+  // 這裡再讀一次以支援重新整理。取不到也不擋——訂單確實已建立。
+  orderNumber.value = await orderService.getOrderNumber(route.params.id)
 })
 </script>

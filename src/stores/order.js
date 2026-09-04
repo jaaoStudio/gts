@@ -148,15 +148,18 @@ export const useOrderStore = defineStore('order', {
          *
          * 失敗時**不清空購物車**，讓客人可以直接重試。
          */
-        async submit({ customerId, contactName, contactPhone, contactAddress, note }) {
+        async submit({ contactName, contactPhone, contactAddress, note }) {
             if (this.isEmpty || this.submitting) return null
 
             this.submitting = true
             this.submitError = null
 
             try {
-                const created = await orderService.createOrder({
-                    customerId,
+                // 送出前先記下自己看得到的最大 id：建立後這筆在 flow 補上 customer
+                // 之前是不可見的（POST 回 204、SDK 回 null），拿不到 id，只能靠比對
+                const beforeId = await orderService.getLatestOrderId()
+
+                await orderService.createOrder({
                     contactName,
                     contactPhone,
                     contactAddress,
@@ -164,16 +167,12 @@ export const useOrderStore = defineStore('order', {
                     items: this.items,
                 })
 
-                // 單號由 action flow 事後補上，取不到就先回 null 由完成頁重試
-                let orderNumber = null
-                try {
-                    orderNumber = await orderService.waitForOrderNumber(created.id)
-                } catch (err) {
-                    console.error('Error waiting for order number:', err)
-                }
+                const created = await orderService.waitForNewOrder(beforeId)
 
+                // 訂單確實已建立；即使輪詢逾時也要清空購物車並帶去完成頁，
+                // 否則客人會重送而產生重複訂單
                 this.clear()
-                return { id: created.id, orderNumber }
+                return { id: created?.id ?? null, orderNumber: created?.order_number ?? null }
             } catch (err) {
                 this.submitError = '訂購單送出失敗，請稍後再試或直接與我們聯絡。'
                 console.error('Error submitting order:', err)

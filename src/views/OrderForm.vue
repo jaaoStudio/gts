@@ -286,20 +286,26 @@ const goLogin = () => {
 }
 
 const submit = async () => {
+  // customer 由後端依登入帳號補上，前端不送；這裡僅確認會員資料已載入，
+  // 否則後端反查不到對應的 customers 資料列，訂單會掛空。
   if (!authStore.customer?.id) {
     orderStore.submitError = '找不到您的會員資料，請重新登入後再試。'
     return
   }
 
   const result = await orderStore.submit({
-    customerId: authStore.customer.id,
     contactName: form.contactName,
     contactPhone: form.contactPhone,
     contactAddress: form.contactAddress,
     note: form.note,
   })
 
-  if (result) router.replace({ name: 'OrderDone', params: { id: result.id } })
+  if (!result) return
+
+  // 極少數情況輪詢逾時而拿不到 id（flow 慢），此時直接帶去訂單列表——
+  // 訂單已經建立，讓客人看得到比停在購物車重要
+  if (result.id) router.replace({ name: 'OrderDone', params: { id: result.id } })
+  else router.replace({ name: 'OrderHistory' })
 }
 
 // customer 可能在本頁掛載後才由 authStore.init() 取回

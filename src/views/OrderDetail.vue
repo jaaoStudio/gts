@@ -277,12 +277,10 @@ const reportPayment = async () => {
 
 onMounted(async () => {
   try {
-    // 匯款資訊只在待付款狀態用得到，但設定有快取，一併載入不增加成本
-    const [fetched] = await Promise.all([
-      orderService.getOrder(route.params.id),
-      settingsStore.fetchSettings(),
-    ])
-    order.value = fetched
+    order.value = await orderService.getOrder(route.params.id)
+
+    // 匯款資訊只有登入客戶讀得到，且只有「待付款」才會顯示——沒必要每次都拉
+    if (order.value?.status === 'quoted') await settingsStore.fetchPaymentInfo()
   } catch (err) {
     // 權限過濾讓別人的單直接查不到，這裡的錯誤同時涵蓋「不存在」與「不是你的」
     error.value = '找不到這張訂購單。'
