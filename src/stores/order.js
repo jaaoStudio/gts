@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { productService } from '../services/productService'
+import { orderService } from '../services/orderService'
 import { getAssetUrl } from '../utils/directus'
 
 const STORAGE_KEY = 'gts_order_items'
@@ -28,6 +29,9 @@ export const useOrderStore = defineStore('order', {
         // revalidate() 產生的提示，供訂購單頁顯示後由使用者關閉
         notices: [],
         revalidatedAt: null,
+
+        submitting: false,
+        submitError: null,
     }),
 
     getters: {
@@ -136,6 +140,47 @@ export const useOrderStore = defineStore('order', {
 
         dismissNotices() {
             this.notices = []
+        },
+
+        /**
+         * 送出訂購單。成功後清空購物車並回傳 { id, orderNumber }。
+         * orderNumber 可能為 null（Flow 還沒補上），呼叫端要能只用 id 顯示。
+         *
+         * 失敗時**不清空購物車**，讓客人可以直接重試。
+         */
+        async submit({ customerId, contactName, contactPhone, contactAddress, note }) {
+            if (this.isEmpty || this.submitting) return null
+
+            this.submitting = true
+            this.submitError = null
+
+            try {
+                const created = await orderService.createOrder({
+                    customerId,
+                    contactName,
+                    contactPhone,
+                    contactAddress,
+                    note,
+                    items: this.items,
+                })
+
+                // 單號由 action flow 事後補上，取不到就先回 null 由完成頁重試
+                let orderNumber = null
+                try {
+                    orderNumber = await orderService.waitForOrderNumber(created.id)
+                } catch (err) {
+                    console.error('Error waiting for order number:', err)
+                }
+
+                this.clear()
+                return { id: created.id, orderNumber }
+            } catch (err) {
+                this.submitError = '訂購單送出失敗，請稍後再試或直接與我們聯絡。'
+                console.error('Error submitting order:', err)
+                return null
+            } finally {
+                this.submitting = false
+            }
         },
 
         /**

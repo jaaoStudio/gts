@@ -1,0 +1,283 @@
+<template>
+  <div class="min-h-[100dvh] bg-steel-50">
+    <Navbar />
+
+    <main class="mx-auto max-w-3xl px-5 pb-24 pt-28 sm:px-8 sm:pt-32">
+      <router-link
+        to="/account/orders"
+        class="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.16em] text-steel-500 transition-colors hover:text-steel-900"
+      >
+        <PhCaretLeft :size="12" weight="bold" /> 我的訂購單
+      </router-link>
+
+      <div v-if="loading" class="mt-8 space-y-4">
+        <div v-for="i in 3" :key="i" class="h-32 animate-pulse rounded-[1.5rem] bg-steel-100" />
+      </div>
+
+      <div
+        v-else-if="error"
+        class="mt-8 rounded-2xl border border-steel-200 bg-white py-20 text-center text-steel-500"
+      >
+        {{ error }}
+      </div>
+
+      <template v-else-if="order">
+        <!-- 狀態 -->
+        <header class="mt-6">
+          <div class="flex flex-wrap items-center gap-4">
+            <h1 class="font-mono text-2xl font-bold tracking-tight text-steel-900 sm:text-3xl">
+              {{ order.order_number || `#${order.id}` }}
+            </h1>
+            <OrderStatusChip :status="order.status" />
+          </div>
+          <p class="mt-3 leading-relaxed text-steel-600">{{ statusHint }}</p>
+          <p class="mt-1 font-mono text-xs text-steel-400">
+            送出於 {{ formatDateTime(order.date_created) }}
+          </p>
+        </header>
+
+        <!-- 待付款：匯款資訊。刻意只在這個狀態顯示，不放在任何公開頁面 -->
+        <section
+          v-if="order.status === 'quoted'"
+          class="mt-8 rounded-[1.5rem] border-2 border-steel-900 bg-white p-6"
+        >
+          <h2 class="font-display text-lg font-semibold text-steel-900">匯款資訊</h2>
+
+          <div class="mt-4 rounded-2xl bg-steel-50 px-5 py-4">
+            <p class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">應付金額</p>
+            <p class="mt-1 font-mono text-3xl font-bold tracking-tight text-steel-900">
+              NT${{ (order.confirmed_total ?? 0).toLocaleString() }}
+            </p>
+          </div>
+
+          <dl v-if="bankInfo" class="mt-4 space-y-2.5 text-sm">
+            <div class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">銀行</dt>
+              <dd class="font-medium text-steel-900">{{ bankInfo.bankName }}</dd>
+            </div>
+            <div class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">帳號</dt>
+              <dd class="font-mono font-medium text-steel-900">{{ bankInfo.bankAccount }}</dd>
+            </div>
+            <div class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">戶名</dt>
+              <dd class="font-medium text-steel-900">{{ bankInfo.bankAccountName }}</dd>
+            </div>
+          </dl>
+          <p v-else class="mt-4 text-sm leading-relaxed text-steel-500">
+            匯款資訊尚未設定，請直接與我們聯絡取得帳號。
+          </p>
+
+          <p class="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm leading-relaxed text-brand-800">
+            請於匯款備註填寫訂購單號
+            <span class="font-mono font-bold">{{ order.order_number || `#${order.id}` }}</span>
+            ，我們才對得到您這一筆。
+          </p>
+
+          <!-- 我已匯款：只寫入 payment_note，狀態一律由老闆對帳後推進 -->
+          <div class="mt-5 border-t border-steel-200 pt-5">
+            <p v-if="order.payment_note" class="text-sm leading-relaxed text-steel-600">
+              已收到您回報的帳號末五碼
+              <span class="font-mono font-bold text-steel-900">{{ order.payment_note }}</span>，
+              我們核對後會更新狀態。
+            </p>
+
+            <form v-else class="flex flex-wrap items-end gap-3" @submit.prevent="reportPayment">
+              <label class="flex-1">
+                <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
+                  匯款後請填帳號末五碼
+                </span>
+                <input
+                  v-model.trim="paymentNote"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="5"
+                  placeholder="12345"
+                  class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 font-mono text-steel-900 outline-none transition-colors placeholder:text-steel-300 focus:border-steel-900"
+                />
+              </label>
+              <button
+                type="submit"
+                :disabled="paymentNote.length < 5 || reporting"
+                class="rounded-full bg-steel-900 px-6 py-3.5 font-display text-sm font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+              >
+                {{ reporting ? '送出中…' : '我已匯款' }}
+              </button>
+            </form>
+            <p v-if="reportError" class="mt-2 text-sm text-red-600">{{ reportError }}</p>
+          </div>
+        </section>
+
+        <!-- 已出貨：貨運單號 -->
+        <section
+          v-if="order.status === 'shipped' && order.tracking_number"
+          class="mt-8 rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6"
+        >
+          <h2 class="font-display text-lg font-semibold text-steel-900">出貨資訊</h2>
+          <div class="mt-4 space-y-2.5 text-sm">
+            <div class="flex gap-3">
+              <span class="w-20 shrink-0 text-steel-500">貨運單號</span>
+              <span class="font-mono font-bold text-steel-900">{{ order.tracking_number }}</span>
+            </div>
+            <div v-if="order.shipped_at" class="flex gap-3">
+              <span class="w-20 shrink-0 text-steel-500">出貨時間</span>
+              <span class="text-steel-900">{{ formatDateTime(order.shipped_at) }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 品項 -->
+        <section class="mt-8 rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6">
+          <h2 class="font-display text-lg font-semibold text-steel-900">訂購品項</h2>
+
+          <ul class="mt-5 divide-y divide-steel-100">
+            <li v-for="item in order.items" :key="item.id" class="flex gap-4 py-4 first:pt-0">
+              <div class="min-w-0 flex-1">
+                <p class="font-display text-sm font-semibold leading-snug text-steel-900">
+                  {{ item.product_name }}
+                </p>
+                <p v-if="item.spec_name" class="mt-0.5 text-sm text-steel-500">
+                  規格：{{ item.spec_name }}
+                </p>
+                <p class="mt-0.5 font-mono text-xs text-steel-400">× {{ item.quantity }}</p>
+              </div>
+              <div class="text-right">
+                <p class="font-mono text-sm font-bold text-steel-900">{{ itemTotal(item) }}</p>
+                <!-- 老闆改過價才顯示原價，讓調整是透明的 -->
+                <p
+                  v-if="item.confirmed_price != null && item.confirmed_price !== item.unit_price"
+                  class="font-mono text-xs text-steel-400 line-through"
+                >
+                  {{ item.unit_price == null ? '詢價' : `NT$${(item.unit_price * item.quantity).toLocaleString()}` }}
+                </p>
+              </div>
+            </li>
+          </ul>
+
+          <dl class="mt-5 space-y-2.5 border-t border-steel-200 pt-5 text-sm">
+            <div v-if="order.subtotal != null" class="flex justify-between">
+              <dt class="text-steel-500">送出時參考小計</dt>
+              <dd class="font-mono text-steel-700">NT${{ order.subtotal.toLocaleString() }}</dd>
+            </div>
+            <div v-if="order.shipping_fee != null" class="flex justify-between">
+              <dt class="text-steel-500">運費</dt>
+              <dd class="font-mono text-steel-700">
+                {{ order.shipping_fee === 0 ? '免運' : `NT$${order.shipping_fee.toLocaleString()}` }}
+              </dd>
+            </div>
+            <div v-if="order.discount" class="flex justify-between">
+              <dt class="text-steel-500">折扣</dt>
+              <dd class="font-mono text-steel-700">−NT${{ order.discount.toLocaleString() }}</dd>
+            </div>
+            <div
+              v-if="order.confirmed_total != null"
+              class="flex items-baseline justify-between border-t border-steel-200 pt-3"
+            >
+              <dt class="font-display font-semibold text-steel-900">應付金額</dt>
+              <dd class="font-mono text-xl font-bold text-steel-900">
+                NT${{ order.confirmed_total.toLocaleString() }}
+              </dd>
+            </div>
+          </dl>
+
+          <p v-if="order.has_quote_items" class="mt-4 text-sm leading-relaxed text-steel-500">
+            本單含待報價品項，實際金額以我們確認後為準。
+          </p>
+        </section>
+
+        <!-- 聯絡資訊 -->
+        <section class="mt-8 rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6">
+          <h2 class="font-display text-lg font-semibold text-steel-900">聯絡與送貨資訊</h2>
+          <dl class="mt-4 space-y-2.5 text-sm">
+            <div v-if="order.contact_name" class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">聯絡人</dt>
+              <dd class="text-steel-900">{{ order.contact_name }}</dd>
+            </div>
+            <div v-if="order.contact_phone" class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">電話</dt>
+              <dd class="font-mono text-steel-900">{{ order.contact_phone }}</dd>
+            </div>
+            <div v-if="order.contact_address" class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">送貨地址</dt>
+              <dd class="text-steel-900">{{ order.contact_address }}</dd>
+            </div>
+            <div v-if="order.note" class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">備註</dt>
+              <dd class="whitespace-pre-wrap text-steel-900">{{ order.note }}</dd>
+            </div>
+          </dl>
+        </section>
+      </template>
+    </main>
+
+    <Footer />
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useSettingsStore } from '../stores/settings'
+import { orderService, ORDER_STATUS } from '../services/orderService'
+import Navbar from '../components/Navbar.vue'
+import Footer from '../components/Footer.vue'
+import OrderStatusChip from '../components/OrderStatusChip.vue'
+import { PhCaretLeft } from '@phosphor-icons/vue'
+
+const route = useRoute()
+const settingsStore = useSettingsStore()
+
+const order = ref(null)
+const loading = ref(true)
+const error = ref(null)
+
+const paymentNote = ref('')
+const reporting = ref(false)
+const reportError = ref(null)
+
+const statusHint = computed(() => ORDER_STATUS[order.value?.status]?.hint || '')
+const bankInfo = computed(() => settingsStore.bankInfo)
+
+const formatDateTime = (iso) =>
+  new Date(iso).toLocaleString('zh-TW', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
+
+// 老闆確認過的單價優先，未確認則沿用客人下單時看到的
+const itemTotal = (item) => {
+  const price = item.confirmed_price ?? item.unit_price
+  return price == null ? '待報價' : `NT$${(price * item.quantity).toLocaleString()}`
+}
+
+const reportPayment = async () => {
+  reporting.value = true
+  reportError.value = null
+  try {
+    const updated = await orderService.reportPayment(order.value.id, paymentNote.value)
+    order.value.payment_note = updated.payment_note
+  } catch (err) {
+    reportError.value = '回報失敗，請稍後再試或直接與我們聯絡。'
+    console.error('Error reporting payment:', err)
+  } finally {
+    reporting.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    // 匯款資訊只在待付款狀態用得到，但設定有快取，一併載入不增加成本
+    const [fetched] = await Promise.all([
+      orderService.getOrder(route.params.id),
+      settingsStore.fetchSettings(),
+    ])
+    order.value = fetched
+  } catch (err) {
+    // 權限過濾讓別人的單直接查不到，這裡的錯誤同時涵蓋「不存在」與「不是你的」
+    error.value = '找不到這張訂購單。'
+    console.error('Error loading order:', err)
+  } finally {
+    loading.value = false
+  }
+})
+</script>

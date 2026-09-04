@@ -30,7 +30,25 @@ const routes = [
         path: '/order',
         name: 'OrderForm',
         component: () => import('../views/OrderForm.vue'),
-        meta: { title: '我的訂購單｜金同心實業' }
+        meta: { title: '訂購單｜金同心實業' }
+    },
+    {
+        path: '/order/done/:id',
+        name: 'OrderDone',
+        component: () => import('../views/OrderDone.vue'),
+        meta: { title: '訂購單已送出｜金同心實業', requiresAuth: true }
+    },
+    {
+        path: '/account/orders',
+        name: 'OrderHistory',
+        component: () => import('../views/OrderHistory.vue'),
+        meta: { title: '我的訂購單｜金同心實業', requiresAuth: true }
+    },
+    {
+        path: '/account/orders/:id',
+        name: 'OrderDetail',
+        component: () => import('../views/OrderDetail.vue'),
+        meta: { title: '訂購單明細｜金同心實業', requiresAuth: true }
     },
     {
         path: '/contact',

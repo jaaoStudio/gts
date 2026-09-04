@@ -34,6 +34,25 @@
           </div>
         </div>
 
+        <!-- Orders entry -->
+        <router-link
+          to="/account/orders"
+          class="group mb-6 flex items-center gap-4 rounded-[1.5rem] bg-white p-6 ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:ring-steel-300 sm:p-8"
+        >
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-steel-100">
+            <PhReceipt :size="22" weight="bold" class="text-steel-700" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h2 class="font-display text-lg font-semibold text-steel-900">我的訂購單</h2>
+            <p class="mt-0.5 text-sm text-steel-500">查看訂購進度、應付金額與出貨狀態</p>
+          </div>
+          <PhCaretRight
+            :size="18"
+            weight="bold"
+            class="text-steel-300 transition-colors group-hover:text-steel-900"
+          />
+        </router-link>
+
         <!-- Info card -->
         <div class="rounded-[1.5rem] bg-white p-6 ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)] sm:p-8">
           <div class="mb-6 flex items-center justify-between">
@@ -214,7 +233,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
-import { PhCircleNotch, PhPencilSimple, PhCheckCircle, PhSignOut } from '@phosphor-icons/vue'
+import { PhCircleNotch, PhPencilSimple, PhCheckCircle, PhSignOut,
+         PhReceipt, PhCaretRight } from '@phosphor-icons/vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

@@ -12,6 +12,16 @@ export const useSettingsStore = defineStore('settings', {
 
     getters: {
         lineId: (s) => s.settings?.lineId || null,
+
+        /** 匯款資訊。三個欄位缺任一就視為未設定，避免顯示不完整的收款方式 */
+        bankInfo: (s) => {
+            const { bankName, bankAccount, bankAccountName } = s.settings || {}
+            if (!bankName || !bankAccount || !bankAccountName) return null
+            return { bankName, bankAccount, bankAccountName }
+        },
+
+        freeShippingThreshold: (s) => s.settings?.freeShippingThreshold ?? null,
+
         // 組出加好友連結：完整網址（lin.ee / line.me）直接用，否則當官方帳號 @id
         lineUrl: (s) => {
             const id = s.settings?.lineId
