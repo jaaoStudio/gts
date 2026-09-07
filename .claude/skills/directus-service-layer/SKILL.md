@@ -113,3 +113,25 @@ buildFilter({ categoryIds, keyword }) {
     return { _and: filters }
 }
 ```
+
+## Order Service（`services/orderService.js`）
+
+訂購單的讀寫與其他 service 有幾點根本不同，動它之前先讀：
+
+- **建立訂單時刻意不送 `customer`**。該欄位已從 `customer access` 的可寫清單移除
+  （送了直接 403），改由 `items.create` 的 Directus Flow 依登入帳號反查後補上。
+  這是為了讓「把訂單掛到別人名下」在寫入端就不可能發生。
+- **因此 `createItem` 回傳 `null`**。建立當下 `customer` 還是空的，讀取權限
+  `customer.user_id = $CURRENT_USER` 不成立，Directus 回 **HTTP 204**、SDK 回 `null`，
+  **拿不到 id**。所以流程是「送出前記下自己看得到的最大 id → 輪詢等 id 更大的那筆出現」
+  （`getLatestOrderId()` + `waitForNewOrder()`），不能直接用回傳值。
+- **讀取一律不帶 customer 條件**。權限已在 Directus 端過濾，前端不重複實作。
+- **金額欄位前端一律唯讀**。`confirmed_total` / `confirmed_price` / `status` 送了都會 403。
+  客人唯一能寫的是 `payment_note`（回報匯款末五碼），且限 `status = quoted`。
+
+### ⚠️ 新增 Directus 欄位後必須同步權限的欄位清單
+
+`customer access` 對 `products` / `site_settings` / `categories` 等的 read 是
+**逐一列欄位而非 `*`**。查一個沒開放的欄位會讓**整個請求**回 FORBIDDEN——
+不是少那一欄，是整包失敗。曾因新增 `iopen_url` 導致已登入客戶連商品頁都打不開，
+而匿名訪客不受影響（public policy 是 `*`），所以用匿名或管理員測都測不出來。

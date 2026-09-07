@@ -11,7 +11,9 @@
          握手本身就吃掉約 780ms，比整趟跨洲往返還貴。SSO 導向前先暖好，
          Google 回跳時就少付這筆。crossorigin 是必要的：auth 一律帶 credentials，
          沒有它會另開一條 anonymous 連線，等於白暖。 -->
-    <link rel="preconnect" href="https://gts-core.jaao.tw" crossorigin />
+    <!-- ⚠️ 換後端網域時務必同步這裡。指到舊網域不會報錯，只會安靜地暖錯連線、
+         整個 preconnect 失效——必須與 VITE_DIRECTUS_PUBLIC_URL 同一個主機名。 -->
+    <link rel="preconnect" href="https://core.gtxin.com.tw" crossorigin />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />

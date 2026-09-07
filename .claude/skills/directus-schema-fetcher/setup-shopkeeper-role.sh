@@ -16,7 +16,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "$DIR/.env"
-BASE="https://gts-core.jaao.tw"
+BASE="https://core.gtxin.com.tw"
 AUTH="Authorization: Bearer $DIRECTUS_AI_TOKEN"
 JSON="Content-Type: application/json"
 NAME="店務"
