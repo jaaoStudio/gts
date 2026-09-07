@@ -8,6 +8,16 @@ status: accepted
 
 前台採用 **Directus 內建 Google SSO**:前端把使用者導向 `${VITE_DIRECTUS_PUBLIC_URL}/auth/login/google?redirect=<origin>/admin/callback`,Google 認證後 Directus 種下 refresh cookie 並把瀏覽器導回前台的 `/admin/callback`;前台在該頁打 `POST /auth/refresh`(`withCredentials`)把 cookie 換成 access token 存進 `localStorage`,再依 `role.admin_access` 導向 `/admin` 或 `/account`。
 
+> **2026-09-07 更新(網域已變,決策不變)**:全站改用 **`gtxin.com.tw`**。
+> 本文中出現的 `gts-core.jaao.tw` 一律改讀作 **`core.gtxin.com.tw`**、
+> `local.jaao.tw` 改讀作 **`local.gtxin.com.tw`**(舊網域僅保留 301 轉址,
+> 憑證 2026-11-19 到期後失效)。實測數據仍具參考價值,故原文保留不改寫。
+> ⚠️ 連帶影響:`SESSION_COOKIE_DOMAIN` 已改為 `.gtxin.com.tw`,
+> **本機 dev 的 hosts 與 mkcert 網域都必須在 `gtxin.com.tw` 底下**,
+> 否則拿不到 session cookie、登不進去。Google Console 需註冊的
+> redirect URI 是 `https://core.gtxin.com.tw/auth/login/google/callback`
+> ——是 **Directus 的** callback,不是前端的 `/admin/callback`。
+
 > **2026-07-29 更新(機制已變,決策不變)**:認證已改為 **Directus session 模式**(`AUTH_GOOGLE_MODE=session`)。credential 是 httpOnly session cookie,**前端不再持有 access token,也不再打 `/auth/refresh`**——`/admin/callback` 直接 `readMe()`,抓得到 user 即代表 session 有效(`authStore.handleCallback()`)。上段的 `localStorage` 描述僅存為歷史。改動原因:token 不進 JS 可免疫 XSS 竊取。SSO 導向、Worker double-tap、下方所有 gotchas 均不受影響。
 
 Directus 後端部署在**德國** VM,掛在 Cloudflare(`gts-core.jaao.tw`)後面。為了遮住這段跨洲延遲,前面架了一個 **Cloudflare Worker**(原始碼:`worker/auth-callback-worker.js`),攔截 `GET /auth/login/google/callback` 做 **double-tap**:第一次請求(網址尾端沒有 `_edge=1` 旗標)由 Worker 在邊緣**立刻**回一頁輕量 spinner,並把瀏覽器導向「同一組 OAuth 參數 + 尾端附加 `&_edge=1`」;第二次(帶旗標)Worker 用字串把旗標切掉、再 `fetch` 給德國的 Directus 處理。
@@ -30,11 +40,11 @@ Worker 用「先回 spinner、再重打一次」把載入畫面塞在中間,讓�
 ## Consequences / gotchas
 
 - **Redirect 白名單**:Directus 的 `AUTH_GOOGLE_REDIRECT_ALLOW_LIST` 必須逐一列出每個前端 origin 的 `/admin/callback`(含正式站與各 dev 網域)。少了就會在登入第一步被擋、回 `INVALID_PAYLOAD: URL ... can't be used to redirect after login`。這是最容易踩到的坑。
-- **本機 dev 需 https + 自訂網域**:`vite.config.js` 用 `vite-plugin-mkcert`,`hosts` 必須包含實際進站的網域(如 `local.jaao.tw`),否則憑證不涵蓋該網域、瀏覽器 `CERT_COMMON_NAME_INVALID` 直接進不了站。改 `hosts` 後若憑證沒更新,清 `~/.vite-plugin-mkcert/`(保留 `rootCA*`)強制重簽。dev 進站網域也要一起放進上面的白名單。
+- **本機 dev 需 https + 自訂網域**:`vite.config.js` 用 `vite-plugin-mkcert`,`hosts` 必須包含實際進站的網域(現為 `local.gtxin.com.tw`),否則憑證不涵蓋該網域、瀏覽器 `CERT_COMMON_NAME_INVALID` 直接進不了站。改 `hosts` 後若憑證沒更新,清 `~/.vite-plugin-mkcert/`(保留 `rootCA*`)強制重簽。dev 進站網域也要一起放進上面的白名單。
 - **auth 走 public URL、不走 `/api` proxy**:`VITE_DIRECTUS_PUBLIC_URL` 直連後端;登入跳轉不能走 Vite 的 `/api` proxy(會失去正確 origin/cookie)。
 - **Worker 與前端耦合**:callback 路徑與 double-tap 行為若要調整,Worker 與前端得一起改。Worker 內那頁 spinner 的樣式仍是舊深色版,與前台 premium-industrial 設計不一致(純視覺、閃一下,列為待整理)。
 - **狀態不要放回 cookie(iOS 血淚)**:初版用短效 `edge_loading` cookie 分辨第一/第二趟,並以 `location.replace(window.location.href)` 重打。桌面正常,但 **iOS 一律卡在 spinner 頁**,原因有二:(1) 目標網址與當前頁**完全相同**,WebKit 視為重導迴圈,在沒有使用者手勢時直接取消 navigation,第二擊根本沒發出;(2) cookie 只活 10 秒,行動網路下常在第二擊前就過期,於是又被判成第一趟 → 無限迴圈。改用 URL 旗標後兩個問題一起消失(網址不再與自己相同,也不再依賴瀏覽器願不願意存 cookie)。
 - **spinner 頁的跳轉要三層備援**:`<meta http-equiv="refresh">`(走 HTML parser,不受 WebKit 對 script navigation 的節流影響,iOS 上最穩)→ `load` 事件後的 `location.replace` → 3 秒後浮出的「繼續登入」連結(帶使用者手勢,任何節流都擋不住)。
-- **握手比距離貴**:實測冷連線(含 DNS+TCP+TLS)TTFB 1160ms、暖連線 390ms——光握手就約 780ms,比整趟跨洲往返還貴。所以 `index.html` 對 `gts-core.jaao.tw` 放了 `<link rel="preconnect" crossorigin>`(auth 走 credentials,**少了 `crossorigin` 會另開一條 anonymous 連線,等於白暖**)。這也意味著 double-tap 的實際額外成本只有約 400ms 而非 1.1 秒:第一擊付掉冷握手,第二擊是暖的。
+- **握手比距離貴**:實測冷連線(含 DNS+TCP+TLS)TTFB 1160ms、暖連線 390ms——光握手就約 780ms,比整趟跨洲往返還貴。所以 `index.html` 對後端網域（現為 `core.gtxin.com.tw`）放了 `<link rel="preconnect" crossorigin>`(auth 走 credentials,**少了 `crossorigin` 會另開一條 anonymous 連線,等於白暖**)。這也意味著 double-tap 的實際額外成本只有約 400ms 而非 1.1 秒:第一擊付掉冷握手,第二擊是暖的。
 - **要再優化前先看 Worker 的 log**:Worker 第二擊會 `console.log` 一筆 `sso_callback_upstream`(含 `ms`/`status`/`colo`/`ua`),涵蓋「邊緣→Directus→Google 換 token 與 userinfo→寫 session→回 302」全程。在 Cloudflare Workers Logs 或 `wrangler tail` 看得到。**這是判斷還值不值得優化的唯一依據,不要憑感覺調。**
 - **HTML escape 別漏**:OAuth 網址含 `&`,寫進 `<meta refresh>` / `href` 前必須 escape 成 `&amp;`,否則 HTML parser 會把 `&state=` 之類當成 entity 解析,參數就毀了。

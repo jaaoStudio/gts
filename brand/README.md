@@ -25,7 +25,7 @@
 > 副標於深底原為 `#6c6f7a`（對比 3.8:1，未達 AA），已改 `#9a9da8`（≈ 6.95:1，達 AA）。淺底維持 `#6c6f7a`（≈ 4.75:1，達 AA）。
 
 ## 字型
-**jf open（W 2.1）Regular** — 主標「金同心實業」與副標「GTS HARDWARE」皆用此字型，僅提供 Regular 一種字重。
+**jf open（W 2.1）Regular** — 主標「金同心實業」與副標「GTXin HARDWARE」皆用此字型，僅提供 Regular 一種字重。
 
 （lockup 檔內文字已轉外框，可直接使用、不依賴系統字型。）
 

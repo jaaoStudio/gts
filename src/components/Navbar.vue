@@ -124,13 +124,20 @@
           </transition>
         </div>
 
-        <!-- Cart (暫時隱藏,購物車功能完成後再啟用) -->
-        <!--
-        <button class="relative flex h-10 w-10 items-center justify-center rounded-full text-steel-600 transition-colors hover:bg-steel-100 hover:text-steel-900" aria-label="購物車">
+        <!-- Order form -->
+        <router-link
+          to="/order"
+          class="relative flex h-10 w-10 items-center justify-center rounded-full text-steel-600 transition-colors hover:bg-steel-100 hover:text-steel-900"
+          aria-label="我的訂購單"
+        >
           <PhShoppingCartSimple :size="20" weight="regular" />
-          <span class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 font-mono text-[10px] font-bold text-white">0</span>
-        </button>
-        -->
+          <span
+            v-if="orderStore.count > 0"
+            class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 font-mono text-[10px] font-bold text-white"
+          >
+            {{ orderStore.count > 99 ? '99+' : orderStore.count }}
+          </span>
+        </router-link>
 
         <!-- Hamburger -->
         <button
@@ -261,6 +268,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCategoryStore } from '../stores/category'
 import { useAuthStore } from '../stores/auth'
+import { useOrderStore } from '../stores/order'
 import { site } from '../config/site'
 import {
   PhCaretDown, PhMagnifyingGlass, PhUser, PhUserCircle,
@@ -270,6 +278,7 @@ import {
 const router = useRouter()
 const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
+const orderStore = useOrderStore()
 
 const searchQuery = ref('')
 const mobileMenuOpen = ref(false)

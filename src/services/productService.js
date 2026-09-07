@@ -18,7 +18,9 @@ const DETAIL_FIELDS = [
     'categories.categories_id.id', 'categories.categories_id.name', 'categories.categories_id.slug',
     'tags.tags_id.id',
     'variants.id', 'variants.spec_name', 'variants.price', 'variants.stock', 'variants.sku', 'variants.status', 'variants.variant_image',
-    'gallery.directus_files_id'
+    'gallery.directus_files_id',
+    // 外部通路導流：只有詳情頁用得到，不放進 LIST_FIELDS 以免列表 payload 變大
+    'iopen_url', 'shopee_url'
 ];
 
 // 2. 預設過濾條件：只顯示已上架的商品
@@ -238,6 +240,37 @@ export const productService = {
     async getFilteredProducts({ page = 1, limit = 12, categoryIds = [], keyword = '', sort = '-date_created' } = {}) {
         const filter = this.buildFilter({ categoryIds, keyword })
         return await this.getProducts({ page, limit, filter, sort })
+    },
+
+    /**
+     * 依 id 批次取規格（含所屬商品的上架狀態），供訂購單重新驗證使用。
+     * 刻意不套 BASE_FILTER：下架的規格也要撈回來，才能告訴使用者「這項已下架」，
+     * 而不是靜默消失。查不到的 id 代表資料已被刪除。
+     * @param {Array<number>} ids
+     */
+    async getVariantsByIds(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return []
+
+        return directus.request(readItems('product_variants', {
+            filter: { id: { _in: ids } },
+            fields: [
+                'id', 'spec_name', 'sku', 'price', 'stock', 'status', 'variant_image',
+                'product_id.id', 'product_id.name', 'product_id.slug',
+                'product_id.status', 'product_id.image',
+            ],
+            limit: -1,
+        }))
+    }
+}
+
+// 外部通路連結由後台人工貼上，直接綁進 <a href> 前先擋掉 javascript: 等 scheme
+const safeExternalUrl = (url) => {
+    if (typeof url !== 'string' || !url.trim()) return null
+    try {
+        const parsed = new URL(url.trim())
+        return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null
+    } catch {
+        return null
     }
 }
 
@@ -317,7 +350,10 @@ export const productMapper = {
             badge: firstTag ? firstTag.name : null,
             badgeColor: firstTag ? firstTag.color : null,
             tags: tags,
-            variants: variants
+            variants: variants,
+            // 外部通路連結（僅詳情頁會帶回，列表為 undefined）
+            iopenUrl: safeExternalUrl(item.iopen_url),
+            shopeeUrl: safeExternalUrl(item.shopee_url)
         }
     },
 

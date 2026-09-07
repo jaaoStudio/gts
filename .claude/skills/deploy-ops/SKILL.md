@@ -14,8 +14,8 @@ description: >-
 ## 線上架構(現況)
 
 ```
-Cloudflare(橘雲) ─▶ Traefik(:443, DNS-01 憑證 cf) ─┬─ gts.jaao.tw / jaao.tw ─▶ gts-frontend-blue@docker(藍綠 slot)
-  VM: 46.225.53.14                                   └─ gts-core.jaao.tw ─▶ directus_app:8055(file router)
+Cloudflare(橘雲) ─▶ Traefik(:443, DNS-01 憑證 cf) ─┬─ gtxin.com.tw ─▶ gts-frontend-blue@docker(藍綠 slot)
+  VM: 46.225.53.14                                   └─ core.gtxin.com.tw ─▶ directus_app:8055(file router)
   (ssh hetzner, key ~/.ssh/hetzner)
 ```
 
@@ -23,6 +23,14 @@ Cloudflare(橘雲) ─▶ Traefik(:443, DNS-01 憑證 cf) ─┬─ gts.jaao.tw 
 - **前端**:藍綠雙 slot `gts_web_store_blue` / `gts_web_store_green`(image `harbor.jaao.tw/gts/gts_web_store:<tag>`),同時常駐,`dynamic/gts.yml` 的 `service: gts-frontend-<color>@docker` 那行決定流量。
 - **後端**:`directus_app`(Directus 11)+ `directus_db`(postgres 15)+ `directus_cache`(redis)。
 - 所有服務容器都在 external network **`traefik-net`**。前端 nginx 靠 `directus_app:8055` 反代 `/api`。
+- **舊網域 `jaao.tw` 已棄用**,`dynamic/gts.yml` 內僅保留 301 轉址
+  (`gts.jaao.tw`/`jaao.tw` → `gtxin.com.tw`、`gts-core.jaao.tw` → `core.gtxin.com.tw`)。
+  ⚠️ 其憑證有效至 **2026-11-19**,且現行 Cloudflare token **已不含 `jaao.tw` zone**、無法續簽,
+  到期後轉址失效,屆時直接刪掉那兩條 router 即可。
+  ⚠️ 新舊網域**必須拆成不同 router**:寫在同一條 rule 會讓 Traefik 去要一張同時涵蓋兩者的
+  憑證而失敗,連帶整個 router 不可用。
+- **郵件**:Directus 走 Resend SMTP relay(`smtp.resend.com:587`,帳號固定字串 `resend`,
+  密碼為 API key)。VM 對外 **port 25 被 Hetzner 封鎖**,只能用 relay,不要考慮自架 MTA。
 
 ## 部署流程(自動)
 
@@ -43,7 +51,7 @@ ssh hetzner 'docker ps --format "{{.Names}}\t{{.Status}}" | grep -E "gts_web_sto
 # Traefik log / 憑證
 ssh hetzner 'docker logs --tail 50 traefik'
 # 三站健康(繞過 Cloudflare,直測 origin)
-for h in gts.jaao.tw jaao.tw gts-core.jaao.tw; do
+for h in gtxin.com.tw core.gtxin.com.tw; do
   ssh hetzner "curl -sk -o /dev/null -w '$h %{http_code}\n' --resolve $h:443:127.0.0.1 https://$h/"; done
 ```
 
@@ -62,7 +70,21 @@ for h in gts.jaao.tw jaao.tw gts-core.jaao.tw; do
 1. **Docker 29 卡 Traefik docker provider**:Docker 29 最低 API 1.40,Traefik v3.3~v3.5 的 docker client 卡在 1.24 協商失敗(狂洗 log)。**升到 v3.7.x 解決**(v3.7 是分水嶺),不需要動 daemon 的 `DOCKER_MIN_API_VERSION`。
 2. **藍綠 healthcheck 用 `localhost` 會 fail**:前端 `nginx/nginx.conf` 只 `listen 80`(無 IPv6),`localhost`→`::1` 連不到 → slot 卡 unhealthy。healthcheck 必須用 `127.0.0.1`(已修在 `deploy/docker-compose.yml`)。
 3. **前端 nginx 啟動硬相依 `directus_app`**:`proxy_pass http://directus_app:8055` 在 nginx 啟動時就解析主機名,`directus_app` 不可解析(不在 traefik-net)→ nginx 起不來。所以 slot 與 directus_app 必須同在 `traefik-net`。
-4. **traefik-net 連線的脆弱點**:`directus_app` / `gts_store_frontend` 接 traefik-net 是**手動 `docker network connect`**、不在它們自己的 compose 裡。若 `docker compose down/up` 重建這些容器會掉連線 → Traefik 找不到後端 → 站掛。長久解:把 `traefik-net` 寫進它們的 compose。
+4. ~~**traefik-net 連線的脆弱點**~~ ✅ **已修**(2026-09-07):`traefik-net` 原本是手動
+   `docker network connect` 接上、不在 compose 裡,`--force-recreate` 之後就會掉,
+   Traefik 找不到後端 → **兩個 Directus 網域一起 502**(實際踩到過)。
+   已把 `traefik-net` 寫進 `/root/gtsWebSite/directus/docker-compose.yaml` 的
+   `directus` 服務與頂層 `networks`(external: true),重建後會自動保留。
+   > 若哪天又出現 502,第一件事就是 `docker inspect directus_app --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'` 看 traefik-net 在不在。
+5. **改 `.env` 後 `docker restart` 沒用**:`docker restart` 會沿用既有容器設定,
+   **不會重讀 env_file**。必須 `docker compose up -d --force-recreate <service>`。
+   注意 service 名不等於 container_name——Directus 的 container 叫 `directus_app`,
+   但 compose service 是 **`directus`**;Traefik 兩者都叫 `traefik`。
+6. **`EMAIL_FROM` 只能填純位址**:此版 Directus 會把整串當信封寄件人送進 SMTP 的
+   `MAIL FROM`,帶任何顯示名稱(連 ASCII 都算)都會 `501 Bad sender address syntax`。
+   **寄件者的顯示名稱其實取自 Directus 的 `project_name`**(已設為「金同心實業」)。
+   另外 compose 的 `env_file` 解析器遇到值裡有 `<` `>` 又只用雙引號包住時,
+   剝掉引號後會把 `<noreply@…>` 當成新變數名而整個檔案解析失敗。
 
 ## image 組成(`Dockerfile` + `nginx/nginx.conf`)
 
@@ -84,7 +106,7 @@ for h in gts.jaao.tw jaao.tw gts-core.jaao.tw; do
 ```bash
 IMG=harbor.jaao.tw/gts/gts_web_store
 docker build --build-arg VITE_DIRECTUS_URL=/api \
-  --build-arg VITE_DIRECTUS_PUBLIC_URL=https://gts-core.jaao.tw \
+  --build-arg VITE_DIRECTUS_PUBLIC_URL=https://core.gtxin.com.tw \
   -t $IMG:<tag> -t $IMG:latest .
 docker push $IMG:<tag> && docker push $IMG:latest
 ```
@@ -99,7 +121,7 @@ docker push $IMG:<tag> && docker push $IMG:latest
 ## 專案要點(部署相關)
 
 - 前端 Vue 3 SPA(Vite build → nginx),後端 Directus 11 + Postgres + Redis;領域詞彙見 `CONTEXT.md`。
-- 網域:`gts.jaao.tw`(+ apex `jaao.tw`)= 前端;`gts-core.jaao.tw` = Directus 後台/API。全開 Cloudflare 橘雲。
+- 網域:`gtxin.com.tw` = 前端;`core.gtxin.com.tw` = Directus 後台/API。全開 Cloudflare 橘雲。
 - Directus 認證用 session 模式(`AUTH_GOOGLE_MODE=session` + cookie 三項 + `CACHE_AUTO_PURGE=true`)。
   - **CSRF**:前端走 `/api` 與 Directus 同源,`SESSION_COOKIE_SAMESITE=Lax`(勿用 `None`,否則 cookie 被跨站夾帶開啟 CSRF 面向);`SESSION_COOKIE_SECURE=true`。
 - VM 架構 x86_64 → workflow `platforms: linux/amd64`(換 ARM 機才要改)。

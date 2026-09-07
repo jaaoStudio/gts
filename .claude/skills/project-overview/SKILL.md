@@ -7,10 +7,15 @@ description: 專案的技術棧、目錄結構、環境變數與正典文件索�
 
 **金同心實業**（GTS Hardware）五金工具店面前台。Vue 3 SPA + Directus headless CMS，Google SSO 登入。
 
-> **這是型錄詢價站，不是交易站** — 沒有購物車、結帳、金流。
-> 商品無價時顯示「詢價」，成交走電話。Navbar 的購物車鈕目前刻意隱藏（`8b5a91a`）。
-> 領域詞彙（User/Customer/Admin、Product/Variant/顯示價/詢價/Category/Tag/精選）
-> 的正典是根目錄 **`CONTEXT.md`**，動到這些字眼前先讀。
+> **型錄 + 訂購單，但站上不收款。**
+> 客人可把品項送成一張**訂購單**，老闆在 Directus 後台確認金額後，客人依通知信的
+> 匯款資訊自行轉帳。**沒有線上刷卡、沒有即時庫存扣減、沒有物流串接。**
+> 商品無價時顯示「詢價」，可與有價品項混在同一張單裡。
+> 部分商品另有外部通路連結（iOPEN Mall / 蝦皮），那是導流出去、不在本站成交。
+>
+> 領域詞彙（User/Customer/Admin、Product/Variant/顯示價/詢價/Category/Tag/精選、
+> 訂購單/訂購單號/確認單價/狀態/外部通路）的正典是根目錄 **`CONTEXT.md`**，
+> 動到這些字眼前先讀。訂購單的完整設計與踩雷紀錄在 **`docs/proposals/訂購單.md`**。
 
 ## 技術棧
 
@@ -44,12 +49,15 @@ src/
 │   ├── PageShell.vue     # 內容頁骨架（Navbar+標題區+Footer），法務/FAQ 類頁面一律用
 │   ├── ProductCard.vue
 │   ├── HeroProductRing.vue / HeroRingCard.vue   # 首頁商品轉盤
-│   └── LineButton.vue    # LINE 聯絡鈕（有 floating prop，但 Footer/Contact 目前都用內嵌）
-├── views/                # 13 個：Home / Products / ProductDetail / Contact / Faq /
+│   ├── LineButton.vue    # LINE 聯絡鈕（有 floating prop，但 Footer/Contact 目前都用內嵌）
+│   └── OrderStatusChip.vue  # 訂購單狀態標籤，顏色與 Directus 後台對齊
+├── views/                # 17 個：Home / Products / ProductDetail / Contact / Faq /
 │                         # Shipping / Warranty / Privacy / Terms / AdminLogin(=/login) /
-│                         # AdminCallback / Account / Admin
-├── stores/               # auth / product / category / settings
-├── services/             # productService（+ productMapper）/ customerService / settingsService
+│                         # AdminCallback / Account / Admin /
+│                         # OrderForm(=/order) / OrderDone / OrderHistory / OrderDetail
+├── stores/               # auth / product / category / settings / order
+├── services/             # productService（+ productMapper）/ customerService /
+│                         # settingsService / orderService
 ├── directives/reveal.js  # v-reveal：IntersectionObserver + failsafe（勿改回 ScrollTrigger）
 ├── utils/
 │   ├── directus.js       # SDK 單例（session 模式）+ getAssetUrl()
@@ -66,14 +74,14 @@ src/
 | 變數 | 用途 |
 |---|---|
 | `VITE_DIRECTUS_URL` | API base。正式站為相對路徑 `/api`（經 nginx 反代，與前端同源）|
-| `VITE_DIRECTUS_PUBLIC_URL` | 對外絕對網址，供 assets 與 SSO 導向用（`https://gts-core.jaao.tw`）|
+| `VITE_DIRECTUS_PUBLIC_URL` | 對外絕對網址，供 assets 與 SSO 導向用（`https://core.gtxin.com.tw`）|
 
 ⚠️ **`VITE_*` 是 build-time 烘進靜態檔的**，換後端網址必須重 build image，改容器環境變數無效。
 
 ## 指令
 
 ```bash
-npm run dev       # Vite dev server（HTTPS，port 5174，https://local.jaao.tw:5174）
+npm run dev       # Vite dev server（HTTPS，port 5174，https://local.gtxin.com.tw:5174）
 npm run build     # → dist/
 npm run preview
 ```
@@ -91,8 +99,26 @@ npm run preview
 | service / mapper 寫法 | skill `directus-service-layer` |
 | 商品分類批次維運 | skill `directus-catalog-categorization` |
 | 部署 / 回滾 / 線上除錯 | skill `deploy-ops` |
+| 訂購單（資料模型／權限／Flow／踩雷） | `docs/proposals/訂購單.md` |
 
 ## 現況已知缺口
 
 - `views/Admin.vue` 只有殼、無 CRUD；後台實務上直接用 Directus admin UI。
+  老闆處理訂購單也是在 Directus 後台（有「待處理訂購單」書籤）。
+  日後規劃改為獨立的後台網站（另一個網域），非本站的 `/admin` 路由。
 - `src/assets/` 有一張 5MB 的 jpg，未經最佳化。
+- 上線前 `site_settings` 必填：匯款銀行／帳號／戶名（缺一即視為未設定，
+  客人會看到「請直接與我們聯絡」）、滿額免運門檻與預設運費（未填則一律不免運）、
+  訂單通知信箱。
+
+## 訂購單相關的硬規則
+
+- **`orders.customer` 客戶端無權寫入**（送了會 403），由 `items.create` 的 flow
+  依登入帳號補上。因此建立當下讀不回自己的單（HTTP 204），前端是靠
+  「記錄送出前的最大 id → 輪詢等新單出現」取得訂單。
+- **金額一律由後端算**。`confirmed_total` 在每次存檔時重算，欄位為唯讀。
+- **新增 Directus 欄位後必須檢查所有 policy 的欄位清單**：`customer access` 對
+  `products` / `site_settings` 等是逐一列欄位，查一個沒開放的欄位會讓**整個請求**
+  回 FORBIDDEN。曾因此讓已登入客戶連商品頁都打不開。
+- **權限相關的驗證一律用非管理員帳號**：管理員 `admin_access=true` 會繞過所有
+  policy，用它測等於沒測。

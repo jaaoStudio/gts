@@ -83,3 +83,21 @@ state: () => ({
 - Init on mount: call `authStore.init()` in `onMounted` of pages needing auth state.
 - Role check: `state.user?.role?.admin_access === true`
 - Dynamic route: `accountRoute` getter returns `/admin` or `/account` based on role.
+
+## Order Store Specifics（`stores/order.js`）
+
+購物車是本專案**唯一持久化到 localStorage 的 store**（key `gts_order_items`），
+因此多了幾條別的 store 沒有的規則：
+
+- **`init()` 在 `main.js` 呼叫一次**，不是各元件 `onMounted`——Navbar 的件數紅點
+  要在首次繪製就正確。解析失敗時丟棄並清 key，不讓壞資料卡住整個頁面。
+- **`_persist()` 的失敗要吞掉**。無痕模式或配額滿時 `localStorage.setItem` 會丟例外；
+  記憶體中的購物車仍可用，只是重整後消失，不該讓整個操作失敗。
+- **存進去的是快照，會過期**。`revalidate()` 必須在每次開啟訂購單頁時跑，
+  對照 Directus 現況處理「已刪除／已下架」與「價格已變動」。
+  ⚠️ **驗證失敗時保留原有品項、不要清空**——寧可顯示舊價，也不要讓客人的訂購單無故消失。
+- **`unitPrice` 用 `null` 表示詢價，絕不可寫 0**，否則會被誤讀成免費。
+  小計一律只加總有價品項。
+
+> 為什麼不用 pinia 持久化套件：只有這一個 store 需要，而且需要的是
+> 「還原後立刻對照後端重新驗證」，套件給的自動同步反而不夠用。

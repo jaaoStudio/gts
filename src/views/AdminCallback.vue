@@ -57,8 +57,19 @@ onMounted(async () => {
   const success = await authStore.handleCallback()
 
   if (success) {
-    // 依角色導向：管理員 → /admin、一般會員 → /account
-    router.replace(authStore.accountRoute)
+    // 送出訂購單前若記下了來源頁，登入後回到那裡（見 OrderForm.vue 的 goLogin）。
+    // 只接受站內相對路徑，擋掉 //evil.com 這種 protocol-relative 的開放導轉。
+    let target = null
+    try {
+      const saved = sessionStorage.getItem('gts_post_login_redirect')
+      sessionStorage.removeItem('gts_post_login_redirect')
+      if (saved && saved.startsWith('/') && !saved.startsWith('//')) target = saved
+    } catch {
+      // sessionStorage 不可用時就走預設導向
+    }
+
+    // 否則依角色導向：管理員 → /admin、一般會員 → /account
+    router.replace(target || authStore.accountRoute)
   } else {
     error.value = authStore.error || '無法完成登入，請再試一次'
   }

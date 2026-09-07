@@ -49,6 +49,15 @@ createDirectus(apiUrl)
 | `/admin/callback` | AdminCallback | Lazy | — |
 | `/account` | Account | Lazy | `requiresAuth` |
 | `/admin` | Admin | Lazy | `requiresAuth` + `requiresAdmin` |
+| `/order` | OrderForm | Lazy | title（**刻意不設 `requiresAuth`**，見下）|
+| `/order/done/:id` | OrderDone | Lazy | `requiresAuth` |
+| `/account/orders` | OrderHistory | Lazy | `requiresAuth` |
+| `/account/orders/:id` | OrderDetail | Lazy | `requiresAuth` |
+
+**`/order` 為何不設 `requiresAuth`**：購物車存在 localStorage，未登入也該看得到自己挑了什麼。
+該頁在未登入時顯示「登入後送出」，按下去會先把來源頁寫進
+`sessionStorage.gts_post_login_redirect`，`AdminCallback` 讀取後導回——
+**只接受站內相對路徑**（擋 `//evil.com` 這類 protocol-relative 開放導轉）。
 
 **載入策略**：核心店面三頁（`/`、`/products`、`/product/:slug`）靜態 import；
 其餘一律 `() => import(...)`。
@@ -64,14 +73,36 @@ router.beforeEach(async (to) => {
     if (to.meta.requiresAuth || to.meta.requiresAdmin) {
         const { useAuthStore } = await import('../stores/auth')   // 動態 import 避免循環相依
         const authStore = useAuthStore()
+
+        // ⚠️ 這一行不能拿掉,見下方「守衛競態」
+        if (!authStore.initialized) await authStore.init()
+
         if (!authStore.isAuthenticated) return '/login'
         if (to.meta.requiresAdmin && !authStore.isAdmin) return '/account'
     }
 })
 ```
 
-守衛**不做任何 fetch**。因為 `main.js` 已保證掛載前 auth 狀態就緒（見下節），
-守衛只讀狀態、不補抓資料，也不做 token refresh。
+### ⚠️ 守衛競態：受保護頁面「直接輸入網址」會被吞掉
+
+`main.js` 的 `app.use(router)` 會**立刻**觸發首次導航，而 `authStore.init()` 是在那之後
+才 await，所以守衛看到的 `isAuthenticated` 一律是 `false`。後果是：
+
+```
+使用者輸入 /account/orders
+  → 守衛判定未登入 → /login
+    → AdminLogin 此時 init 已完成、看到已登入 → replace 到 accountRoute
+      → 使用者莫名其妙停在 /account
+```
+
+**`/account` 本身之所以看起來正常，純粹是繞一圈剛好回到同一頁**——在只有 `/account`
+一個非管理員保護路由的年代不會被發現，加了 `/account/orders` 才現形（2026-09-04 修）。
+
+解法就是守衛內先 `await authStore.init()`。`init()` 有 `initialized` 旗標、冪等，
+再呼叫一次不會重打 API。
+
+> 這也是為什麼守衛**仍然不該做業務性的 fetch**：它只補等這一個必要的初始化，
+> 其餘資料一律留給元件自己抓。
 
 ## 初始化：Init Before Mount
 
@@ -121,7 +152,7 @@ AdminCallback.vue → authStore.handleCallback()
   每個前端 origin 的 `/admin/callback`（正式站 + 各 dev 網域）。少了會在登入第一步被擋，
   回 `INVALID_PAYLOAD: URL ... can't be used to redirect after login`。**最常踩的坑。**
 - **本機 dev 需 https + 自訂網域**：`vite.config.js` 的 `mkcert({ hosts: [...] })` 必須包含
-  實際進站網域（如 `local.jaao.tw`），否則憑證不涵蓋、直接 `CERT_COMMON_NAME_INVALID`。
+  實際進站網域（如 `local.gtxin.com.tw`），否則憑證不涵蓋、直接 `CERT_COMMON_NAME_INVALID`。
   該網域也要放進上面的白名單。
 - **改 double-tap 要動 Worker**：callback 路徑或 double-tap 行為調整時，
   Worker（`worker/auth-callback-worker.js`）與前端必須一起改。
