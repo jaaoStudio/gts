@@ -49,7 +49,7 @@ sudo cp traefik-dynamic/gts.yml /opt/traefik/dynamic/gts.yml
 ```
 
 ### 4. DNS
-Cloudflare 加 `gts.jaao.tw` A record 指向新 VM（DNS-01 憑證，橘雲/灰雲都可）。
+Cloudflare 加 `gtxin.com.tw` / `core.gtxin.com.tw` A record 指向新 VM（DNS-01 憑證，橘雲/灰雲都可）。
 
 ### 5. 登入 Harbor + 首次啟動兩個 slot
 ```bash
@@ -58,14 +58,14 @@ cd ~/gts-web
 docker compose --env-file .env up -d     # blue + green 都起來
 docker compose ps                        # 兩個都 healthy
 ```
-確認 https://gts.jaao.tw 正常後即完成。之後 push main 就會自動滾動更新。
+確認 https://gtxin.com.tw 正常後即完成。之後 push main 就會自動滾動更新。
 
 ### 6. GitHub Secrets（本 repo → Settings → Secrets and variables → Actions）
 | Secret | 說明 |
 |---|---|
 | `HARBOR_URL` / `HARBOR_USER` / `HARBOR_PASSWORD` | 沿用 boss-timing 那組 Harbor |
 | `VM_HOST` / `VM_USER` / `VM_SSH_KEY` | **新 VM** 的 SSH（key 用 private key 全文） |
-| `VITE_DIRECTUS_PUBLIC_URL` | `https://gts-core.jaao.tw`（SSO 導向用的絕對網址） |
+| `VITE_DIRECTUS_PUBLIC_URL` | `https://core.gtxin.com.tw`（SSO 導向用的絕對網址） |
 
 > `VITE_DIRECTUS_URL` 固定 `/api`（已寫死在 workflow build-args），不需 secret。
 

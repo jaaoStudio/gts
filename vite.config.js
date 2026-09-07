@@ -8,8 +8,10 @@ export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    // 憑證需涵蓋自訂 dev 網域，否則瀏覽器連 https://local.jaao.tw:5174 會 CERT_COMMON_NAME_INVALID
-    mkcert({ hosts: ['localhost', '127.0.0.1', 'local.jaao.tw'] })
+    // 憑證需涵蓋自訂 dev 網域，否則瀏覽器連 https://local.gtxin.com.tw:5174 會 CERT_COMMON_NAME_INVALID
+    // ⚠️ dev 網域必須在 gtxin.com.tw 底下：Directus 的 SESSION_COOKIE_DOMAIN 是
+    //    .gtxin.com.tw，用其他網域跑 dev 會拿不到 session cookie、登不進去
+    mkcert({ hosts: ['localhost', '127.0.0.1', 'local.gtxin.com.tw'] })
   ],
   resolve: {
     alias: {
@@ -20,10 +22,10 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5174,
     https: true,
-    allowedHosts: ['local.jaao.tw'],
+    allowedHosts: ['local.gtxin.com.tw'],
     proxy: {
       '/api': {
-        target: 'https://gts-core.jaao.tw',
+        target: 'https://core.gtxin.com.tw',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

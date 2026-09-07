@@ -1,11 +1,46 @@
-# 複製到 VM 的 /opt/traefik/dynamic/gts.yml
+# 複製到 VM 的 /opt/traefik/dynamic/gts.yml（此為參考副本，正典在 VM 上）
 # deploy.sh / rollback.sh 只會改 service 那行的 blue<->green，Traefik 自動 reload。
+# /opt/traefik/dynamic/gts.yml — Phase 2(藍綠) + gtxin.com.tw 遷移
+# 前端走 docker provider 的 blue/green service(deploy.sh 會切 service 那行 blue<->green)。
+# directus 維持 file provider 直指容器。
+#
+# ⚠️ 新舊網域刻意拆成不同 router：Cloudflare token 目前只涵蓋 gtxin.com.tw，
+#    若把兩個網域寫在同一條 rule，Traefik 會去要一張同時涵蓋兩者的憑證而失敗，
+#    連帶讓整個 router 不可用。分開之後各自用各自的憑證，互不影響。
 http:
   routers:
-    gts:
-      rule: "Host(`gts.jaao.tw`)"
+    # ── 新網域（主要）──────────────────────────────
+    gts-new:
+      rule: "Host(`gtxin.com.tw`)"
       entryPoints:
         - websecure
-      service: gts-frontend-blue@docker   # ← deploy.sh 會切這行 blue/green
+      service: gts-frontend-blue@docker
       tls:
         certResolver: cf
+    directus-new:
+      rule: "Host(`core.gtxin.com.tw`)"
+      entryPoints:
+        - websecure
+      service: directus
+      tls:
+        certResolver: cf
+
+    # ── 舊網域（過渡期保留，憑證已存在於 acme.json，有效至 2026-11-19）──
+    gts:
+      rule: "Host(`gts.jaao.tw`) || Host(`jaao.tw`)"
+      entryPoints:
+        - websecure
+      service: gts-frontend-blue@docker
+      tls: {}
+    directus:
+      rule: "Host(`gts-core.jaao.tw`)"
+      entryPoints:
+        - websecure
+      service: directus
+      tls: {}
+
+  services:
+    directus:
+      loadBalancer:
+        servers:
+          - url: "http://directus_app:8055"
