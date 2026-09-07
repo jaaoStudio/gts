@@ -1,11 +1,61 @@
-# 複製到 VM 的 /opt/traefik/dynamic/gts.yml
+# 複製到 VM 的 /opt/traefik/dynamic/gts.yml（此為參考副本，正典在 VM 上）
 # deploy.sh / rollback.sh 只會改 service 那行的 blue<->green，Traefik 自動 reload。
+# /opt/traefik/dynamic/gts.yml — Phase 2(藍綠)，正式網域為 gtxin.com.tw
+# 前端走 docker provider 的 blue/green service(deploy.sh 會切 service 那行 blue<->green)。
+# directus 維持 file provider 直指容器。
+#
+# jaao.tw 已棄用，僅保留 301 轉址讓舊連結不致 404。
+# ⚠️ 其憑證有效至 2026-11-19，且目前的 Cloudflare token 已不含 jaao.tw zone，
+#    無法續簽 —— 到期後這兩條轉址會失效，屆時直接刪除即可。
 http:
   routers:
     gts:
-      rule: "Host(`gts.jaao.tw`)"
+      rule: "Host(`gtxin.com.tw`)"
       entryPoints:
         - websecure
-      service: gts-frontend-blue@docker   # ← deploy.sh 會切這行 blue/green
+      service: gts-frontend-blue@docker
       tls:
         certResolver: cf
+    directus:
+      rule: "Host(`core.gtxin.com.tw`)"
+      entryPoints:
+        - websecure
+      service: directus
+      tls:
+        certResolver: cf
+
+    # ── 舊網域：301 轉址 ──────────────────────────────
+    legacy-front:
+      rule: "Host(`gts.jaao.tw`) || Host(`jaao.tw`)"
+      entryPoints:
+        - websecure
+      service: gts-frontend-blue@docker   # 必填但不會用到，middleware 先攔下
+      middlewares:
+        - redirect-front
+      tls: {}
+    legacy-core:
+      rule: "Host(`gts-core.jaao.tw`)"
+      entryPoints:
+        - websecure
+      service: directus
+      middlewares:
+        - redirect-core
+      tls: {}
+
+  middlewares:
+    redirect-front:
+      redirectRegex:
+        regex: "^https?://[^/]+/(.*)"
+        replacement: "https://gtxin.com.tw/${1}"
+        permanent: true
+    redirect-core:
+      redirectRegex:
+        regex: "^https?://[^/]+/(.*)"
+        replacement: "https://core.gtxin.com.tw/${1}"
+        permanent: true
+
+  services:
+    directus:
+      loadBalancer:
+        servers:
+          - url: "http://directus_app:8055"
