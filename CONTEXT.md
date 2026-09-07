@@ -2,6 +2,11 @@
 
 The customer-facing storefront for GTS Hardware (五金/工具電商). A Vue 3 SPA backed by a Directus CMS/API, with Google SSO for sign-in. This glossary fixes the ubiquitous language so code, UI copy, and docs agree on one word per concept.
 
+> **型錄 + 訂購單，仍然不是線上結帳站。**
+> 客人可以把品項送成一張 **Order form**（訂購單），但**站上不收款**：老闆確認金額後，
+> 客人依信中的匯款資訊轉帳。沒有線上刷卡、沒有即時庫存扣減、沒有物流串接。
+> 部分商品另有外部通路連結（iOPEN Mall / 蝦皮），那是導流出去、不在本站成交。
+
 ## Language
 
 ### People
@@ -47,3 +52,35 @@ _Avoid_: label, flag, badge (the chip is a rendering of a Tag, not a concept of 
 **Featured** (精選):
 A Product carrying the Tag named "精選"; the home page "本月精選" section is exactly this set. It is a convention over the Tag *name* string, not a dedicated flag.
 _Avoid_: promoted, highlighted, spotlight.
+
+### Ordering
+
+**Order form** (訂購單):
+A submitted request to buy (Directus `orders`), created by a signed-in Customer from their
+cart. It is **not** a completed transaction — the Display prices on it are 參考價 and the
+amount only becomes binding once the Admin confirms it. Addressed by an **Order number**.
+_Avoid_: 訂單 alone when the distinction matters, cart (that is the pre-submission state),
+詢價單 (詢價 already means something else — see above).
+
+**Order number** (訂購單號):
+The customer-facing identifier, format `GTS-YYMMDD-####`, derived from the row's
+auto-increment id. Short enough to read aloud on the phone.
+_Avoid_: order id (that is the internal integer).
+
+**Confirmed price** (確認單價):
+The per-item price the Admin sets after checking stock and current cost. Takes precedence
+over the snapshot the Customer saw. The **Amount due** (應付金額) is
+`Σ 確認單價 × 數量 − 折扣 + 運費`, recalculated on every save.
+_Avoid_: 售價 (that is the catalogue price), 總價 when quote-only items are present.
+
+**Order status** (狀態):
+One of 待確認 → 待付款 → 已付款 → 已出貨, plus 已取消. 已出貨 is the normal terminal
+state; there is deliberately no 已完成 because nothing confirms receipt.
+_Avoid_: inventing intermediate states — each one must correspond to something the
+Customer actually sees change.
+
+**External channel** (外部通路):
+iOPEN Mall / 蝦皮 links stored on a Product. A Product may offer both an external channel
+and the Order form; the shopper chooses. Those platforms provide no order-creation API, so
+this is one-way outbound linking only.
+_Avoid_: implying stock or price sync — there is none.

@@ -32,7 +32,7 @@ description: Directus 商品分類的批次維運與重歸類手法。整批改�
   另外 `status` 預設 `draft`，不改成 `published` 不會上架。
 
 ## 直接打 API 的連線守則（踩過的坑）
-連線：`https://gts-core.jaao.tw`。token 有**兩個位置、變數名不同**，別搞混：
+連線：`https://core.gtxin.com.tw`。token 有**兩個位置、變數名不同**，別搞混：
 
 | 位置 | 變數名 | 用途 |
 |---|---|---|
@@ -43,7 +43,7 @@ description: Directus 商品分類的批次維運與重歸類手法。整批改�
 
 ```python
 import json, urllib.request
-B = "https://gts-core.jaao.tw"
+B = "https://core.gtxin.com.tw"
 TOKEN = open("/path/to/.env").read().split("DIRECTUS_AI_AGENT_TOKEN=")[1].split("\n")[0].strip()
 H = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Mozilla/5.0", "Content-Type": "application/json"}
 ```
