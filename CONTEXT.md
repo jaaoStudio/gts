@@ -76,6 +76,9 @@ _Avoid_: 售價 (that is the catalogue price), 總價 when quote-only items are 
 **Order status** (狀態):
 One of 待確認 → 待付款 → 已付款 → 已出貨, plus 已取消. 已出貨 is the normal terminal
 state; there is deliberately no 已完成 because nothing confirms receipt.
+The stored keys are `pending` / `quoted` / `paid` / `shipped` / `cancelled`. Note that
+`quoted` is the 待付款 state: the key names it from the Admin's side (已報價), the UI
+label from the Customer's (該付錢了). Same state, two viewpoints — grep for both.
 _Avoid_: inventing intermediate states — each one must correspond to something the
 Customer actually sees change.
 
