@@ -14,8 +14,14 @@
 
         <div class="mt-6 rounded-2xl bg-steel-50 px-6 py-5">
           <p class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">訂購單號</p>
-          <p class="mt-1.5 font-mono text-xl font-bold tracking-tight text-steel-900">
-            {{ orderNumber || '產生中…' }}
+          <p v-if="state === 'ready'" class="mt-1.5 font-mono text-xl font-bold tracking-tight text-steel-900">
+            {{ orderNumber }}
+          </p>
+          <p v-else-if="state === 'loading'" class="mt-1.5 font-mono text-xl font-bold tracking-tight text-steel-900">
+            產生中…
+          </p>
+          <p v-else class="mt-1.5 text-sm leading-relaxed text-steel-500">
+            單號稍後產生，可到「我的訂購單」查看
           </p>
         </div>
 
@@ -56,9 +62,16 @@ import { PhCheckCircle } from '@phosphor-icons/vue'
 const route = useRoute()
 const orderNumber = ref(null)
 
+// getOrderNumber() 內部是 catch { return null }，查詢失敗與「flow 還沒補上單號」
+// 回傳同一個值。少了這個第三態，失敗時畫面會永遠停在「產生中…」，
+// 客人沒有重試、沒有逾時、也沒有線索知道下一步該做什麼。
+const state = ref('loading') // loading | ready | unavailable
+
 onMounted(async () => {
   // 單號由 items.create 的 action flow 補上，通常送出頁輪詢時就已取得；
   // 這裡再讀一次以支援重新整理。取不到也不擋——訂單確實已建立。
-  orderNumber.value = await orderService.getOrderNumber(route.params.id)
+  const n = await orderService.getOrderNumber(route.params.id)
+  orderNumber.value = n
+  state.value = n ? 'ready' : 'unavailable'
 })
 </script>
