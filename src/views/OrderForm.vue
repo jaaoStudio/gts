@@ -140,7 +140,9 @@
           class="rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6"
         >
           <h2 class="font-display text-lg font-semibold text-steel-900">聯絡與送貨資訊</h2>
-          <p class="mt-1 text-sm text-steel-500">已帶入您的會員資料，這次要送到別處可直接修改。</p>
+          <p class="mt-1 text-sm text-steel-500">
+            已帶入您的會員資料，這次要送到別處可直接修改。標示 <span class="text-red-500">*</span> 為必填。
+          </p>
 
           <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <label class="block">
@@ -152,9 +154,12 @@
               />
             </label>
             <label class="block">
-              <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">聯絡電話</span>
+              <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
+                聯絡電話 <span class="text-red-500">*</span>
+              </span>
               <input
                 v-model.trim="form.contactPhone"
+                required
                 type="tel"
                 inputmode="tel"
                 class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 text-steel-900 outline-none transition-colors focus:border-steel-900"
@@ -217,7 +222,7 @@
             v-else
             type="button"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
-            :disabled="orderStore.submitting"
+            :disabled="!canSubmit"
             @click="submit"
           >
             {{ orderStore.submitting ? '送出中…' : '送出訂購單' }}
@@ -242,7 +247,7 @@
 </template>
 
 <script setup>
-import { reactive, watch, onMounted } from 'vue'
+import { computed, reactive, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOrderStore } from '../stores/order'
 import { useAuthStore } from '../stores/auth'
@@ -261,6 +266,13 @@ const form = reactive({
   contactAddress: '',
   note: '',
 })
+
+// 送出的下一步就是「由專人與您確認價格與庫存」——也就是要打電話。三欄全空的單
+// 到後台只能回頭翻會員資料，而會員資料的電話也可能沒填，所以電話是唯一的硬門檻。
+// 只驗非空不驗格式：市話、分機、手機的寫法差太多，擋掉真客人的代價高於擋掉爛資料。
+const canSubmit = computed(() =>
+  !!authStore.customer?.id && !!form.contactPhone && !orderStore.submitting
+)
 
 // 詢價品項沒有單價，不能算小計也不該顯示 NT$0
 const lineTotal = (item) =>
