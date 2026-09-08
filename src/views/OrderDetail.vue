@@ -166,10 +166,29 @@
             </li>
           </ul>
 
-          <dl class="mt-5 space-y-2.5 border-t border-steel-200 pt-5 text-sm">
-            <div v-if="order.subtotal != null" class="flex justify-between">
-              <dt class="text-steel-500">送出時參考小計</dt>
-              <dd class="font-mono text-steel-700">NT${{ order.subtotal.toLocaleString() }}</dd>
+          <!--
+            參考小計是「送出當下」的快照，老闆改價後它就不再是應付金額的基底。
+            把它留在計算欄裡，客人會拿它去加運費與折扣，怎麼算都對不上應付金額
+            （少的正是改價的差額）。因此獨立成一區並置灰，明確排除在算式之外。
+          -->
+          <div v-if="order.subtotal != null" class="mt-5 border-t border-steel-200 pt-5">
+            <div class="flex justify-between text-sm text-steel-400">
+              <span>送出時參考小計</span>
+              <span class="font-mono">NT${{ order.subtotal.toLocaleString() }}</span>
+            </div>
+            <p v-if="isConfirmed" class="mt-1.5 text-xs leading-relaxed text-steel-400">
+              價格已由專人重新確認，實際金額請看下方。
+            </p>
+          </div>
+
+          <!-- 真正會相加的項目才放進這一欄 -->
+          <dl
+            v-if="isConfirmed"
+            class="mt-4 space-y-2.5 border-t border-steel-200 pt-4 text-sm"
+          >
+            <div class="flex justify-between">
+              <dt class="text-steel-500">確認後小計</dt>
+              <dd class="font-mono text-steel-700">NT${{ confirmedSubtotal.toLocaleString() }}</dd>
             </div>
             <div v-if="order.shipping_fee != null" class="flex justify-between">
               <dt class="text-steel-500">運費</dt>
@@ -181,10 +200,7 @@
               <dt class="text-steel-500">折扣</dt>
               <dd class="font-mono text-steel-700">−NT${{ order.discount.toLocaleString() }}</dd>
             </div>
-            <div
-              v-if="order.confirmed_total != null"
-              class="flex items-baseline justify-between border-t border-steel-200 pt-3"
-            >
+            <div class="flex items-baseline justify-between border-t border-steel-200 pt-3">
               <dt class="font-display font-semibold text-steel-900">應付金額</dt>
               <dd class="font-mono text-xl font-bold text-steel-900">
                 NT${{ order.confirmed_total.toLocaleString() }}
@@ -251,6 +267,23 @@ const reportError = ref(null)
 // 驗證時作用，都擋不住貼上的 "abcde"，所以送出條件要自己驗。
 const LAST_FIVE_DIGITS = /^\d{5}$/
 const canReport = computed(() => LAST_FIVE_DIGITS.test(paymentNote.value) && !reporting.value)
+
+// 老闆按下確認後才有應付金額；在那之前這張單沒有任何可相加的數字
+const isConfirmed = computed(() => order.value?.confirmed_total != null)
+
+/**
+ * 應付金額的基底：Σ 確認單價 × 數量。
+ *
+ * 未儲存於資料庫，這裡即時算——與 itemTotal() 同一套取價規則（確認價優先，
+ * 未確認則沿用下單時的單價），確保逐行金額加起來一定等於這個小計。
+ * 詢價且尚未報價的品項沒有價格可加，跳過。
+ */
+const confirmedSubtotal = computed(() =>
+  (order.value?.items ?? []).reduce((sum, it) => {
+    const price = it.confirmed_price ?? it.unit_price
+    return price == null ? sum : sum + price * it.quantity
+  }, 0)
+)
 
 const statusHint = computed(() => ORDER_STATUS[order.value?.status]?.hint || '')
 const bankInfo = computed(() => settingsStore.bankInfo)

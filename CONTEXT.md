@@ -69,9 +69,25 @@ _Avoid_: order id (that is the internal integer).
 
 **Confirmed price** (確認單價):
 The per-item price the Admin sets after checking stock and current cost. Takes precedence
-over the snapshot the Customer saw. The **Amount due** (應付金額) is
-`Σ 確認單價 × 數量 − 折扣 + 運費`, recalculated on every save.
+over the snapshot the Customer saw.
 _Avoid_: 售價 (that is the catalogue price), 總價 when quote-only items are present.
+
+**Reference subtotal** (參考小計):
+The priced-item total captured **at submission** (`orders.subtotal`) — a record of what
+the Customer saw, nothing more. Once the Admin adjusts any 確認單價 it stops describing
+the money owed, so it **takes no part in the Amount due calculation**.
+_Avoid_: listing it in the same column as the figures that do add up — a Customer will
+try to total it against 運費 and 折扣, and land short by exactly the price adjustment.
+
+**Confirmed subtotal** (確認後小計):
+`Σ 確認單價 × 數量` — the base the Amount due is built from. Derived, not stored: it is
+computed from the order's items whenever it is shown.
+_Avoid_: 小計 unqualified (it collides with 參考小計 — always say which one).
+
+**Amount due** (應付金額):
+`確認後小計 − 折扣 + 運費`, recalculated on every save. Binding only once the Admin has
+confirmed; before that the Order form has no Amount due at all.
+_Avoid_: 總價, 應付 (as a bare noun).
 
 **Order status** (狀態):
 One of 待確認 → 待付款 → 已付款 → 已出貨, plus 已取消. 已出貨 is the normal terminal
