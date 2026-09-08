@@ -79,6 +79,47 @@ callback 收到的是**陣列**。用 `([entry]) => …` 解構只讀第一筆,�
 const entry = entries[entries.length - 1]
 ```
 
+## 送出流程:await 前後讀同一個 reactive 來源
+
+**這個坑在同一條分支上被抓到三次**(2026-09,`OrderDetail` 匯款回報、`OrderForm`
+送單、`Account` 儲存),形狀完全一樣,所以值得記下來。
+
+**症狀**
+
+送出期間客人改了輸入框,結果「畫面說的」和「真的送出去的」對不上:
+
+- `OrderDetail.reportPayment()` — 送出 `12345`,等待中改成 `54321`,Directus 回
+  204(SDK 拿到 `null`)走 fallback 又讀一次 `paymentNote.value` → 顯示
+  「已收到…54321」並收起表單,實際寫進去的是 `12345`。**店家會拿舊末五碼對帳。**
+- `OrderForm.submit()` — `canSubmit` 只在點下去那一刻成立,但重抓會員資料隔著一段
+  `await`,等待中清空電話就會把空字串送到 service 轉成 `contact_phone: null`。
+- `Account.handleSave()` — 送的是 `{ ...form }` 快照(這步是對的),但欄位沒鎖,
+  等待中打的字不進這次請求,成功後表單直接收起 → **鍵盤輸入無聲消失**。
+
+**根因**
+
+`ref` / `reactive` 讀的永遠是「當下」。`await` 把「檢查」「送出」「回填」拆成三個
+不同的時間點,而使用者在那段空窗裡是可以動的。原生 `required` / `pattern` 也救不了
+——這些輸入框多半不在真正提交的 `<form>` 裡,或按鈕是 `type="button"` 搭 `@click`。
+
+**對策**(兩件事都要做,少一件都不夠)
+
+1. **`await` 之前先定住值**,請求與其後的驗證、回填、錯誤訊息一律只用這份快照。
+   一次把整組欄位快照起來,不要一半快照一半即時——那種不一致讀起來像有特殊理由。
+
+   ```js
+   const payload = { contactPhone: form.contactPhone.trim(), /* … */ }
+   if (!payload.contactPhone) { /* 報錯 */ return }
+   const result = await orderStore.submit(payload)
+   ```
+
+2. **送出期間鎖住輸入**。值已經定住了,畫面就不該再暗示「還改得動」。多個欄位用
+   `<fieldset :disabled="saving">` 一次蓋住,比逐個掛 `:disabled` 少一輪漏改的機會
+   (記得 `border-0 p-0 min-w-0`,fieldset 的預設樣式會弄壞版面)。
+
+`v-model.trim` 只作用在使用者輸入。程式碼直接指派的預填值(如
+`form.contactPhone = c.phone || ''`)**不會被 trim**,所以閘門自己也要 `.trim()`。
+
 ## 除錯:手機才能復現的問題不要靠猜
 
 沒有裝置 console 可看時,加一個 dev-only 的 Vite middleware 把狀態寫進檔案,

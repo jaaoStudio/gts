@@ -324,21 +324,23 @@ const submit = async () => {
     }
   }
 
-  // 電話在此重驗並定住。canSubmit 只在「點下去的那一刻」成立，而上面的重抓中間隔著
-  // 一段 await——客人在等待期間清掉電話，這裡就會把空字串一路送到 service 轉成
-  // contact_phone: null。輸入框不在原生提交的 form 裡，required 也攔不到這條路徑。
-  const contactPhone = form.contactPhone.trim()
-  if (!contactPhone) {
+  // 四欄一次定住，之後只用這份快照。canSubmit 只在「點下去的那一刻」成立，而上面的
+  // 重抓中間隔著一段 await——客人在等待期間清掉電話，直接讀 form 就會把空字串一路送到
+  // service 轉成 contact_phone: null。輸入框不在原生提交的 form 裡，required 也攔不到。
+  // 其餘三欄本身沒有閘門，但一起快照才讀得出「送出的是同一個時間點的資料」。
+  const payload = {
+    contactName: form.contactName,
+    contactPhone: form.contactPhone.trim(),
+    contactAddress: form.contactAddress,
+    note: form.note,
+  }
+
+  if (!payload.contactPhone) {
     orderStore.submitError = '請填寫聯絡電話，我們需要它才能與您確認價格與庫存。'
     return
   }
 
-  const result = await orderStore.submit({
-    contactName: form.contactName,
-    contactPhone,
-    contactAddress: form.contactAddress,
-    note: form.note,
-  })
+  const result = await orderStore.submit(payload)
 
   if (!result) return
 

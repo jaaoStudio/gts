@@ -145,6 +145,10 @@
 
           <!-- Edit mode -->
           <form v-else @submit.prevent="handleSave" class="space-y-5">
+            <!-- 儲存期間鎖住整組欄位。handleSave() 送的是 { ...form } 的快照，等待期間
+                 打的字不會進到這次請求，成功後表單直接收起——鍵盤輸入就這樣無聲消失。
+                 fieldset 一次蓋住六個欄位，比逐個掛 :disabled 少一輪漏改的機會。 -->
+            <fieldset :disabled="saving" class="min-w-0 space-y-5 border-0 p-0">
             <div class="flex flex-col gap-2">
               <label for="edit-user-name" class="text-sm font-medium text-steel-700">名稱</label>
               <input
@@ -205,6 +209,7 @@
                 placeholder="請輸入帳單地址"
               ></textarea>
             </div>
+            </fieldset>
 
             <!-- Error -->
             <p v-if="saveError" class="text-sm text-red-600">{{ saveError }}</p>
@@ -278,7 +283,7 @@ const authStore = useAuthStore()
 
 // 共用輸入框樣式（label 在上、focus 用 brand ring，符合全站表單對比）
 const inputClass =
-  'w-full rounded-xl border border-steel-200 bg-steel-50 px-4 py-2.5 text-sm text-steel-900 placeholder-steel-400 transition-all duration-200 focus:border-brand-500/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/15'
+  'w-full rounded-xl border border-steel-200 bg-steel-50 px-4 py-2.5 text-sm text-steel-900 placeholder-steel-400 transition-all duration-200 focus:border-brand-500/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/15 disabled:bg-steel-100 disabled:text-steel-400'
 
 // --- 編輯模式狀態 ---
 const isEditing = ref(false)
