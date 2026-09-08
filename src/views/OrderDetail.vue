@@ -254,6 +254,7 @@ import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import OrderStatusChip from '../components/OrderStatusChip.vue'
 import { PhCaretLeft } from '@phosphor-icons/vue'
+import { effectivePrice, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
 
 const route = useRoute()
 const settingsStore = useSettingsStore()
@@ -274,19 +275,9 @@ const canReport = computed(() => LAST_FIVE_DIGITS.test(paymentNote.value) && !re
 // 老闆按下確認後才有應付金額；在那之前這張單沒有任何可相加的數字
 const isConfirmed = computed(() => order.value?.confirmed_total != null)
 
-/**
- * 應付金額的基底：Σ 確認單價 × 數量。
- *
- * 未儲存於資料庫，這裡即時算——與 itemTotal() 同一套取價規則（確認價優先，
- * 未確認則沿用下單時的單價），確保逐行金額加起來一定等於這個小計。
- * 詢價且尚未報價的品項沒有價格可加，跳過。
- */
-const confirmedSubtotal = computed(() =>
-  (order.value?.items ?? []).reduce((sum, it) => {
-    const price = it.confirmed_price ?? it.unit_price
-    return price == null ? sum : sum + price * it.quantity
-  }, 0)
-)
+// 應付金額的基底。算法與 itemTotal() 共用 utils/orderTotals 的取價規則，
+// 逐行金額加起來才保證等於這個小計。
+const confirmedSubtotal = computed(() => calcConfirmedSubtotal(order.value?.items))
 
 const statusHint = computed(() => ORDER_STATUS[order.value?.status]?.hint || '')
 const bankInfo = computed(() => settingsStore.bankInfo)
@@ -297,9 +288,8 @@ const formatDateTime = (iso) =>
     hour: '2-digit', minute: '2-digit',
   })
 
-// 老闆確認過的單價優先，未確認則沿用客人下單時看到的
 const itemTotal = (item) => {
-  const price = item.confirmed_price ?? item.unit_price
+  const price = effectivePrice(item)
   return price == null ? '待報價' : `NT$${(price * item.quantity).toLocaleString()}`
 }
 
