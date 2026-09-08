@@ -13,9 +13,13 @@ export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null,
         customer: null,
-        initialized: false, // init() 是否已跑過（冪等，避免各元件重複觸發）
+        initialized: false, // init() 是否已跑完（冪等，避免各元件重複觸發）
         loading: false,
         error: null,
+
+        // 進行中的 init() promise。initialized 要到 finally 才變 true，光靠它擋不住
+        // 「請求還飛在半空中時的第二次呼叫」——那段空窗剛好就是首次導航會落進去的地方。
+        _initPromise: null,
     }),
 
     getters: {
@@ -148,18 +152,32 @@ export const useAuthStore = defineStore('auth', {
             this.customer = null
         },
 
+        /**
+         * 冪等：只在首次進入點跑一次；各元件 onMounted 或路由守衛再呼叫都不會重打 API。
+         *
+         * 用 in-flight 的 promise 本身當旗標，而不是只看 `initialized`——後者要到
+         * finally 才設為 true，檢查與設旗標之間隔著一整段 await，是典型的
+         * check-then-act 空窗。main.js 先 `app.use(router)` 觸發首次導航，才呼叫
+         * init()，守衛的動態 import 解析完時請求正在飛，`initialized` 還是 false，
+         * 少了這層就會多打一次 /users/me。
+         */
         async init() {
-            // 冪等：只在首次進入點跑一次；各元件 onMounted 再呼叫也不會重打
             if (this.initialized) return
+            if (this._initPromise) return this._initPromise
 
-            this.loading = true
-            try {
-                // session cookie 由瀏覽器夾帶；抓得到 user 即已登入，抓不到即匿名
-                await this.fetchCurrentUser({ force: true })
-            } finally {
-                this.initialized = true
-                this.loading = false
-            }
+            this._initPromise = (async () => {
+                this.loading = true
+                try {
+                    // session cookie 由瀏覽器夾帶；抓得到 user 即已登入，抓不到即匿名
+                    await this.fetchCurrentUser({ force: true })
+                } finally {
+                    this.initialized = true
+                    this.loading = false
+                    this._initPromise = null
+                }
+            })()
+
+            return this._initPromise
         },
     }
 })

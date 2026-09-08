@@ -133,8 +133,8 @@ router.beforeEach(async (to) => {
         // 還沒 resolve，isAuthenticated 一律是 false。少了這一行，任何以完整網址
         // 直接開啟的受保護頁面都會被踢到 /login，AdminLogin 再把已登入的使用者
         // replace 到 /account —— 結果就是「網址列打 /account/orders 卻跳到 /account」。
-        // init() 冪等（有 initialized 旗標），這裡再呼叫一次不會重打 API。
-        if (!authStore.initialized) await authStore.init()
+        // init() 會共用進行中的那趟請求（見 auth store），這裡等它即可，不會重打 API。
+        await authStore.init()
 
         // 未登入 → 登入頁
         if (!authStore.isAuthenticated) {
