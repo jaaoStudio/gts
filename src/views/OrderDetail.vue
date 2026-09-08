@@ -98,6 +98,8 @@
                 <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
                   匯款後請填帳號末五碼
                 </span>
+                <!-- 送出期間鎖住：值已在 reportPayment() 內定住，這裡是不讓畫面
+                     暗示「還改得動」——客人改了字卻送出舊值，比不給改更難解釋 -->
                 <input
                   v-model.trim="paymentNote"
                   type="text"
@@ -105,7 +107,8 @@
                   pattern="\d{5}"
                   maxlength="5"
                   placeholder="12345"
-                  class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 font-mono text-steel-900 outline-none transition-colors placeholder:text-steel-300 focus:border-steel-900"
+                  :disabled="reporting"
+                  class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 font-mono text-steel-900 outline-none transition-colors placeholder:text-steel-300 focus:border-steel-900 disabled:bg-steel-50 disabled:text-steel-400"
                 />
               </label>
               <button
@@ -304,13 +307,19 @@ const reportPayment = async () => {
   // 表單是 @submit.prevent，按 Enter 會繞過 disabled 的按鈕，這裡要再擋一次
   if (!canReport.value) return
 
+  // 先把實際送出的值定住。204 的 fallback 若回頭讀 paymentNote.value，讀到的是
+  // 「回應到達當下」的輸入框內容——客人在等待期間改了字，成功提示就會顯示他改過的
+  // 新號碼，但送到 Directus 的是舊的那組。畫面同時隱藏表單，於是他以為更正成功，
+  // 店家卻拿著舊末五碼在對帳。請求與 fallback 必須用同一份快照。
+  const submittedNote = paymentNote.value
+
   reporting.value = true
   reportError.value = null
   try {
-    const updated = await orderService.reportPayment(order.value.id, paymentNote.value)
+    const updated = await orderService.reportPayment(order.value.id, submittedNote)
     // Directus 回 204 時 updated 是 null。少了防護會拋 TypeError 被下面接住顯示
     // 「回報失敗」，但寫入其實成功了——客人會重送。
-    order.value.payment_note = updated?.payment_note ?? paymentNote.value
+    order.value.payment_note = updated?.payment_note ?? submittedNote
   } catch (err) {
     reportError.value = '回報失敗，請稍後再試或直接與我們聯絡。'
     console.error('Error reporting payment:', err)

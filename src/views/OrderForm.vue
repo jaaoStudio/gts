@@ -274,7 +274,10 @@ const form = reactive({
 // ⚠️ 會員資料的檢查**刻意不放進來**：放進來會讓按鈕帶著 disabled:pointer-events-none
 // 灰掉，客人既點不到也 hover 不到，submit() 內那段說明性錯誤永遠不可達——一個可診斷
 // 的失敗會變成一顆沒有解釋的灰鈕。會員資料的問題留到點擊時處理，見 submit()。
-const canSubmit = computed(() => !!form.contactPhone && !orderStore.submitting)
+//
+// trim 過再判斷：輸入框有 v-model.trim，但 prefillFromCustomer 是直接指派
+// `c.phone || ''`，會員資料裡若是一串空白就會原樣進來並讓這個閘門成立。
+const canSubmit = computed(() => !!form.contactPhone.trim() && !orderStore.submitting)
 
 // 詢價品項沒有單價，不能算小計也不該顯示 NT$0
 const lineTotal = (item) =>
@@ -321,9 +324,18 @@ const submit = async () => {
     }
   }
 
+  // 電話在此重驗並定住。canSubmit 只在「點下去的那一刻」成立，而上面的重抓中間隔著
+  // 一段 await——客人在等待期間清掉電話，這裡就會把空字串一路送到 service 轉成
+  // contact_phone: null。輸入框不在原生提交的 form 裡，required 也攔不到這條路徑。
+  const contactPhone = form.contactPhone.trim()
+  if (!contactPhone) {
+    orderStore.submitError = '請填寫聯絡電話，我們需要它才能與您確認價格與庫存。'
+    return
+  }
+
   const result = await orderStore.submit({
     contactName: form.contactName,
-    contactPhone: form.contactPhone,
+    contactPhone,
     contactAddress: form.contactAddress,
     note: form.note,
   })

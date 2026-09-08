@@ -1,0 +1,191 @@
+{
+  "basic_info": {
+    "target": "GitHub PR #11",
+    "project_path": "jaaoStudio/gts",
+    "source_branch": "fix/order-review-followups",
+    "target_branch": "main",
+    "review_date": "2026-09-08",
+    "files_changed": 9,
+    "additions": 334,
+    "deletions": 73,
+    "skill_version": "2026.06.29.02",
+    "review_model": "unknown"
+  },
+  "verdict": "Request Changes",
+  "confidence": 39,
+  "overall_score": 82,
+  "na_categories": [
+    "API端點規範",
+    "資料庫"
+  ],
+  "change_summary": "審查 HEAD f80e0afcd2b660950dd5db98dce37e530f3e3fe1 相對 main 的 merge-base diff。修正基準讀取失敗誤認舊單、登入初始化重複請求、會員資料錯誤狀態、完成頁單號重試與確認後金額顯示，新增電話及匯款末五碼檢查。未找到此 PR 的歷史報告，編號重置；本報告 C1/S1 是本輪新編號，與 issue #10 的編號不同。",
+  "commendations": "src/stores/order.js:154 將無可信基準保留為 null，避免誤拿舊單；src/stores/auth.js:197 共用進行中的初始化請求；src/views/OrderDetail.vue:183 將確認後小計與參考快照分開；Account 與 OrderDone 的錯誤／缺漏狀態提供清楚的下一步。獨立邏輯模型驗證基準判斷四情境、確認後小計兩情境及並行 init 均通過。",
+  "findings": [
+    {
+      "id": "C1",
+      "severity": "Critical",
+      "category": "非Python檔案",
+      "location": "src/views/OrderDetail.vue:313",
+      "in_diff": true,
+      "problem": "204 fallback 使用回應到達時的可變輸入，造成成功提示與實際送出內容不同（race condition）。輸入框在 reporting 期間仍可編輯：先送出 12345，等待期間改成 54321；當服務回傳 null，畫面會顯示「已收到…54321」並隱藏表單，但請求送的是 12345。\n```js\nconst updated = await orderService.reportPayment(order.value.id, paymentNote.value)\norder.value.payment_note = updated?.payment_note ?? paymentNote.value\n```\n已以獨立 Node 程式、可手動 resolve 的 Promise 重現：sent=12345、displayed=54321；assert.equal(displayed, sent) 失敗，exit 1。另靜態讀取 @directus/sdk 23.0.0 的 dist/utils/extract-data.js，確認無 JSON/text body 的 HTTP 204 分支回傳 null。未對線上 Directus 送出請求，204 發生條件沿用本 PR 明確支援的情境。",
+      "fix": "在 await 前固定實際送出的值，請求與 fallback 使用同一份快照；等待期間也可停用輸入框。\n```js\nconst submittedNote = paymentNote.value\nconst updated = await orderService.reportPayment(order.value.id, submittedNote)\norder.value.payment_note = updated?.payment_note ?? submittedNote\n```\n補上「等待回應時編輯輸入、服務回傳 null」的回歸情境。",
+      "severity_reason": "成功提示錯誤地宣稱另一組對帳資料已收妥，且隱藏了可提交的表單；客人可能以為更正成功，讓店家持續用舊末五碼對帳。這是可重現的核心匯款回報行為錯誤，應在合併前修正。"
+    },
+    {
+      "id": "S1",
+      "severity": "Suggestion",
+      "category": "非Python檔案",
+      "location": "src/views/OrderForm.vue:310",
+      "in_diff": true,
+      "problem": "電話必填僅靠按鈕 disabled，會員資料重試後沒有再驗證即送單（TOCTOU：檢查後資料仍可變動）。customerStatus=error 時，客人填好電話按送出，refreshCustomerProfile 等待期間清空電話；若取回的會員資料也沒有電話，prefillFromCustomer 無法補值，後續仍將空字串交給 store，service 轉成 contact_phone:null。輸入框不在原生提交的 form 內，required 不會攔下此路徑。已以獨立 Promise 模型重現 sentPhone=null，電話非空斷言失敗，exit 1；未進行瀏覽器端到端操作。",
+      "fix": "完成會員重試後、orderStore.submit 前再次檢查並固定電話值，失敗時顯示可讀錯誤。\n```js\nconst contactPhone = form.contactPhone.trim()\nif (!contactPhone) {\n  orderStore.submitError = '請填寫聯絡電話。'\n  return\n}\n// 將 contactPhone 傳給 orderStore.submit\n```\ncanSubmit 同樣使用 trim()，避免會員資料預填空白字串時誤認為有效。",
+      "severity_reason": "S1 所宣告的電話必填意圖尚未覆蓋非同步重試路徑；屬前端流程完整性缺口，不據此推定後端存在權限漏洞。"
+    }
+  ],
+  "static_analysis": {
+    "coverage": [
+      {
+        "tool": "eslint",
+        "status": "⏭ 跳過：未安裝，專案亦無設定檔"
+      },
+      {
+        "tool": "ruff",
+        "status": "N/A：無 Python 異動"
+      },
+      {
+        "tool": "shellcheck",
+        "status": "N/A：無 Shell 異動"
+      }
+    ],
+    "disclosures": [
+      {
+        "kind": "靜態分析",
+        "body": "eslint 未執行，無自動化 lint 通過保證；已人工逐行檢查 9 個異動檔案。git diff --check exit 0。"
+      },
+      {
+        "kind": "驗證邊界",
+        "body": "依審查執行邊界未執行專案測試、建置或安裝依賴。PR 宣稱的 build 與線上訂單驗證未獨立重跑；本輪實證僅為自行撰寫、不 import 專案的獨立邏輯模型。"
+      },
+      {
+        "kind": "依賴",
+        "body": "依賴 CVE 未驗證（環境無 pip-audit / Snyk）。package.json 要求 Node >=24，本輪 Node 24 所屬系列仍為 LTS，已核對 [Node.js 官方版本表](https://nodejs.org/en/about/previous-releases)；其他套件 EOL 未逐項查核，本 PR 無依賴版本異動。"
+      },
+      {
+        "kind": "審查依據",
+        "body": "Vue/JavaScript 依前端規範及業界通用最佳實踐審查；CONTEXT.md 無專屬檔案類型規則，已核對領域語意與實作。"
+      }
+    ]
+  },
+  "entry_point_matrix": {
+    "rows": [
+      {
+        "operation": "init / fetchCurrentUser",
+        "location": "src/main.js:28；src/router/index.js:137",
+        "precondition": "初始化完成旗標、共用 _initPromise；受保護路由另檢查 user 與 admin",
+        "result": "✅",
+        "evidence": "兩個初始化呼叫共用一次讀取；獨立模型並行與完成後重入均只呼叫一次。"
+      },
+      {
+        "operation": "fetchCustomerProfile",
+        "location": "src/stores/auth.js:94、178；src/views/Account.vue:85；src/views/OrderForm.vue:310",
+        "precondition": "登入者 id；成功、缺列及失敗分別轉為 ready/missing/error",
+        "result": "✅",
+        "evidence": "初始化、帳戶重試、送單重試共用同一讀取及狀態轉換；未驗證後端 policy。"
+      },
+      {
+        "operation": "createOrder",
+        "location": "src/views/OrderForm.vue:302 → src/stores/order.js:144 → src/services/orderService.js:33",
+        "precondition": "會員 id、非空購物車、submitting；電話只在按鈕上檢查",
+        "result": "⚠️",
+        "evidence": "S1：會員重試的 await 後未重查電話；基準無效則略過輪詢，成功建立後清空購物車。"
+      },
+      {
+        "operation": "reportPayment",
+        "location": "src/views/OrderDetail.vue:96、303 → src/services/orderService.js:122",
+        "precondition": "quoted、已確認金額、尚未回報的渲染門檻；函式驗末五碼與 reporting",
+        "result": "❌",
+        "evidence": "按鈕／form submit 共用函式，但 C1 的 null 回應提交確認使用可變欄位，與實際請求不一致。"
+      },
+      {
+        "operation": "getOrderNumber",
+        "location": "src/views/OrderDone.vue:34、105 → src/services/orderService.js:99",
+        "precondition": "受保護路由；history state 核對 orderId；重讀及重試共用 loadOrderNumber",
+        "result": "✅",
+        "evidence": "ready/loading/unavailable/error 分支齊備；讀取拋錯進 error，可重試。"
+      },
+      {
+        "operation": "updateCustomerProfile / logout",
+        "location": "src/views/Account.vue:64、166、257 → src/stores/auth.js:138、164",
+        "precondition": "ready 才開編輯；customer id、欄位白名單；登出清 user/customer/status",
+        "result": "✅",
+        "evidence": "本次 ready 門檻避免缺資料時開啟表單；取消只改本機狀態，儲存與登出各有處理函式。"
+      }
+    ]
+  },
+  "coverage_ledger": {
+    "entries": [
+      {
+        "file": "CONTEXT.md",
+        "count": 115
+      },
+      {
+        "file": "src/router/index.js",
+        "count": 156
+      },
+      {
+        "file": "src/services/orderService.js",
+        "count": 136
+      },
+      {
+        "file": "src/stores/auth.js",
+        "count": 215
+      },
+      {
+        "file": "src/stores/order.js",
+        "count": 258
+      },
+      {
+        "file": "src/views/Account.vue",
+        "count": 384
+      },
+      {
+        "file": "src/views/OrderDetail.vue",
+        "count": 340
+      },
+      {
+        "file": "src/views/OrderDone.vue",
+        "count": 115
+      },
+      {
+        "file": "src/views/OrderForm.vue",
+        "count": 355
+      },
+      {
+        "file": "src/main.js",
+        "count": 30
+      },
+      {
+        "file": "src/utils/directus.js",
+        "count": 39
+      },
+      {
+        "file": "src/services/customerService.js",
+        "count": 37
+      }
+    ]
+  },
+  "impact_analysis": "本輪逐行掃描全部 9 個異動檔案，另補掃 src/main.js、src/utils/directus.js、src/services/customerService.js。追查 getLatestOrderId/getOrderNumber/waitForNewOrder、auth 初始化與 profile 重試的所有直接呼叫點；移除的三個 getter/state 無殘留讀取端。參考提案中的確認金額 fallback 公式，與 confirmedSubtotal 的確認價優先規則相符。新增 customerStatus 供 Account 與 OrderForm 消費，history state 的 orderId/orderNumber 供 OrderDone 消費；未增加 DB 欄位。S6 測試框架與 S7 流程回饋已明確排除於 PR 範圍，不重複列為本輪待修 finding。",
+  "uncovered_declaration": [
+    "逐行覆蓋帳本涵蓋 9 個異動檔案與 3 個既有檔案；其餘 src 檔案未全部逐行掃描，提案僅閱讀相關段落。",
+    "C1/S1 的非同步邏輯已獨立重現；瀏覽器事件、實際 204 回應與持久化結果未端到端驗證。",
+    "Directus policy、action flow、金額重算及訂單歸屬規則不在本 repo，僅以提案與呼叫端契約核對，未驗證線上設定。",
+    "前端顯示、SSO 首次導航的實際 Network 次數、完整測試及 build 未執行。SDK 204 回傳 null 行為已讀取套件原始碼；其他第三方行為未作未經佐證的結論。"
+  ],
+  "conclusion": "基準讀取失敗處理與金額呈現已有改善；請先修正 C1 的匯款回報錯誤成功提示，再合併。S1 建議一併補上送單前的電話檢查。",
+  "publish_record": {
+    "discussion_id": "IC_kwDOQ5i0jM8AAAABTLTAJQ",
+    "root_note_id": "5581881381",
+    "created_at": "2026-09-08T08:35:11Z",
+    "comment_url": "https://github.com/jaaoStudio/gts/pull/11#issuecomment-5581881381"
+  }
+}
