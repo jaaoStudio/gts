@@ -28,16 +28,12 @@ export const useOrderStore = defineStore('order', {
 
         // revalidate() 產生的提示，供訂購單頁顯示後由使用者關閉
         notices: [],
-        revalidatedAt: null,
 
         submitting: false,
         submitError: null,
     }),
 
     getters: {
-        /** 品項行數（不是件數）*/
-        lineCount: (state) => state.items.length,
-
         /** 總件數，給 Navbar 的紅點用 */
         count: (state) => state.items.reduce((sum, it) => sum + it.quantity, 0),
 
@@ -54,8 +50,6 @@ export const useOrderStore = defineStore('order', {
 
         /** 詢價品項數，用於「另有 N 項待報價」文案 */
         quoteItemCount: (state) => state.items.filter((it) => it.unitPrice == null).length,
-
-        hasVariant: (state) => (variantId) => state.items.some((it) => it.variantId === variantId),
     },
 
     actions: {
@@ -188,10 +182,7 @@ export const useOrderStore = defineStore('order', {
          * 庫存不做阻擋（沒有收款，由老闆確認），僅在頁面上呈現。
          */
         async revalidate() {
-            if (this.isEmpty) {
-                this.revalidatedAt = Date.now()
-                return
-            }
+            if (this.isEmpty) return
 
             this.loading = true
             this.error = null
@@ -246,7 +237,6 @@ export const useOrderStore = defineStore('order', {
 
                 this.items = kept
                 this._persist()
-                this.revalidatedAt = Date.now()
             } catch (err) {
                 // 驗證失敗時保留原有品項——寧可讓客人看到舊價，也不要把訂購單清空
                 this.error = '無法確認最新價格與供應狀況，以下為您上次看到的內容。'
