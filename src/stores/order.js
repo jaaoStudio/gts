@@ -28,16 +28,12 @@ export const useOrderStore = defineStore('order', {
 
         // revalidate() 產生的提示，供訂購單頁顯示後由使用者關閉
         notices: [],
-        revalidatedAt: null,
 
         submitting: false,
         submitError: null,
     }),
 
     getters: {
-        /** 品項行數（不是件數）*/
-        lineCount: (state) => state.items.length,
-
         /** 總件數，給 Navbar 的紅點用 */
         count: (state) => state.items.reduce((sum, it) => sum + it.quantity, 0),
 
@@ -54,8 +50,6 @@ export const useOrderStore = defineStore('order', {
 
         /** 詢價品項數，用於「另有 N 項待報價」文案 */
         quoteItemCount: (state) => state.items.filter((it) => it.unitPrice == null).length,
-
-        hasVariant: (state) => (variantId) => state.items.some((it) => it.variantId === variantId),
     },
 
     actions: {
@@ -157,7 +151,12 @@ export const useOrderStore = defineStore('order', {
             try {
                 // 送出前先記下自己看得到的最大 id：建立後這筆在 flow 補上 customer
                 // 之前是不可見的（POST 回 204、SDK 回 null），拿不到 id，只能靠比對
-                const beforeId = await orderService.getLatestOrderId()
+                let beforeId = null
+                try {
+                    beforeId = await orderService.getLatestOrderId()
+                } catch (err) {
+                    console.error('無法取得比對基準，將略過輪詢:', err)
+                }
 
                 await orderService.createOrder({
                     contactName,
@@ -167,7 +166,11 @@ export const useOrderStore = defineStore('order', {
                     items: this.items,
                 })
 
-                const created = await orderService.waitForNewOrder(beforeId)
+                // 沒有可信基準就不要猜——猜錯會把舊單的單號當成這張新單的秀給客人。
+                // 直接走「訂單已建立、請到列表查看」的既有 fallback。
+                const created = beforeId === null
+                    ? null
+                    : await orderService.waitForNewOrder(beforeId)
 
                 // 訂單確實已建立；即使輪詢逾時也要清空購物車並帶去完成頁，
                 // 否則客人會重送而產生重複訂單
@@ -188,10 +191,7 @@ export const useOrderStore = defineStore('order', {
          * 庫存不做阻擋（沒有收款，由老闆確認），僅在頁面上呈現。
          */
         async revalidate() {
-            if (this.isEmpty) {
-                this.revalidatedAt = Date.now()
-                return
-            }
+            if (this.isEmpty) return
 
             this.loading = true
             this.error = null
@@ -246,7 +246,6 @@ export const useOrderStore = defineStore('order', {
 
                 this.items = kept
                 this._persist()
-                this.revalidatedAt = Date.now()
             } catch (err) {
                 // 驗證失敗時保留原有品項——寧可讓客人看到舊價，也不要把訂購單清空
                 this.error = '無法確認最新價格與供應狀況，以下為您上次看到的內容。'

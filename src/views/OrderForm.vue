@@ -140,7 +140,9 @@
           class="rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6"
         >
           <h2 class="font-display text-lg font-semibold text-steel-900">聯絡與送貨資訊</h2>
-          <p class="mt-1 text-sm text-steel-500">已帶入您的會員資料，這次要送到別處可直接修改。</p>
+          <p class="mt-1 text-sm text-steel-500">
+            已帶入您的會員資料，這次要送到別處可直接修改。標示 <span class="text-red-500">*</span> 為必填。
+          </p>
 
           <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <label class="block">
@@ -152,9 +154,12 @@
               />
             </label>
             <label class="block">
-              <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">聯絡電話</span>
+              <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
+                聯絡電話 <span class="text-red-500">*</span>
+              </span>
               <input
                 v-model.trim="form.contactPhone"
+                required
                 type="tel"
                 inputmode="tel"
                 class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 text-steel-900 outline-none transition-colors focus:border-steel-900"
@@ -217,7 +222,7 @@
             v-else
             type="button"
             class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
-            :disabled="orderStore.submitting"
+            :disabled="!canSubmit"
             @click="submit"
           >
             {{ orderStore.submitting ? '送出中…' : '送出訂購單' }}
@@ -242,7 +247,7 @@
 </template>
 
 <script setup>
-import { reactive, watch, onMounted } from 'vue'
+import { computed, reactive, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOrderStore } from '../stores/order'
 import { useAuthStore } from '../stores/auth'
@@ -261,6 +266,18 @@ const form = reactive({
   contactAddress: '',
   note: '',
 })
+
+// 送出的下一步就是「由專人與您確認價格與庫存」——也就是要打電話。三欄全空的單
+// 到後台只能回頭翻會員資料，而會員資料的電話也可能沒填，所以電話是唯一的硬門檻。
+// 只驗非空不驗格式：市話、分機、手機的寫法差太多，擋掉真客人的代價高於擋掉爛資料。
+//
+// ⚠️ 會員資料的檢查**刻意不放進來**：放進來會讓按鈕帶著 disabled:pointer-events-none
+// 灰掉，客人既點不到也 hover 不到，submit() 內那段說明性錯誤永遠不可達——一個可診斷
+// 的失敗會變成一顆沒有解釋的灰鈕。會員資料的問題留到點擊時處理，見 submit()。
+//
+// trim 過再判斷：輸入框有 v-model.trim，但 prefillFromCustomer 是直接指派
+// `c.phone || ''`，會員資料裡若是一串空白就會原樣進來並讓這個閘門成立。
+const canSubmit = computed(() => !!form.contactPhone.trim() && !orderStore.submitting)
 
 // 詢價品項沒有單價，不能算小計也不該顯示 NT$0
 const lineTotal = (item) =>
@@ -289,23 +306,59 @@ const submit = async () => {
   // customer 由後端依登入帳號補上，前端不送；這裡僅確認會員資料已載入，
   // 否則後端反查不到對應的 customers 資料列，訂單會掛空。
   if (!authStore.customer?.id) {
-    orderStore.submitError = '找不到您的會員資料，請重新登入後再試。'
+    // 讀取失敗的話按鈕本身就是重試鈕：先重抓一次，救得回來就無縫往下送，
+    // 客人不必重整頁面、也不會丟掉已經填好的聯絡資訊。
+    if (authStore.customerStatus === 'error') {
+      orderStore.submitError = null
+      await authStore.refreshCustomerProfile()
+    }
+
+    if (!authStore.customer?.id) {
+      // 依建檔 flow 的契約每個帳號都該有會員資料列（docs/proposals/訂購單.md:905），
+      // 所以 missing 是後端壞了，重新登入救不了，只能請客人找我們。
+      orderStore.submitError =
+        authStore.customerStatus === 'missing'
+          ? '您的會員資料尚未建立完成，請直接與我們聯絡，我們會協助您完成訂購。'
+          : '目前讀不到您的會員資料，請稍後再按一次送出。'
+      return
+    }
+  }
+
+  // 四欄一次定住，之後只用這份快照。canSubmit 只在「點下去的那一刻」成立，而上面的
+  // 重抓中間隔著一段 await——客人在等待期間清掉電話，直接讀 form 就會把空字串一路送到
+  // service 轉成 contact_phone: null。輸入框不在原生提交的 form 裡，required 也攔不到。
+  // 其餘三欄本身沒有閘門，但一起快照才讀得出「送出的是同一個時間點的資料」。
+  const payload = {
+    contactName: form.contactName,
+    contactPhone: form.contactPhone.trim(),
+    contactAddress: form.contactAddress,
+    note: form.note,
+  }
+
+  if (!payload.contactPhone) {
+    orderStore.submitError = '請填寫聯絡電話，我們需要它才能與您確認價格與庫存。'
     return
   }
 
-  const result = await orderStore.submit({
-    contactName: form.contactName,
-    contactPhone: form.contactPhone,
-    contactAddress: form.contactAddress,
-    note: form.note,
-  })
+  const result = await orderStore.submit(payload)
 
   if (!result) return
 
   // 極少數情況輪詢逾時而拿不到 id（flow 慢），此時直接帶去訂單列表——
   // 訂單已經建立，讓客人看得到比停在購物車重要
-  if (result.id) router.replace({ name: 'OrderDone', params: { id: result.id } })
-  else router.replace({ name: 'OrderHistory' })
+  if (result.id) {
+    // 單號跟著這次導航一起帶過去。輪詢命中的那一刻 order_number 必然已存在
+    // （action flow 是 customer + order_number + subtotal 一起寫入，
+    // docs/proposals/訂購單.md:737），沒有理由讓完成頁再讀一次才拿得到。
+    // 放在 history state 而非 store：生命週期剛好等於「這次送出」，不必自己清。
+    router.replace({
+      name: 'OrderDone',
+      params: { id: result.id },
+      state: { orderId: result.id, orderNumber: result.orderNumber },
+    })
+  } else {
+    router.replace({ name: 'OrderHistory' })
+  }
 }
 
 // customer 可能在本頁掛載後才由 authStore.init() 取回

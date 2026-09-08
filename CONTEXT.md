@@ -17,7 +17,17 @@ _Avoid_: account, member (when referring to the auth identity).
 
 **Customer**:
 The business profile of a shopper (Directus `customers` collection), holding company name, tax id, phone, shipping/billing address, and level. Exactly one Customer belongs to one User. "**會員**" is the Chinese UI label for this same concept — not a separate entity.
+Every User has one — the profile-creation flow builds a row for *every* signed-in account, Admins included. So a signed-in User with no Customer is never a normal state; it is always a fault, and the code must say which fault (see **Customer profile status**).
 _Avoid_: member (as a distinct code entity), client, buyer.
+
+**Customer profile status** (`authStore.customerStatus`):
+Which of the mutually exclusive facts about the current User's Customer holds. `customer === null` alone cannot express this, and collapsing the last two is the bug it exists to prevent.
+- `idle` — nobody is signed in; the question does not apply.
+- `loading` — the read is in flight.
+- `ready` — the profile is loaded.
+- `missing` — the read succeeded and found no row. Per the invariant above this means the creation flow broke; signing in again will not fix it, so the shopper is told to contact us.
+- `error` — the read itself failed (network / session). Retrying usually fixes it, so retrying is what we offer.
+_Avoid_: treating a null Customer as "this shopper has no profile"; "not found" as a synonym for `error`.
 
 **Admin**:
 A User whose Directus role has `admin_access` — not a separate kind of person. Admins are routed to the back-office; everyone else to their Customer account.
@@ -69,13 +79,32 @@ _Avoid_: order id (that is the internal integer).
 
 **Confirmed price** (確認單價):
 The per-item price the Admin sets after checking stock and current cost. Takes precedence
-over the snapshot the Customer saw. The **Amount due** (應付金額) is
-`Σ 確認單價 × 數量 − 折扣 + 運費`, recalculated on every save.
+over the snapshot the Customer saw.
 _Avoid_: 售價 (that is the catalogue price), 總價 when quote-only items are present.
+
+**Reference subtotal** (參考小計):
+The priced-item total captured **at submission** (`orders.subtotal`) — a record of what
+the Customer saw, nothing more. Once the Admin adjusts any 確認單價 it stops describing
+the money owed, so it **takes no part in the Amount due calculation**.
+_Avoid_: listing it in the same column as the figures that do add up — a Customer will
+try to total it against 運費 and 折扣, and land short by exactly the price adjustment.
+
+**Confirmed subtotal** (確認後小計):
+`Σ 確認單價 × 數量` — the base the Amount due is built from. Derived, not stored: it is
+computed from the order's items whenever it is shown.
+_Avoid_: 小計 unqualified (it collides with 參考小計 — always say which one).
+
+**Amount due** (應付金額):
+`確認後小計 − 折扣 + 運費`, recalculated on every save. Binding only once the Admin has
+confirmed; before that the Order form has no Amount due at all.
+_Avoid_: 總價, 應付 (as a bare noun).
 
 **Order status** (狀態):
 One of 待確認 → 待付款 → 已付款 → 已出貨, plus 已取消. 已出貨 is the normal terminal
 state; there is deliberately no 已完成 because nothing confirms receipt.
+The stored keys are `pending` / `quoted` / `paid` / `shipped` / `cancelled`. Note that
+`quoted` is the 待付款 state: the key names it from the Admin's side (已報價), the UI
+label from the Customer's (該付錢了). Same state, two viewpoints — grep for both.
 _Avoid_: inventing intermediate states — each one must correspond to something the
 Customer actually sees change.
 

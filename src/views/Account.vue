@@ -57,8 +57,10 @@
         <div class="rounded-[1.5rem] bg-white p-6 ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)] sm:p-8">
           <div class="mb-6 flex items-center justify-between">
             <h2 class="font-display text-lg font-semibold text-steel-900">帳戶資訊</h2>
+            <!-- 沒有會員資料就沒有東西可編輯。留著這顆鈕等於讓客人填完一整張表，
+                 才被 updateCustomerProfile() 的「找不到會員資料」擋下來 -->
             <button
-              v-if="!isEditing"
+              v-if="!isEditing && authStore.customerStatus === 'ready'"
               @click="enterEditMode"
               class="inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm font-medium text-steel-700 transition-colors hover:border-steel-900 hover:text-steel-900"
             >
@@ -66,8 +68,43 @@
             </button>
           </div>
 
+          <!-- 會員資料讀取中（整頁 loading 只涵蓋 init()，這裡是按下重試後的那段） -->
+          <div v-if="authStore.customerStatus === 'loading'" class="flex justify-center py-10">
+            <PhCircleNotch :size="28" weight="bold" class="animate-spin text-brand-500" />
+          </div>
+
+          <!-- 讀不到（網路／session）。重試通常就會好，所以給的是重試而不是說明 -->
+          <div v-else-if="authStore.customerStatus === 'error'" class="py-6 text-center">
+            <PhWarningCircle :size="30" weight="bold" class="mx-auto text-steel-400" />
+            <p class="mt-3 text-sm leading-relaxed text-steel-600">
+              目前讀不到您的會員資料，您的帳號本身沒有問題。
+            </p>
+            <button
+              type="button"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm font-medium text-steel-700 transition-colors hover:border-steel-900 hover:text-steel-900"
+              @click="authStore.refreshCustomerProfile()"
+            >
+              重新載入
+            </button>
+          </div>
+
+          <!-- 讀得到卻沒有資料列。依建檔 flow 的契約每個帳號都該有，所以這是後端壞了，
+               客人自己重試或重新登入都救不回來，只能請他找我們 -->
+          <div v-else-if="authStore.customerStatus === 'missing'" class="py-6 text-center">
+            <PhWarningCircle :size="30" weight="bold" class="mx-auto text-steel-400" />
+            <p class="mt-3 text-sm leading-relaxed text-steel-600">
+              您的會員資料尚未建立完成，請與我們聯絡，我們會協助您處理。
+            </p>
+            <router-link
+              to="/contact"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm font-medium text-steel-700 transition-colors hover:border-steel-900 hover:text-steel-900"
+            >
+              聯絡我們
+            </router-link>
+          </div>
+
           <!-- Display mode -->
-          <dl v-if="!isEditing" class="divide-y divide-steel-100">
+          <dl v-else-if="!isEditing" class="divide-y divide-steel-100">
             <div class="flex items-center justify-between py-3">
               <dt class="text-sm text-steel-500">名稱</dt>
               <dd class="text-sm font-medium text-steel-900">{{ authStore.customer?.user_name || '—' }}</dd>
@@ -108,6 +145,10 @@
 
           <!-- Edit mode -->
           <form v-else @submit.prevent="handleSave" class="space-y-5">
+            <!-- 儲存期間鎖住整組欄位。handleSave() 送的是 { ...form } 的快照，等待期間
+                 打的字不會進到這次請求，成功後表單直接收起——鍵盤輸入就這樣無聲消失。
+                 fieldset 一次蓋住六個欄位，比逐個掛 :disabled 少一輪漏改的機會。 -->
+            <fieldset :disabled="saving" class="min-w-0 space-y-5 border-0 p-0">
             <div class="flex flex-col gap-2">
               <label for="edit-user-name" class="text-sm font-medium text-steel-700">名稱</label>
               <input
@@ -168,6 +209,7 @@
                 placeholder="請輸入帳單地址"
               ></textarea>
             </div>
+            </fieldset>
 
             <!-- Error -->
             <p v-if="saveError" class="text-sm text-red-600">{{ saveError }}</p>
@@ -234,14 +276,14 @@ import { useAuthStore } from '../stores/auth'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCircleNotch, PhPencilSimple, PhCheckCircle, PhSignOut,
-         PhReceipt, PhCaretRight } from '@phosphor-icons/vue'
+         PhReceipt, PhCaretRight, PhWarningCircle } from '@phosphor-icons/vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 // 共用輸入框樣式（label 在上、focus 用 brand ring，符合全站表單對比）
 const inputClass =
-  'w-full rounded-xl border border-steel-200 bg-steel-50 px-4 py-2.5 text-sm text-steel-900 placeholder-steel-400 transition-all duration-200 focus:border-brand-500/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/15'
+  'w-full rounded-xl border border-steel-200 bg-steel-50 px-4 py-2.5 text-sm text-steel-900 placeholder-steel-400 transition-all duration-200 focus:border-brand-500/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/15 disabled:bg-steel-100 disabled:text-steel-400'
 
 // --- 編輯模式狀態 ---
 const isEditing = ref(false)

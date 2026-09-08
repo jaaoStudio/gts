@@ -98,18 +98,22 @@
                 <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
                   匯款後請填帳號末五碼
                 </span>
+                <!-- 送出期間鎖住：值已在 reportPayment() 內定住，這裡是不讓畫面
+                     暗示「還改得動」——客人改了字卻送出舊值，比不給改更難解釋 -->
                 <input
                   v-model.trim="paymentNote"
                   type="text"
                   inputmode="numeric"
+                  pattern="\d{5}"
                   maxlength="5"
                   placeholder="12345"
-                  class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 font-mono text-steel-900 outline-none transition-colors placeholder:text-steel-300 focus:border-steel-900"
+                  :disabled="reporting"
+                  class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 font-mono text-steel-900 outline-none transition-colors placeholder:text-steel-300 focus:border-steel-900 disabled:bg-steel-50 disabled:text-steel-400"
                 />
               </label>
               <button
                 type="submit"
-                :disabled="paymentNote.length < 5 || reporting"
+                :disabled="!canReport"
                 class="rounded-full bg-steel-900 px-6 py-3.5 font-display text-sm font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
               >
                 {{ reporting ? '送出中…' : '我已匯款' }}
@@ -165,10 +169,29 @@
             </li>
           </ul>
 
-          <dl class="mt-5 space-y-2.5 border-t border-steel-200 pt-5 text-sm">
-            <div v-if="order.subtotal != null" class="flex justify-between">
-              <dt class="text-steel-500">送出時參考小計</dt>
-              <dd class="font-mono text-steel-700">NT${{ order.subtotal.toLocaleString() }}</dd>
+          <!--
+            參考小計是「送出當下」的快照，老闆改價後它就不再是應付金額的基底。
+            把它留在計算欄裡，客人會拿它去加運費與折扣，怎麼算都對不上應付金額
+            （少的正是改價的差額）。因此獨立成一區並置灰，明確排除在算式之外。
+          -->
+          <div v-if="order.subtotal != null" class="mt-5 border-t border-steel-200 pt-5">
+            <div class="flex justify-between text-sm text-steel-400">
+              <span>送出時參考小計</span>
+              <span class="font-mono">NT${{ order.subtotal.toLocaleString() }}</span>
+            </div>
+            <p v-if="isConfirmed" class="mt-1.5 text-xs leading-relaxed text-steel-400">
+              價格已由專人重新確認，實際金額請看下方。
+            </p>
+          </div>
+
+          <!-- 真正會相加的項目才放進這一欄 -->
+          <dl
+            v-if="isConfirmed"
+            class="mt-4 space-y-2.5 border-t border-steel-200 pt-4 text-sm"
+          >
+            <div class="flex justify-between">
+              <dt class="text-steel-500">確認後小計</dt>
+              <dd class="font-mono text-steel-700">NT${{ confirmedSubtotal.toLocaleString() }}</dd>
             </div>
             <div v-if="order.shipping_fee != null" class="flex justify-between">
               <dt class="text-steel-500">運費</dt>
@@ -180,10 +203,7 @@
               <dt class="text-steel-500">折扣</dt>
               <dd class="font-mono text-steel-700">−NT${{ order.discount.toLocaleString() }}</dd>
             </div>
-            <div
-              v-if="order.confirmed_total != null"
-              class="flex items-baseline justify-between border-t border-steel-200 pt-3"
-            >
+            <div class="flex items-baseline justify-between border-t border-steel-200 pt-3">
               <dt class="font-display font-semibold text-steel-900">應付金額</dt>
               <dd class="font-mono text-xl font-bold text-steel-900">
                 NT${{ order.confirmed_total.toLocaleString() }}
@@ -246,6 +266,28 @@ const paymentNote = ref('')
 const reporting = ref(false)
 const reportError = ref(null)
 
+// 帳號末五碼一定是數字。inputmode="numeric" 只換手機鍵盤、pattern 只在原生表單
+// 驗證時作用，都擋不住貼上的 "abcde"，所以送出條件要自己驗。
+const LAST_FIVE_DIGITS = /^\d{5}$/
+const canReport = computed(() => LAST_FIVE_DIGITS.test(paymentNote.value) && !reporting.value)
+
+// 老闆按下確認後才有應付金額；在那之前這張單沒有任何可相加的數字
+const isConfirmed = computed(() => order.value?.confirmed_total != null)
+
+/**
+ * 應付金額的基底：Σ 確認單價 × 數量。
+ *
+ * 未儲存於資料庫，這裡即時算——與 itemTotal() 同一套取價規則（確認價優先，
+ * 未確認則沿用下單時的單價），確保逐行金額加起來一定等於這個小計。
+ * 詢價且尚未報價的品項沒有價格可加，跳過。
+ */
+const confirmedSubtotal = computed(() =>
+  (order.value?.items ?? []).reduce((sum, it) => {
+    const price = it.confirmed_price ?? it.unit_price
+    return price == null ? sum : sum + price * it.quantity
+  }, 0)
+)
+
 const statusHint = computed(() => ORDER_STATUS[order.value?.status]?.hint || '')
 const bankInfo = computed(() => settingsStore.bankInfo)
 
@@ -262,11 +304,22 @@ const itemTotal = (item) => {
 }
 
 const reportPayment = async () => {
+  // 表單是 @submit.prevent，按 Enter 會繞過 disabled 的按鈕，這裡要再擋一次
+  if (!canReport.value) return
+
+  // 先把實際送出的值定住。204 的 fallback 若回頭讀 paymentNote.value，讀到的是
+  // 「回應到達當下」的輸入框內容——客人在等待期間改了字，成功提示就會顯示他改過的
+  // 新號碼，但送到 Directus 的是舊的那組。畫面同時隱藏表單，於是他以為更正成功，
+  // 店家卻拿著舊末五碼在對帳。請求與 fallback 必須用同一份快照。
+  const submittedNote = paymentNote.value
+
   reporting.value = true
   reportError.value = null
   try {
-    const updated = await orderService.reportPayment(order.value.id, paymentNote.value)
-    order.value.payment_note = updated.payment_note
+    const updated = await orderService.reportPayment(order.value.id, submittedNote)
+    // Directus 回 204 時 updated 是 null。少了防護會拋 TypeError 被下面接住顯示
+    // 「回報失敗」，但寫入其實成功了——客人會重送。
+    order.value.payment_note = updated?.payment_note ?? submittedNote
   } catch (err) {
     reportError.value = '回報失敗，請稍後再試或直接與我們聯絡。'
     console.error('Error reporting payment:', err)
@@ -278,6 +331,10 @@ const reportPayment = async () => {
 onMounted(async () => {
   try {
     order.value = await orderService.getOrder(route.params.id)
+
+    // Directus 在權限尚未成立時會回 HTTP 204、SDK 拿到 null——沒拋錯但也沒資料。
+    // 少了這行，loading/error/order 三個渲染分支會同時不成立而整頁空白。
+    if (!order.value) error.value = '找不到這張訂購單。'
 
     // 匯款資訊只有登入客戶讀得到，且只有「待付款」才會顯示——沒必要每次都拉
     if (order.value?.status === 'quoted') await settingsStore.fetchPaymentInfo()
