@@ -86,16 +86,21 @@ export const orderService = {
         return null
     },
 
-    /** 供完成頁重試單號用（此時訂單已可見） */
+    /**
+     * 供完成頁重讀單號用（此時訂單已可見）。
+     *
+     * ⚠️ **讀取失敗一律往上拋**：回傳的 `null` 語意只有一個——訂單讀得到、但
+     * `order_number` 還沒被 flow 蓋上。把讀取失敗也吞成 `null`，會讓一次網路或
+     * session 抖動被完成頁渲染成「單號稍後產生」這種終局答案，而那筆訂單其實
+     * 毫秒前才剛拿到過單號。和 getLatestOrderId() 不吞成 0 是同一個道理。
+     *
+     * @returns {Promise<string|null>} 單號；null 代表確實尚未蓋上
+     */
     async getOrderNumber(orderId) {
-        try {
-            const order = await directus.request(
-                readItem('orders', orderId, { fields: ['order_number'] })
-            )
-            return order?.order_number ?? null
-        } catch {
-            return null
-        }
+        const order = await directus.request(
+            readItem('orders', orderId, { fields: ['order_number'] })
+        )
+        return order?.order_number ?? null
     },
 
     async getMyOrders() {

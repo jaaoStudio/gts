@@ -17,7 +17,17 @@ _Avoid_: account, member (when referring to the auth identity).
 
 **Customer**:
 The business profile of a shopper (Directus `customers` collection), holding company name, tax id, phone, shipping/billing address, and level. Exactly one Customer belongs to one User. "**會員**" is the Chinese UI label for this same concept — not a separate entity.
+Every User has one — the profile-creation flow builds a row for *every* signed-in account, Admins included. So a signed-in User with no Customer is never a normal state; it is always a fault, and the code must say which fault (see **Customer profile status**).
 _Avoid_: member (as a distinct code entity), client, buyer.
+
+**Customer profile status** (`authStore.customerStatus`):
+Which of the mutually exclusive facts about the current User's Customer holds. `customer === null` alone cannot express this, and collapsing the last two is the bug it exists to prevent.
+- `idle` — nobody is signed in; the question does not apply.
+- `loading` — the read is in flight.
+- `ready` — the profile is loaded.
+- `missing` — the read succeeded and found no row. Per the invariant above this means the creation flow broke; signing in again will not fix it, so the shopper is told to contact us.
+- `error` — the read itself failed (network / session). Retrying usually fixes it, so retrying is what we offer.
+_Avoid_: treating a null Customer as "this shopper has no profile"; "not found" as a synonym for `error`.
 
 **Admin**:
 A User whose Directus role has `admin_access` — not a separate kind of person. Admins are routed to the back-office; everyone else to their Customer account.
