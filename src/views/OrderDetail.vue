@@ -102,6 +102,7 @@
                   v-model.trim="paymentNote"
                   type="text"
                   inputmode="numeric"
+                  pattern="\d{5}"
                   maxlength="5"
                   placeholder="12345"
                   class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 font-mono text-steel-900 outline-none transition-colors placeholder:text-steel-300 focus:border-steel-900"
@@ -109,7 +110,7 @@
               </label>
               <button
                 type="submit"
-                :disabled="paymentNote.length < 5 || reporting"
+                :disabled="!canReport"
                 class="rounded-full bg-steel-900 px-6 py-3.5 font-display text-sm font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
               >
                 {{ reporting ? '送出中…' : '我已匯款' }}
@@ -246,6 +247,11 @@ const paymentNote = ref('')
 const reporting = ref(false)
 const reportError = ref(null)
 
+// 帳號末五碼一定是數字。inputmode="numeric" 只換手機鍵盤、pattern 只在原生表單
+// 驗證時作用，都擋不住貼上的 "abcde"，所以送出條件要自己驗。
+const LAST_FIVE_DIGITS = /^\d{5}$/
+const canReport = computed(() => LAST_FIVE_DIGITS.test(paymentNote.value) && !reporting.value)
+
 const statusHint = computed(() => ORDER_STATUS[order.value?.status]?.hint || '')
 const bankInfo = computed(() => settingsStore.bankInfo)
 
@@ -262,11 +268,16 @@ const itemTotal = (item) => {
 }
 
 const reportPayment = async () => {
+  // 表單是 @submit.prevent，按 Enter 會繞過 disabled 的按鈕，這裡要再擋一次
+  if (!canReport.value) return
+
   reporting.value = true
   reportError.value = null
   try {
     const updated = await orderService.reportPayment(order.value.id, paymentNote.value)
-    order.value.payment_note = updated.payment_note
+    // Directus 回 204 時 updated 是 null。少了防護會拋 TypeError 被下面接住顯示
+    // 「回報失敗」，但寫入其實成功了——客人會重送。
+    order.value.payment_note = updated?.payment_note ?? paymentNote.value
   } catch (err) {
     reportError.value = '回報失敗，請稍後再試或直接與我們聯絡。'
     console.error('Error reporting payment:', err)
@@ -278,6 +289,10 @@ const reportPayment = async () => {
 onMounted(async () => {
   try {
     order.value = await orderService.getOrder(route.params.id)
+
+    // Directus 在權限尚未成立時會回 HTTP 204、SDK 拿到 null——沒拋錯但也沒資料。
+    // 少了這行，loading/error/order 三個渲染分支會同時不成立而整頁空白。
+    if (!order.value) error.value = '找不到這張訂購單。'
 
     // 匯款資訊只有登入客戶讀得到，且只有「待付款」才會顯示——沒必要每次都拉
     if (order.value?.status === 'quoted') await settingsStore.fetchPaymentInfo()
