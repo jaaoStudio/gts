@@ -151,7 +151,12 @@ export const useOrderStore = defineStore('order', {
             try {
                 // 送出前先記下自己看得到的最大 id：建立後這筆在 flow 補上 customer
                 // 之前是不可見的（POST 回 204、SDK 回 null），拿不到 id，只能靠比對
-                const beforeId = await orderService.getLatestOrderId()
+                let beforeId = null
+                try {
+                    beforeId = await orderService.getLatestOrderId()
+                } catch (err) {
+                    console.error('無法取得比對基準，將略過輪詢:', err)
+                }
 
                 await orderService.createOrder({
                     contactName,
@@ -161,7 +166,11 @@ export const useOrderStore = defineStore('order', {
                     items: this.items,
                 })
 
-                const created = await orderService.waitForNewOrder(beforeId)
+                // 沒有可信基準就不要猜——猜錯會把舊單的單號當成這張新單的秀給客人。
+                // 直接走「訂單已建立、請到列表查看」的既有 fallback。
+                const created = beforeId === null
+                    ? null
+                    : await orderService.waitForNewOrder(beforeId)
 
                 // 訂單確實已建立；即使輪詢逾時也要清空購物車並帶去完成頁，
                 // 否則客人會重送而產生重複訂單

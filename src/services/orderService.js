@@ -28,7 +28,7 @@ export const orderService = {
      * 無從把訂單掛到別人名下——偽造在寫入端就被擋掉，不會產生需要清理的垃圾單。
      *
      * ⚠️ 回傳的物件**不會有 order_number**，也可能因 `customer` 尚未補上而
-     * 讀不回內容（HTTP 204）。單號請改用 waitForOrderNumber()。
+     * 讀不回內容（HTTP 204）。單號請改用 waitForNewOrder()。
      */
     async createOrder({ contactName, contactPhone, contactAddress, note, items }) {
         return directus.request(createItem('orders', {
@@ -48,16 +48,19 @@ export const orderService = {
         }, { fields: ['id'] }))
     },
 
-    /** 目前自己看得到的最大訂單 id，送出前記錄，用來辨識新建的那一筆 */
+    /**
+     * 目前自己看得到的最大訂單 id，送出前記錄，用來辨識新建的那一筆。
+     *
+     * ⚠️ **讀取失敗一律往上拋，不要吞成 0**：0 的語意是「這位客人還沒有任何訂單」，
+     * 拿它當比對基準會讓 waitForNewOrder() 的 `id > afterId` 對這位客人的**任何一張
+     * 舊單**都成立，於是輪詢第一圈就命中舊單，完成頁顯示的是別張單的單號——
+     * 而客人會拿那個單號去填匯款備註。失敗要保持成失敗，由呼叫端決定怎麼辦。
+     */
     async getLatestOrderId() {
-        try {
-            const [latest] = await directus.request(readItems('orders', {
-                fields: ['id'], sort: ['-id'], limit: 1,
-            }))
-            return latest?.id ?? 0
-        } catch {
-            return 0
-        }
+        const [latest] = await directus.request(readItems('orders', {
+            fields: ['id'], sort: ['-id'], limit: 1,
+        }))
+        return latest?.id ?? 0
     },
 
     /**
