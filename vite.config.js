@@ -18,6 +18,13 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  // 只測純邏輯與 store，不碰 DOM——所以用 node 環境（不裝 jsdom），跑得快也不會
+  // 讓測試跟 class 名稱之類的版面細節耦合。localStorage 由 setup 檔補上假的。
+  test: {
+    environment: 'node',
+    setupFiles: ['./src/test/setup.js'],
+    include: ['src/**/*.test.js'],
+  },
   server: {
     host: '0.0.0.0',
     port: 5174,
