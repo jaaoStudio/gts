@@ -57,8 +57,10 @@
         <div class="rounded-[1.5rem] bg-white p-6 ring-1 ring-steel-900/[0.06] shadow-[0_1px_2px_rgba(16,17,21,0.04)] sm:p-8">
           <div class="mb-6 flex items-center justify-between">
             <h2 class="font-display text-lg font-semibold text-steel-900">帳戶資訊</h2>
+            <!-- 沒有會員資料就沒有東西可編輯。留著這顆鈕等於讓客人填完一整張表，
+                 才被 updateCustomerProfile() 的「找不到會員資料」擋下來 -->
             <button
-              v-if="!isEditing"
+              v-if="!isEditing && authStore.customerStatus === 'ready'"
               @click="enterEditMode"
               class="inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm font-medium text-steel-700 transition-colors hover:border-steel-900 hover:text-steel-900"
             >
@@ -66,8 +68,43 @@
             </button>
           </div>
 
+          <!-- 會員資料讀取中（整頁 loading 只涵蓋 init()，這裡是按下重試後的那段） -->
+          <div v-if="authStore.customerStatus === 'loading'" class="flex justify-center py-10">
+            <PhCircleNotch :size="28" weight="bold" class="animate-spin text-brand-500" />
+          </div>
+
+          <!-- 讀不到（網路／session）。重試通常就會好，所以給的是重試而不是說明 -->
+          <div v-else-if="authStore.customerStatus === 'error'" class="py-6 text-center">
+            <PhWarningCircle :size="30" weight="bold" class="mx-auto text-steel-400" />
+            <p class="mt-3 text-sm leading-relaxed text-steel-600">
+              目前讀不到您的會員資料，您的帳號本身沒有問題。
+            </p>
+            <button
+              type="button"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm font-medium text-steel-700 transition-colors hover:border-steel-900 hover:text-steel-900"
+              @click="authStore.refreshCustomerProfile()"
+            >
+              重新載入
+            </button>
+          </div>
+
+          <!-- 讀得到卻沒有資料列。依建檔 flow 的契約每個帳號都該有，所以這是後端壞了，
+               客人自己重試或重新登入都救不回來，只能請他找我們 -->
+          <div v-else-if="authStore.customerStatus === 'missing'" class="py-6 text-center">
+            <PhWarningCircle :size="30" weight="bold" class="mx-auto text-steel-400" />
+            <p class="mt-3 text-sm leading-relaxed text-steel-600">
+              您的會員資料尚未建立完成，請與我們聯絡，我們會協助您處理。
+            </p>
+            <router-link
+              to="/contact"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-steel-300 px-4 py-2 text-sm font-medium text-steel-700 transition-colors hover:border-steel-900 hover:text-steel-900"
+            >
+              聯絡我們
+            </router-link>
+          </div>
+
           <!-- Display mode -->
-          <dl v-if="!isEditing" class="divide-y divide-steel-100">
+          <dl v-else-if="!isEditing" class="divide-y divide-steel-100">
             <div class="flex items-center justify-between py-3">
               <dt class="text-sm text-steel-500">名稱</dt>
               <dd class="text-sm font-medium text-steel-900">{{ authStore.customer?.user_name || '—' }}</dd>
@@ -234,7 +271,7 @@ import { useAuthStore } from '../stores/auth'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCircleNotch, PhPencilSimple, PhCheckCircle, PhSignOut,
-         PhReceipt, PhCaretRight } from '@phosphor-icons/vue'
+         PhReceipt, PhCaretRight, PhWarningCircle } from '@phosphor-icons/vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
