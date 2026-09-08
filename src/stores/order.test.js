@@ -49,6 +49,24 @@ const variant = (over = {}) => ({
     ...over,
 })
 
+// add() 收的是 mapProduct 的結果與它底下的 variant，欄位命名與 store 內部不同
+const product = (over = {}) => ({ id: 10, slug: 'hammer', name: '鐵鎚', image: null, ...over })
+const addableVariant = (over = {}) => ({ id: 1, spec_name: '', sku: 'H-1', price: 100, image: null, ...over })
+
+/**
+ * 模擬重新整理：換一個 pinia，讓 store 從 localStorage 重新還原。
+ *
+ * 直接指派 `s.items` 只動到記憶體。若 clear() 哪天漏掉 _persist()，斷言記憶體
+ * 是空的仍然會通過，但客人重整後會從 gts_order_items 還原出已經送出的品項，
+ * 然後再送一次——「不重送」這個保證是存在儲存層的，測試就要驗到儲存層。
+ */
+const itemsAfterReload = () => {
+    setActivePinia(createPinia())
+    const fresh = useOrderStore()
+    fresh.init()
+    return fresh.items
+}
+
 beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
@@ -92,7 +110,7 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
 
     test('given_基準讀取失敗_will_略過輪詢而不是拿舊單充數', async () => {
         const s = useOrderStore()
-        s.items = [line()]
+        s.add(product(), addableVariant(), 1)
 
         orderService.getLatestOrderId.mockRejectedValue(new Error('network flake'))
         orderService.createOrder.mockResolvedValue({ id: null })
@@ -103,8 +121,9 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
         // 輪詢第一圈就命中舊單，客人拿到別張單的單號去填匯款備註
         expect(orderService.waitForNewOrder).not.toHaveBeenCalled()
         expect(result).toEqual({ id: null, orderNumber: null })
-        // 訂單確實已建立，購物車要清空，否則客人會重送
+        // 訂單確實已建立，購物車要清空——連重整之後都不能復活，否則客人會重送
         expect(s.items).toEqual([])
+        expect(itemsAfterReload()).toEqual([])
     })
 
     test('given_新客人本來就沒有訂單_will_仍然正常輪詢', async () => {
@@ -122,23 +141,30 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
         expect(result).toEqual({ id: 1, orderNumber: 'GTS-260908-0001' })
     })
 
-    test('given_輪詢逾時_will_仍清空購物車並回傳空id', async () => {
+    test('given_輪詢逾時_will_仍清空購物車且重整後不會復活', async () => {
         const s = useOrderStore()
-        s.items = [line()]
+        s.add(product(), addableVariant(), 1)
+        // 前置條件：購物車真的寫進儲存層了，否則後面的斷言會平白通過
+        expect(itemsAfterReload()).toHaveLength(1)
+        setActivePinia(createPinia())
+
+        const s2 = useOrderStore()
+        s2.init()
 
         orderService.getLatestOrderId.mockResolvedValue(101)
         orderService.createOrder.mockResolvedValue({ id: null })
         orderService.waitForNewOrder.mockResolvedValue(null)
 
-        const result = await s.submit(payload)
+        const result = await s2.submit(payload)
 
         expect(result).toEqual({ id: null, orderNumber: null })
-        expect(s.items).toEqual([])
+        expect(s2.items).toEqual([])
+        expect(itemsAfterReload()).toEqual([])
     })
 
-    test('given_建單失敗_will_保留購物車讓客人重試', async () => {
+    test('given_建單失敗_will_保留購物車且重整後仍在', async () => {
         const s = useOrderStore()
-        s.items = [line()]
+        s.add(product(), addableVariant(), 1)
 
         orderService.getLatestOrderId.mockResolvedValue(101)
         orderService.createOrder.mockRejectedValue(new Error('500'))
@@ -149,6 +175,8 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
         expect(s.items).toHaveLength(1)
         expect(s.submitError).toBeTruthy()
         expect(s.submitting).toBe(false)
+        // 失敗要能直接重試——重整後品項必須還在
+        expect(itemsAfterReload()).toHaveLength(1)
     })
 
     test('given_訂購單是空的_will_不送出', async () => {

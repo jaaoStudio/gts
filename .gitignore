@@ -25,3 +25,8 @@ dist-ssr
 *.sw?
 .env.docker
 .claude/skills/**/.env
+# 程式碼審查工具的輸出，是本機產物不是專案內容
+nathan-reviews/
+
+# vitest 快取
+.vitest/
