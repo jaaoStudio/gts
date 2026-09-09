@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { confirmedSubtotal, effectivePrice, lineTotal } from './orderTotals'
+import { SHIPPING, confirmedSubtotal, effectivePrice, estimateShipping, lineTotal } from './orderTotals'
 
 // 明細頁的品項欄位用 Directus 的原始命名（snake_case），與 store 裡的 camelCase 不同
 const item = (over = {}) => ({ unit_price: 100, confirmed_price: null, quantity: 1, ...over })
@@ -112,5 +112,68 @@ describe('逐行金額與小計的一致性', () => {
 
         expect(byLine).toBe(confirmedSubtotal(items))
         expect(byLine).toBe(1850)
+    })
+})
+
+describe('estimateShipping', () => {
+    // 正式站的設定：一箱 140、滿 2000 免運
+    const rule = { fee: 140, threshold: 2000 }
+    const est = ({ subtotal = 0, hasQuoteItems = false, ...over } = {}) =>
+        estimateShipping({ subtotal, hasQuoteItems, rule: { ...rule, ...over } })
+
+    describe('設定不完整', () => {
+        test('given_規則為null_will_回unavailable', () => {
+            // 設定是否完整由 settings store 的 shippingRule 認定：缺值、或運費 <= 0
+            // （不支援的設定，見該 getter 的註解）都會是 null
+            expect(estimateShipping({ subtotal: 0, hasQuoteItems: false, rule: null }).state)
+                .toBe(SHIPPING.unavailable)
+        })
+
+        test('given_規則為null又有詢價品項_will_unavailable優先', () => {
+            expect(estimateShipping({ subtotal: 0, hasQuoteItems: true, rule: null }).state)
+                .toBe(SHIPPING.unavailable)
+        })
+    })
+
+    describe('未達免運門檻', () => {
+        test('given_全部標價且未達門檻_will_收費並算出差額', () => {
+            expect(est({ subtotal: 1650 })).toEqual({
+                state: SHIPPING.charged, amount: 140, gap: 350,
+            })
+        })
+
+        test('given_差1元到門檻_will_仍然收費', () => {
+            expect(est({ subtotal: 1999 })).toEqual({
+                state: SHIPPING.charged, amount: 140, gap: 1,
+            })
+        })
+
+        test('given_空的訂購單_will_收費', () => {
+            expect(est({ subtotal: 0 }).state).toBe(SHIPPING.charged)
+        })
+    })
+
+    describe('達到免運門檻', () => {
+        test('given_剛好等於門檻_will_免運', () => {
+            // 「滿 2000」含 2000 本身，差一塊錢的爭議客服成本比放寬高
+            expect(est({ subtotal: 2000 }).state).toBe(SHIPPING.free)
+        })
+
+        test('given_超過門檻_will_免運', () => {
+            expect(est({ subtotal: 5000 }).state).toBe(SHIPPING.free)
+        })
+    })
+
+    describe('含詢價品項', () => {
+        test('given_未達門檻又有詢價品項_will_不給數字', () => {
+            // 小計 800 但那項詢價的可能報 4000，實際應該免運。
+            // 給 140 這個數字，報價後就會被推翻。
+            expect(est({ subtotal: 800, hasQuoteItems: true }).state).toBe(SHIPPING.quote)
+        })
+
+        test('given_標價部分已達門檻_will_免運而不是quote', () => {
+            // 詢價品項只會讓總額更多，免運是確定的，沒有不敢講的理由
+            expect(est({ subtotal: 2500, hasQuoteItems: true }).state).toBe(SHIPPING.free)
+        })
     })
 })

@@ -24,7 +24,26 @@ export const useSettingsStore = defineStore('settings', {
             return { bankName, bankAccount, bankAccountName }
         },
 
-        freeShippingThreshold: (s) => s.settings?.freeShippingThreshold ?? null,
+        /**
+         * 運費規則。缺任一值就回 null，訂購單頁據此整行不渲染運費——
+         * 與 bankInfo 同慣例：寧可少顯示一行，也不要顯示不完整或猜出來的金額。
+         *
+         * 不在這裡填寫死的預設值：那會讓「後台把值清空」看起來像正常運作，
+         * 設定頁因此變成騙人的。
+         */
+        shippingRule: (s) => {
+            const fee = s.settings?.defaultShippingFee ?? null
+            const threshold = s.settings?.freeShippingThreshold ?? null
+            if (fee == null || threshold == null) return null
+
+            // 運費 0 不是支援的設定。全站免運促銷沒有人要求過，做出來只是憑空多三處
+            // 分支；但也不能讓 0 直接落到收費那條路——那會渲染成「NT$0，再買
+            // NT$1,900 免運」，金額沒錯而加購提示在騙人。當作未設定最安全：整行不
+            // 顯示，退回加運費之前的畫面。真要辦免運促銷時再刻意實作。
+            if (fee <= 0 || threshold <= 0) return null
+
+            return { fee, threshold }
+        },
 
         // 組出加好友連結：完整網址（lin.ee / line.me）直接用，否則當官方帳號 @id
         lineUrl: (s) => {
