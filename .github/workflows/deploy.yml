@@ -15,7 +15,29 @@ env:
   IMAGE: ${{ secrets.HARBOR_URL }}/gts/gts_web_store
 
 jobs:
+  # 部署前的關卡。PR 上的測試由 test.yml 負責，這裡擋的是「直接 push 到 main」
+  # 以及 merge 之後才浮現的問題——沒有這一關，紅燈的 main 仍會被推上正式站。
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          # 與 Dockerfile 的 node:24-alpine、package.json 的 engines.node 對齊，三處要一起改
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
   build-and-deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       # 以下 action 一律用 commit SHA 釘版（後方註解標對應 tag），
