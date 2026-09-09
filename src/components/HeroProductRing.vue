@@ -95,7 +95,6 @@ let rotation = 0               // current ring rotation, degrees
 let proxy                      // detached element Draggable drives via type:"x"
 let autoCall                   // gsap.delayedCall handle for autoplay
 let hovering = false
-let visible = true             // ring inside the viewport (IntersectionObserver)
 const AUTO_INTERVAL = 3.4      // seconds each card is shown
 const AUTO_RESUME = 5          // idle before autoplay resumes after interaction
 
@@ -274,7 +273,6 @@ function init() {
       // reflects the current state. Reading entries[0] leaves the ring stuck in
       // the stale "off-screen" branch — paused and never re-synced.
       const entry = entries[entries.length - 1]
-      visible = entry.isIntersecting
       if (entry.isIntersecting) {
         // Re-entry self-heal: while the ring was off-screen the mobile URL bar may
         // have resized the viewport and Draggable's cached hit area / start position

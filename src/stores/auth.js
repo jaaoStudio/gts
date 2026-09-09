@@ -89,7 +89,7 @@ export const useAuthStore = defineStore('auth', {
                 this.user = userData
                 await this.fetchCustomerProfile(this.user.id)
                 return this.user
-            } catch (err) {
+            } catch {
                 // 未登入 / session 失效 → 視為登出狀態（正常情況，不需噴錯）
                 this.user = null
                 this.customer = null

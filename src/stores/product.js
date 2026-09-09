@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { productService, productMapper } from '../services/productService'
+import { productService } from '../services/productService'
 import { useCategoryStore } from './category'
 
 export const useProductStore = defineStore('product', {
