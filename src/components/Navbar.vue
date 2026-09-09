@@ -114,7 +114,7 @@
                 <p class="truncate font-display text-sm font-semibold text-steel-900">{{ authStore.userName }}</p>
                 <p class="truncate font-mono text-xs text-steel-400">{{ authStore.user?.email }}</p>
               </div>
-              <router-link :to="authStore.accountRoute" @click="userMenuOpen = false" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-steel-600 transition-colors hover:bg-steel-50 hover:text-steel-900">
+              <router-link to="/account" @click="userMenuOpen = false" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-steel-600 transition-colors hover:bg-steel-50 hover:text-steel-900">
                 <PhUserCircle :size="18" weight="regular" /> 我的帳戶
               </router-link>
               <button @click="handleLogout" class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-brand-600 transition-colors hover:bg-brand-50">
@@ -252,7 +252,7 @@
                 </div>
               </div>
               <div class="flex items-center gap-4">
-                <router-link :to="authStore.accountRoute" @click="closeMobile" class="text-sm font-medium text-steel-700">我的帳戶</router-link>
+                <router-link to="/account" @click="closeMobile" class="text-sm font-medium text-steel-700">我的帳戶</router-link>
                 <button @click="handleLogout" class="text-sm font-medium text-brand-600">登出</button>
               </div>
             </template>

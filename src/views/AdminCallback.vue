@@ -69,7 +69,7 @@ onMounted(async () => {
     }
 
     // 否則依角色導向：管理員 → /admin、一般會員 → /account
-    router.replace(target || authStore.accountRoute)
+    router.replace(target || '/account')
   } else {
     error.value = authStore.error || '無法完成登入，請再試一次'
   }

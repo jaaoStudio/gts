@@ -132,3 +132,36 @@ const entry = entries[entries.length - 1]
 - 前端用 `navigator.sendBeacon('/__log', …)` 回報,高頻事件記得節流
 - 回報欄位要能**互斥地區分假設**（如上面那組內部值 / inline / computed）
 - 查完把 plugin 與所有回報程式碼移除再 commit
+
+## Directus 11:role 已經沒有 `admin_access`,別再從 role 判斷管理員
+
+**症狀**:`user.role.admin_access` 恆為 `undefined`,任何 `=== true` 的判斷永遠是
+false。程式碼看起來完全合理,沒有錯誤訊息,只是那條路線對所有人都不通。
+
+前台曾有 `isAdmin` / `accountRoute` / `/admin` 路由靠這個欄位判斷,結果 `/admin`
+對所有人不可達(2026-09 發現)。沒人察覺是因為那頁只顯示「功能即將上線」——
+**權限判斷寫錯而沒有任何人抱怨,是因為錯誤的那一側剛好什麼都沒有**。
+
+**成因**:Directus 11 把 `admin_access` / `app_access` 從 `directus_roles` 搬到
+`directus_policies`,role 改以 `policies` 關聯過去。實際欄位:
+
+```
+directus_roles     children description icon id name parent policies users …
+directus_policies  admin_access app_access name permissions roles users …
+```
+
+`readMe({ fields: ['*', 'role.*'] })` 因此永遠拿不到 `admin_access`。
+
+**要在客戶端判斷的話**,可用的欄位路徑是(兩條都有效,使用者可直接掛 policy,
+也可經由 role 繼承):
+
+```
+policies.policy.admin_access
+role.policies.policy.admin_access
+```
+
+⚠️ **但不要把它加進 `readMe()` 的預設 fields**。`customer access` policy 對系統
+collection 只開放 `directus_files` / `directus_users` / `directus_roles`,**沒有
+`directus_policies`**;夾帶進去會讓整個 `readMe` 403,也就是**所有客戶都登不進去**
+(與 `settingsService.getSettings()` 的 403 陷阱同型)。真要做就另發一個請求、
+catch 掉失敗當作非管理員,並且只在需要的路由上呼叫。

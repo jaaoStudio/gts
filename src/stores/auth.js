@@ -35,10 +35,6 @@ export const useAuthStore = defineStore('auth', {
     getters: {
         // session 模式：以是否取得到 user 判斷登入態
         isAuthenticated: (state) => !!state.user,
-        isAdmin: (state) => state.user?.role?.admin_access === true,
-        /** 根據角色回傳登入後應導向的路由 */
-        accountRoute: (state) =>
-            state.user?.role?.admin_access === true ? '/admin' : '/account',
         userName: (state) => {
             if (state.customer?.user_name) return state.customer.user_name
             if (!state.user) return ''
