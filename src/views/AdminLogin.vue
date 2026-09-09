@@ -87,7 +87,7 @@ onMounted(async () => {
   if (authStore.isAuthenticated) {
     await authStore.fetchCurrentUser()
     if (authStore.isAuthenticated) {
-      await router.replace(authStore.accountRoute)
+      await router.replace('/account')
     }
   }
 })

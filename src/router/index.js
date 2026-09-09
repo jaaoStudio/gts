@@ -102,12 +102,6 @@ const routes = [
         name: 'Account',
         component: () => import('../views/Account.vue'),
         meta: { requiresAuth: true, title: '會員專區｜金同心實業' }
-    },
-    {
-        path: '/admin',
-        name: 'Admin',
-        component: () => import('../views/Admin.vue'),
-        meta: { requiresAuth: true, requiresAdmin: true, title: '管理後台｜金同心實業' }
     }
 ]
 
@@ -123,9 +117,13 @@ const router = createRouter({
     }
 })
 
-// 路由守衛：檢查認證與管理員權限
+// 路由守衛：檢查是否登入
+//
+// 前台沒有「管理員」這個角色概念——後台作業一律在 Directus 自己的管理介面完成。
+// 曾經有過 requiresAdmin 與 /admin 路由，但那個判斷在 Directus 11 之後恆為 false，
+// 見 docs/gotchas.md。要重新引入前，先讀那一節。
 router.beforeEach(async (to) => {
-    if (to.meta.requiresAuth || to.meta.requiresAdmin) {
+    if (to.meta.requiresAuth) {
         const { useAuthStore } = await import('../stores/auth')
         const authStore = useAuthStore()
 
@@ -136,14 +134,8 @@ router.beforeEach(async (to) => {
         // init() 會共用進行中的那趟請求（見 auth store），這裡等它即可，不會重打 API。
         await authStore.init()
 
-        // 未登入 → 登入頁
         if (!authStore.isAuthenticated) {
             return '/login'
-        }
-
-        // 需要管理員權限但使用者不是管理員 → 導向會員頁
-        if (to.meta.requiresAdmin && !authStore.isAdmin) {
-            return '/account'
         }
     }
 })

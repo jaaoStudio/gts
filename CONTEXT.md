@@ -30,8 +30,8 @@ Which of the mutually exclusive facts about the current User's Customer holds. `
 _Avoid_: treating a null Customer as "this shopper has no profile"; "not found" as a synonym for `error`.
 
 **Admin**:
-A User whose Directus role has `admin_access` — not a separate kind of person. Admins are routed to the back-office; everyone else to their Customer account.
-_Avoid_: staff, manager, superuser.
+Whoever runs the shop from Directus's own admin app — confirms prices, sets 運費, moves an Order form along. Not a separate kind of person: an Admin signs into the storefront exactly like any other User, and sees exactly what any other User sees. **The storefront has no notion of who is an Admin** and no back-office of its own; everyone lands on their Customer account.
+_Avoid_: staff, manager, superuser; implying the storefront routes Admins anywhere different.
 
 ### Catalog
 
