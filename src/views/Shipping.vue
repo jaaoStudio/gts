@@ -11,7 +11,16 @@
 
       <h2>運費</h2>
       <ul>
-        <li>運費依<strong>重量、材積與配送地區</strong>計算，將於報價時一併告知。</li>
+        <li v-if="rule">
+          宅配運費<strong>一箱 {{ feeText }}</strong>，單筆<strong>滿 {{ thresholdText }} 免運</strong>。
+        </li>
+        <li v-else>宅配運費會在確認金額時一併告知。</li>
+        <li>
+          單箱容量約為長寬高總和 90 公分、重量 20 公斤以內。
+          品項較多需<strong>分箱寄送</strong>時，運費會依實際箱數調整。
+        </li>
+        <li>重物、大材積或偏遠地區<strong>另行報價</strong>，會在確認金額時一併告知。</li>
+        <li>含<strong>待報價品項</strong>的訂購單，運費於報價時一併確認。</li>
         <li>大宗訂購或自取可另行洽談。</li>
       </ul>
 
@@ -32,5 +41,13 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import PageShell from '../components/PageShell.vue'
+import { useSettingsStore } from '../stores/settings'
+import { useShippingCopy } from '../composables/useShippingCopy'
+
+const settingsStore = useSettingsStore()
+const { rule, feeText, thresholdText } = useShippingCopy()
+
+onMounted(() => settingsStore.fetchSettings())
 </script>

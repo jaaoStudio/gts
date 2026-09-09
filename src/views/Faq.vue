@@ -18,7 +18,14 @@
       <p>顯示「暫時缺貨」的品項多數仍可<strong>預訂</strong>。請與我們聯繫確認補貨時間。</p>
 
       <h3>有提供宅配 / 貨運嗎？運費怎麼算？</h3>
-      <p>可安排貨運或宅配，運費依重量、材積與地區計算，詳見 <router-link to="/shipping">運送與退貨</router-link>。</p>
+      <p>
+        可安排貨運或宅配。
+        <template v-if="rule">
+          運費一箱 <strong>{{ feeText }}</strong>，單筆滿 <strong>{{ thresholdText }} 免運</strong>；
+        </template>
+        需分箱寄送、重物與大材積商品另行報價，詳見
+        <router-link to="/shipping">運送與退貨</router-link>。
+      </p>
 
       <h3>買到的商品有問題可以退換嗎？</h3>
       <p>新品若有瑕疵，符合條件可辦理退換，詳見 <router-link to="/shipping">運送與退貨</router-link> 與 <router-link to="/warranty">保固資訊</router-link>。</p>
@@ -27,5 +34,13 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import PageShell from '../components/PageShell.vue'
+import { useSettingsStore } from '../stores/settings'
+import { useShippingCopy } from '../composables/useShippingCopy'
+
+const settingsStore = useSettingsStore()
+const { rule, feeText, thresholdText } = useShippingCopy()
+
+onMounted(() => settingsStore.fetchSettings())
 </script>

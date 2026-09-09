@@ -199,8 +199,28 @@
             另有 {{ orderStore.quoteItemCount }} 項待報價，未計入小計。
           </p>
 
+          <!-- 運費：設定不完整時整行不顯示，不猜、也不用寫死的預設值頂替 -->
+          <div
+            v-if="shipping.state !== SHIPPING.unavailable"
+            class="mt-4 border-t border-steel-200 pt-4"
+          >
+            <div class="flex items-baseline justify-between text-sm">
+              <span class="text-steel-500">
+                運費<span v-if="shipping.state === 'charged'" class="text-steel-400">（預估）</span>
+              </span>
+              <span class="font-mono text-steel-700">
+                <template v-if="shipping.state === SHIPPING.free">免運</template>
+                <template v-else-if="shipping.state === SHIPPING.quote">報價時一併確認</template>
+                <template v-else>NT${{ shipping.amount.toLocaleString() }}</template>
+              </span>
+            </div>
+            <p v-if="shipping.state === SHIPPING.charged" class="mt-1.5 text-xs text-steel-400">
+              再買 NT${{ shipping.gap.toLocaleString() }} 免運
+            </p>
+          </div>
+
           <p class="mt-4 text-sm leading-relaxed text-steel-500">
-            此金額不含運費，且
+            運費為預估，重物與大材積商品可能另行報價，且
             <span class="font-semibold text-steel-700">價格與庫存以專人確認為準</span>。
           </p>
 
@@ -251,6 +271,8 @@ import { computed, reactive, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOrderStore } from '../stores/order'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
+import { SHIPPING, estimateShipping } from '../utils/orderTotals'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
@@ -259,6 +281,18 @@ import { PhArrowRight, PhInfo, PhMinus, PhPlus } from '@phosphor-icons/vue'
 const router = useRouter()
 const orderStore = useOrderStore()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+
+// 預估運費。設定讀不到時 shippingRule 是 null，estimateShipping 會回 unavailable，
+// 運費那一行就整行不渲染——退回加運費之前的畫面，而不是顯示一個猜出來的金額。
+const shipping = computed(() =>
+  estimateShipping({
+    subtotal: orderStore.subtotal,
+    hasQuoteItems: orderStore.hasQuoteItems,
+    fee: settingsStore.shippingRule?.fee ?? null,
+    threshold: settingsStore.shippingRule?.threshold ?? null,
+  })
+)
 
 const form = reactive({
   contactName: '',
@@ -365,5 +399,10 @@ const submit = async () => {
 watch(() => authStore.customer, prefillFromCustomer, { immediate: true })
 
 // init() 已在 main.js 執行過，這裡只需對照 Directus 現況重新驗證
-onMounted(() => orderStore.revalidate())
+onMounted(() => {
+  orderStore.revalidate()
+  // 運費規則來自 site_settings。Footer 也會呼叫，但不能假設它先跑完——
+  // fetchSettings() 有快取，重複呼叫不會重打 API。
+  settingsStore.fetchSettings()
+})
 </script>

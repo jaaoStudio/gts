@@ -24,7 +24,19 @@ export const useSettingsStore = defineStore('settings', {
             return { bankName, bankAccount, bankAccountName }
         },
 
-        freeShippingThreshold: (s) => s.settings?.freeShippingThreshold ?? null,
+        /**
+         * 運費規則。缺任一值就回 null，訂購單頁據此整行不渲染運費——
+         * 與 bankInfo 同慣例：寧可少顯示一行，也不要顯示不完整或猜出來的金額。
+         *
+         * 不在這裡填寫死的預設值：那會讓「後台把值清空」看起來像正常運作，
+         * 設定頁因此變成騙人的。
+         */
+        shippingRule: (s) => {
+            const fee = s.settings?.defaultShippingFee ?? null
+            const threshold = s.settings?.freeShippingThreshold ?? null
+            if (fee == null || threshold == null) return null
+            return { fee, threshold }
+        },
 
         // 組出加好友連結：完整網址（lin.ee / line.me）直接用，否則當官方帳號 @id
         lineUrl: (s) => {

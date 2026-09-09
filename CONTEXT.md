@@ -99,6 +99,17 @@ _Avoid_: 小計 unqualified (it collides with 參考小計 — always say which 
 confirmed; before that the Order form has no Amount due at all.
 _Avoid_: 總價, 應付 (as a bare noun).
 
+**Estimated shipping** (預估運費):
+What the cart shows a shopper before submitting, derived from the shipping rule (a flat
+per-box fee, waived above a threshold — both held in site settings). It assumes **one
+box**, because nothing in the catalogue records weight or volume. It is a forecast and
+**takes no part in the Amount due** — the 運費 there is the real figure the Admin enters
+after looking at what actually has to be packed. Withheld entirely when the priced items
+alone cannot settle the question: below the threshold with 詢價 items present, the
+subtotal is not the order's real value, so no number is shown.
+_Avoid_: 運費 unqualified on the cart side (it reads as a commitment); presenting it as
+the amount the shopper will pay.
+
 **Order status** (狀態):
 One of 待確認 → 待付款 → 已付款 → 已出貨, plus 已取消. 已出貨 is the normal terminal
 state; there is deliberately no 已完成 because nothing confirms receipt.
