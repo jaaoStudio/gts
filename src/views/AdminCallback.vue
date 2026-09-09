@@ -68,7 +68,8 @@ onMounted(async () => {
       // sessionStorage 不可用時就走預設導向
     }
 
-    // 否則依角色導向：管理員 → /admin、一般會員 → /account
+    // 有記下登入前的目的地就回到那裡，否則一律進會員專區——
+    // 前台不分角色，後台作業在 Directus 自己的管理介面完成
     router.replace(target || '/account')
   } else {
     error.value = authStore.error || '無法完成登入，請再試一次'
