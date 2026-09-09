@@ -75,9 +75,14 @@ const renderOrder = async (items) => {
     return wrapper
 }
 
-/** 每一行右側那個粗體金額（line-through 的原價不算） */
-const lineAmounts = (wrapper) =>
-    wrapper.findAll('li .text-right > p.font-bold').map((p) => parseAmount(p.text()))
+/**
+ * 每一行右側那個粗體金額節點（line-through 的原價不算）。
+ * 逐行金額的 DOM 結構知識只放這一處，改版時不必同步修改多個 selector。
+ */
+const lineAmountNodes = (wrapper) => wrapper.findAll('li .text-right > p.font-bold')
+
+/** 逐行金額，已解析成數字；「待報價」為 null */
+const lineAmounts = (wrapper) => lineAmountNodes(wrapper).map((p) => parseAmount(p.text()))
 
 /** 「確認後小計」那一列的數字 */
 const subtotalShown = (wrapper) => {
@@ -118,7 +123,7 @@ describe('明細頁：逐行金額與小計的一致性', () => {
         // 顯示 NT$0 會讓客人以為這項免費
         const w = await renderOrder([item({ unit_price: null, confirmed_price: null, quantity: 5 })])
 
-        expect(w.findAll('li .text-right > p.font-bold')[0].text()).toBe('待報價')
+        expect(lineAmountNodes(w)[0].text()).toBe('待報價')
         expect(subtotalShown(w)).toBe(0)
     })
 })
