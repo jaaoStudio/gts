@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { confirmedSubtotal, effectivePrice } from './orderTotals'
+import { confirmedSubtotal, effectivePrice, lineTotal } from './orderTotals'
 
 // 明細頁的品項欄位用 Directus 的原始命名（snake_case），與 store 裡的 camelCase 不同
 const item = (over = {}) => ({ unit_price: 100, confirmed_price: null, quantity: 1, ...over })
@@ -73,9 +73,34 @@ describe('confirmedSubtotal', () => {
     })
 })
 
+describe('lineTotal', () => {
+    // 明細頁每一列顯示的數字。OrderDetail.vue 的 itemTotal() 只做格式化，
+    // 金額一律由這裡算——所以這幾條同時是在守畫面上那一欄。
+    test('given_老闆改過價_will_用確認價計算這一行', () => {
+        // 逐行若退回 unit_price（510×3=1530）而小計用確認價（1650），
+        // 客人自己加起來就對不上——GTS-260907-0039 就是這個形狀
+        expect(lineTotal(item({ unit_price: 510, confirmed_price: 550, quantity: 3 }))).toBe(1650)
+    })
+
+    test('given_老闆尚未改價_will_用下單時的單價計算', () => {
+        expect(lineTotal(item({ unit_price: 100, confirmed_price: null, quantity: 2 }))).toBe(200)
+    })
+
+    test('given_確認價為0_will_回傳0而不是退回原價', () => {
+        expect(lineTotal(item({ unit_price: 200, confirmed_price: 0, quantity: 3 }))).toBe(0)
+    })
+
+    test('given_詢價品項尚未報價_will_回傳null而不是0', () => {
+        // 0 會在畫面上顯示成「NT$0」，但這一行的真實狀態是「待報價」
+        expect(lineTotal(item({ unit_price: null, confirmed_price: null, quantity: 5 }))).toBeNull()
+    })
+})
+
 describe('逐行金額與小計的一致性', () => {
     test('given_任何組合_will_逐行加總等於confirmedSubtotal', () => {
-        // 這是明細頁對客人的隱含承諾：他把每一行加起來，必須等於小計那個數字
+        // 這是明細頁對客人的隱含承諾：他把每一行加起來，必須等於小計那個數字。
+        // 這裡刻意用 lineTotal 累加而不是複製 confirmedSubtotal 的算式——
+        // 若哪天 confirmedSubtotal 改成不走 lineTotal，這條就會紅。
         const items = [
             item({ unit_price: 510, confirmed_price: 550, quantity: 3 }),
             item({ unit_price: 100, confirmed_price: null, quantity: 2 }),
@@ -83,11 +108,9 @@ describe('逐行金額與小計的一致性', () => {
             item({ unit_price: 200, confirmed_price: 0, quantity: 1 }),
         ]
 
-        const byLine = items.reduce((sum, it) => {
-            const price = effectivePrice(it)
-            return price == null ? sum : sum + price * it.quantity
-        }, 0)
+        const byLine = items.reduce((sum, it) => sum + (lineTotal(it) ?? 0), 0)
 
         expect(byLine).toBe(confirmedSubtotal(items))
+        expect(byLine).toBe(1850)
     })
 })

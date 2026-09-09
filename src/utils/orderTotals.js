@@ -18,7 +18,20 @@
 export const effectivePrice = (item) => item.confirmed_price ?? item.unit_price ?? null
 
 /**
- * 確認後小計：`Σ 確認單價 × 數量`，應付金額的基底。
+ * 這一行的金額：`單價 × 數量`。明細頁每一列顯示的就是這個數字。
+ *
+ * 回傳 `null` 的意義與 effectivePrice 相同：詢價品項尚未報價，這一行算不出金額。
+ *
+ * 存在的理由是 confirmedSubtotal 底下就是它的加總——「逐行加起來等於小計」因此
+ * 是結構上成立的，而不是元件與 util 各寫一份剛好算出同一個數。
+ */
+export const lineTotal = (item) => {
+    const price = effectivePrice(item)
+    return price == null ? null : price * item.quantity
+}
+
+/**
+ * 確認後小計：`Σ lineTotal`，應付金額的基底。
  *
  * 衍生值，不儲存於資料庫。與 `orders.subtotal`（參考小計，送出當下的舊價快照）
  * 是兩回事——後者不參與應付金額的計算。
@@ -30,6 +43,6 @@ export const effectivePrice = (item) => item.confirmed_price ?? item.unit_price 
 // 呼叫端是 `order.value?.items` 透傳，兩種值都可能進來。
 export const confirmedSubtotal = (items) =>
     (items ?? []).reduce((sum, it) => {
-        const price = effectivePrice(it)
-        return price == null ? sum : sum + price * it.quantity
+        const total = lineTotal(it)
+        return total == null ? sum : sum + total
     }, 0)

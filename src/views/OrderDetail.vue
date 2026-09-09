@@ -254,7 +254,7 @@ import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import OrderStatusChip from '../components/OrderStatusChip.vue'
 import { PhCaretLeft } from '@phosphor-icons/vue'
-import { effectivePrice, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
+import { lineTotal, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
 
 const route = useRoute()
 const settingsStore = useSettingsStore()
@@ -288,9 +288,11 @@ const formatDateTime = (iso) =>
     hour: '2-digit', minute: '2-digit',
   })
 
+// 只負責格式化。金額本身一律由 lineTotal 算，這裡不再自己乘一次——
+// 逐行金額與小計的一致性靠的是「兩邊都走同一個函式」，不是兩份算式剛好一樣。
 const itemTotal = (item) => {
-  const price = effectivePrice(item)
-  return price == null ? '待報價' : `NT$${(price * item.quantity).toLocaleString()}`
+  const total = lineTotal(item)
+  return total == null ? '待報價' : `NT$${total.toLocaleString()}`
 }
 
 const reportPayment = async () => {
