@@ -6,6 +6,13 @@ name: Test
 on:
   pull_request:
 
+# 同一支 PR 只留最新那次測試。這裡取消是安全的（測試沒有副作用，不像部署會切流量），
+# 舊 commit 的結果本來就沒有參考價值——required check 看的是最新 commit 的 run。
+# ⚠️ 與 deploy.yml 的 cancel-in-progress: false 是刻意的差別，別順手改成一致。
+concurrency:
+  group: test-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest

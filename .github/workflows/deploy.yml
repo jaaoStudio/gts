@@ -10,6 +10,20 @@ on:
       - 'docs/**'
       - 'deploy/**'          # VM 端腳本改動不需要重 build（需手動同步到 VM）
 
+# 同一時間只允許一個部署在跑。
+#
+# ⚠️ 這不是效能考量，是正確性：兩個部署重疊時，**先切換的不一定是先觸發的**。
+# 連續合併兩支 PR（2026-09-09 就發生過，兩次 push 相隔 13 秒）會同時起兩個 run，
+# 各自建自己那個 commit 的 image。若較舊那個建得比較慢、藍綠切換排在後面，
+# 線上就會退回舊 code——而 Actions 上**兩個 run 都是綠燈**，沒有任何錯誤訊息。
+#
+# cancel-in-progress 刻意設為 false（排隊，不取消）：取消可能打斷正在進行的
+# 藍綠切換，留下半套狀態。排隊的話舊的先跑完、新的後蓋上，最新的 commit 一定
+# 最後生效，代價只是線上會短暫停在舊版本幾分鐘。
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
 env:
   # Harbor 沿用 boss-timing 那組（HARBOR_URL/USER/PASSWORD secrets）
   IMAGE: ${{ secrets.HARBOR_URL }}/gts/gts_web_store
