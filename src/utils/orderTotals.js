@@ -25,8 +25,11 @@ export const effectivePrice = (item) => item.confirmed_price ?? item.unit_price 
  *
  * 尚未報價的詢價品項沒有價格可加，跳過而不是當成 0。
  */
-export const confirmedSubtotal = (items = []) =>
-    items.reduce((sum, it) => {
+// ⚠️ 用 `items ?? []` 而不是預設參數 `(items = [])`：預設參數只對 `undefined` 生效，
+// Directus 若把空關聯回成 `items: null`，預設值不會啟動而是直接對 null 呼叫 reduce。
+// 呼叫端是 `order.value?.items` 透傳，兩種值都可能進來。
+export const confirmedSubtotal = (items) =>
+    (items ?? []).reduce((sum, it) => {
         const price = effectivePrice(it)
         return price == null ? sum : sum + price * it.quantity
     }, 0)

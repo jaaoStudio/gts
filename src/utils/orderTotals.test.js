@@ -61,6 +61,12 @@ describe('confirmedSubtotal', () => {
         expect(confirmedSubtotal(undefined)).toBe(0)
     })
 
+    test('given_items為null_will_回傳0而不是拋錯', () => {
+        // Directus 的空關聯可能回 null 而非 []，這條與上面那條要分開測：
+        // 預設參數 `(items = [])` 能過 undefined 那條，卻會在這條拋 TypeError
+        expect(confirmedSubtotal(null)).toBe(0)
+    })
+
     test('given_全部都是未報價的詢價品項_will_回傳0', () => {
         const items = [item({ unit_price: null, confirmed_price: null, quantity: 9 })]
         expect(confirmedSubtotal(items)).toBe(0)
