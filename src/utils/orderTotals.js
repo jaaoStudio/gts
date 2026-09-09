@@ -83,11 +83,6 @@ export const estimateShipping = ({ subtotal, hasQuoteItems, rule }) => {
 
     const { fee, threshold } = rule
 
-    // 運費本身就是 0（全站免運促銷）→ 湊不湊得到門檻都一樣，直接說免運。
-    // 少了這一條會變成「運費（預估）NT$0，再買 NT$1,900 免運」——金額沒錯，
-    // 但那句加購提示在騙客人，湊滿了他也省不到半毛。
-    if (fee === 0) return { state: SHIPPING.free }
-
     // 門檻判斷放在詢價判斷之前：標價部分自己就已達門檻時，再加上詢價品項只會更多，
     // 免運是確定的，沒有不敢講的理由。
     if (subtotal >= threshold) return { state: SHIPPING.free }

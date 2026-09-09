@@ -35,6 +35,13 @@ export const useSettingsStore = defineStore('settings', {
             const fee = s.settings?.defaultShippingFee ?? null
             const threshold = s.settings?.freeShippingThreshold ?? null
             if (fee == null || threshold == null) return null
+
+            // 運費 0 不是支援的設定。全站免運促銷沒有人要求過，做出來只是憑空多三處
+            // 分支；但也不能讓 0 直接落到收費那條路——那會渲染成「NT$0，再買
+            // NT$1,900 免運」，金額沒錯而加購提示在騙人。當作未設定最安全：整行不
+            // 顯示，退回加運費之前的畫面。真要辦免運促銷時再刻意實作。
+            if (fee <= 0 || threshold <= 0) return null
+
             return { fee, threshold }
         },
 

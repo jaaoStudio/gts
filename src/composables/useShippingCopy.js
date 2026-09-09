@@ -16,13 +16,6 @@ export const useShippingCopy = () => {
 
     const rule = computed(() => settingsStore.shippingRule)
 
-    /**
-     * 運費本身就是 0（全站免運促銷）。此時「一箱 NT$0，滿 NT$2,000 免運」是自相
-     * 矛盾的句子——門檻沒有意義，因為湊不湊都一樣。呼叫端要改講「不收運費」。
-     * 與 estimateShipping() 的 `fee === 0 → free` 是同一條規則。
-     */
-    const isFreeShipping = computed(() => rule.value?.fee === 0)
-
     const feeText = computed(() =>
         rule.value ? `NT$${rule.value.fee.toLocaleString()}` : null
     )
@@ -30,5 +23,5 @@ export const useShippingCopy = () => {
         rule.value ? `NT$${rule.value.threshold.toLocaleString()}` : null
     )
 
-    return { rule, isFreeShipping, feeText, thresholdText }
+    return { rule, feeText, thresholdText }
 }

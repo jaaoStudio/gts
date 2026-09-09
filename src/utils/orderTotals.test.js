@@ -123,20 +123,15 @@ describe('estimateShipping', () => {
 
     describe('設定不完整', () => {
         test('given_規則為null_will_回unavailable', () => {
-            // 設定是否完整由 settings store 的 shippingRule 認定，缺任一值就是 null
+            // 設定是否完整由 settings store 的 shippingRule 認定：缺值、或運費 <= 0
+            // （不支援的設定，見該 getter 的註解）都會是 null
             expect(estimateShipping({ subtotal: 0, hasQuoteItems: false, rule: null }).state)
                 .toBe(SHIPPING.unavailable)
         })
 
-        test('given_運費設為0_will_直接免運而不是收0元還叫人湊門檻', () => {
-            // 0 是合法設定值（全站免運促銷），不可與「沒設定」混為一談。
-            // 也不能回 charged：那會渲染成「NT$0，再買 NT$1,900 免運」，
-            // 金額沒錯但那句加購提示在騙人——湊滿了也省不到半毛。
-            expect(est({ fee: 0, subtotal: 100 }).state).toBe(SHIPPING.free)
-        })
-
-        test('given_運費0又含詢價品項_will_仍然免運', () => {
-            expect(est({ fee: 0, subtotal: 100, hasQuoteItems: true }).state).toBe(SHIPPING.free)
+        test('given_規則為null又有詢價品項_will_unavailable優先', () => {
+            expect(estimateShipping({ subtotal: 0, hasQuoteItems: true, rule: null }).state)
+                .toBe(SHIPPING.unavailable)
         })
     })
 
@@ -179,11 +174,6 @@ describe('estimateShipping', () => {
         test('given_標價部分已達門檻_will_免運而不是quote', () => {
             // 詢價品項只會讓總額更多，免運是確定的，沒有不敢講的理由
             expect(est({ subtotal: 2500, hasQuoteItems: true }).state).toBe(SHIPPING.free)
-        })
-
-        test('given_規則為null又有詢價品項_will_unavailable優先', () => {
-            expect(estimateShipping({ subtotal: 0, hasQuoteItems: true, rule: null }).state)
-                .toBe(SHIPPING.unavailable)
         })
     })
 })

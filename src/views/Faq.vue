@@ -20,8 +20,7 @@
       <h3>有提供宅配 / 貨運嗎？運費怎麼算？</h3>
       <p>
         可安排貨運或宅配。
-        <template v-if="isFreeShipping"><strong>目前全站不收運費</strong>；</template>
-        <template v-else-if="rule">
+        <template v-if="rule">
           運費一箱 <strong class="font-mono">{{ feeText }}</strong>，單筆滿
           <strong><span class="font-mono">{{ thresholdText }}</span> 免運</strong>；
         </template>
@@ -42,7 +41,7 @@ import PageShell from '../components/PageShell.vue'
 import { useShippingCopy } from '../composables/useShippingCopy'
 
 const settingsStore = useSettingsStore()
-const { rule, isFreeShipping, feeText, thresholdText } = useShippingCopy()
+const { rule, feeText, thresholdText } = useShippingCopy()
 
 onMounted(() => settingsStore.fetchSettings())
 </script>

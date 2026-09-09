@@ -11,8 +11,7 @@
 
       <h2>運費</h2>
       <ul>
-        <li v-if="isFreeShipping"><strong>目前全站不收運費。</strong></li>
-        <li v-else-if="rule">
+        <li v-if="rule">
           宅配運費<strong>一箱 <span class="font-mono">{{ feeText }}</span></strong>，
           單筆<strong>滿 <span class="font-mono">{{ thresholdText }}</span> 免運</strong>。
         </li>
@@ -25,7 +24,7 @@
         <li>重物、大材積或偏遠地區<strong>另行報價</strong>，會在確認金額時一併告知。</li>
         <!-- 「未達門檻」這個條件不能省：標價部分自己就已達門檻時，訂購單頁會直接
              顯示免運（見 ADR 0003 第 2 條），這裡若寫成所有詢價單都待確認就對不上 -->
-        <li v-if="!isFreeShipping">
+        <li>
           <strong>未達免運門檻</strong>且含<strong>待報價品項</strong>時，運費於報價時一併確認。
         </li>
         <li>大宗訂購或自取可另行洽談。</li>
@@ -54,7 +53,7 @@ import PageShell from '../components/PageShell.vue'
 import { useShippingCopy } from '../composables/useShippingCopy'
 
 const settingsStore = useSettingsStore()
-const { rule, isFreeShipping, feeText, thresholdText } = useShippingCopy()
+const { rule, feeText, thresholdText } = useShippingCopy()
 
 onMounted(() => settingsStore.fetchSettings())
 </script>
