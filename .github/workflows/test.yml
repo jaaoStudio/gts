@@ -1,0 +1,28 @@
+name: Test
+
+# 刻意不設 paths-ignore：這個 workflow 要當 branch protection 的 required check，
+# 而被 paths-ignore 跳過的 job 是「從未回報」而不是「通過」，純文件 PR 會卡住合不掉。
+# 測試只跑 ~250ms，全跑的成本遠低於例外規則的維護成本。
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # action 一律用 commit SHA 釘版（後方註解標對應 tag），與 deploy.yml 的慣例一致
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          # 與 Dockerfile 的 node:24-alpine、package.json 的 engines.node 對齊，三處要一起改
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
