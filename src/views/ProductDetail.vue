@@ -211,6 +211,7 @@
         <!-- Description -->
         <div v-if="product.description" v-reveal class="mt-20">
           <h2 class="mb-6 font-display text-2xl font-bold tracking-tight text-steel-900">商品介紹</h2>
+          <!-- eslint-disable-next-line vue/no-v-html -- 內容已於 sanitizedDescription 經 DOMPurify 消毒，見 script 區 -->
           <div class="prose prose-steel max-w-none rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6 sm:p-10" v-html="sanitizedDescription" />
         </div>
       </div>

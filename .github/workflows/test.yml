@@ -31,5 +31,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # lint 排在 test 前面：機械性錯誤（未使用的變數、拼錯的識別字）先擋掉，
+      # 免得測試紅了還要先分辨到底是邏輯壞了還是打錯字
+      - name: Lint
+        run: npm run lint
+
       - name: Test
         run: npm test
