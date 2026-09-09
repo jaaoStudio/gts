@@ -72,13 +72,21 @@ export const SHIPPING = {
  * @param {object}      p
  * @param {number}      p.subtotal       只含標價品項的小計
  * @param {boolean}     p.hasQuoteItems  是否含尚未報價的詢價品項
- * @param {number|null} p.fee            Directus 的 default_shipping_fee
- * @param {number|null} p.threshold      Directus 的 free_shipping_threshold
+ * @param {{fee: number, threshold: number}|null} p.rule
+ *        運費規則，來自 settings store 的 shippingRule。**設定是否完整由那個 getter
+ *        單獨認定**，這裡不重複判斷 null 欄位——兩邊各判一次，規則遲早會分歧。
  */
-export const estimateShipping = ({ subtotal, hasQuoteItems, fee, threshold }) => {
-    // 設定缺一不可。寧可整行不顯示，也不要拿寫死的預設值假裝——那會讓「後台把值
+export const estimateShipping = ({ subtotal, hasQuoteItems, rule }) => {
+    // 設定不完整。寧可整行不顯示，也不要拿寫死的預設值假裝——那會讓「後台把值
     // 清空」看起來像正常運作，設定頁因此變成騙人的。與 settings 的 bankInfo 同慣例。
-    if (fee == null || threshold == null) return { state: SHIPPING.unavailable }
+    if (!rule) return { state: SHIPPING.unavailable }
+
+    const { fee, threshold } = rule
+
+    // 運費本身就是 0（全站免運促銷）→ 湊不湊得到門檻都一樣，直接說免運。
+    // 少了這一條會變成「運費（預估）NT$0，再買 NT$1,900 免運」——金額沒錯，
+    // 但那句加購提示在騙客人，湊滿了他也省不到半毛。
+    if (fee === 0) return { state: SHIPPING.free }
 
     // 門檻判斷放在詢價判斷之前：標價部分自己就已達門檻時，再加上詢價品項只會更多，
     // 免運是確定的，沒有不敢講的理由。

@@ -11,16 +11,23 @@
 
       <h2>運費</h2>
       <ul>
-        <li v-if="rule">
-          宅配運費<strong>一箱 {{ feeText }}</strong>，單筆<strong>滿 {{ thresholdText }} 免運</strong>。
+        <li v-if="isFreeShipping"><strong>目前全站不收運費。</strong></li>
+        <li v-else-if="rule">
+          宅配運費<strong>一箱 <span class="font-mono">{{ feeText }}</span></strong>，
+          單筆<strong>滿 <span class="font-mono">{{ thresholdText }}</span> 免運</strong>。
         </li>
         <li v-else>宅配運費會在確認金額時一併告知。</li>
         <li>
-          單箱容量約為長寬高總和 90 公分、重量 20 公斤以內。
+          單箱容量約為長寬高總和 <span class="font-mono">90</span> 公分、重量
+          <span class="font-mono">20</span> 公斤以內。
           品項較多需<strong>分箱寄送</strong>時，運費會依實際箱數調整。
         </li>
         <li>重物、大材積或偏遠地區<strong>另行報價</strong>，會在確認金額時一併告知。</li>
-        <li>含<strong>待報價品項</strong>的訂購單，運費於報價時一併確認。</li>
+        <!-- 「未達門檻」這個條件不能省：標價部分自己就已達門檻時，訂購單頁會直接
+             顯示免運（見 ADR 0003 第 2 條），這裡若寫成所有詢價單都待確認就對不上 -->
+        <li v-if="!isFreeShipping">
+          <strong>未達免運門檻</strong>且含<strong>待報價品項</strong>時，運費於報價時一併確認。
+        </li>
         <li>大宗訂購或自取可另行洽談。</li>
       </ul>
 
@@ -42,12 +49,12 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import PageShell from '../components/PageShell.vue'
 import { useSettingsStore } from '../stores/settings'
+import PageShell from '../components/PageShell.vue'
 import { useShippingCopy } from '../composables/useShippingCopy'
 
 const settingsStore = useSettingsStore()
-const { rule, feeText, thresholdText } = useShippingCopy()
+const { rule, isFreeShipping, feeText, thresholdText } = useShippingCopy()
 
 onMounted(() => settingsStore.fetchSettings())
 </script>

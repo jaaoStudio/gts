@@ -215,7 +215,7 @@
               </span>
             </div>
             <p v-if="shipping.state === SHIPPING.charged" class="mt-1.5 text-xs text-steel-400">
-              再買 NT${{ shipping.gap.toLocaleString() }} 免運
+              再買 <span class="font-mono">NT${{ shipping.gap.toLocaleString() }}</span> 免運
             </p>
           </div>
 
@@ -272,9 +272,9 @@ import { useRouter } from 'vue-router'
 import { useOrderStore } from '../stores/order'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
-import { SHIPPING, estimateShipping } from '../utils/orderTotals'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
+import { SHIPPING, estimateShipping } from '../utils/orderTotals'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 import { PhArrowRight, PhInfo, PhMinus, PhPlus } from '@phosphor-icons/vue'
 
@@ -289,8 +289,7 @@ const shipping = computed(() =>
   estimateShipping({
     subtotal: orderStore.subtotal,
     hasQuoteItems: orderStore.hasQuoteItems,
-    fee: settingsStore.shippingRule?.fee ?? null,
-    threshold: settingsStore.shippingRule?.threshold ?? null,
+    rule: settingsStore.shippingRule,
   })
 )
 

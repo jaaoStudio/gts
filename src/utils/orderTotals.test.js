@@ -117,24 +117,26 @@ describe('逐行金額與小計的一致性', () => {
 
 describe('estimateShipping', () => {
     // 正式站的設定：一箱 140、滿 2000 免運
-    const settings = { fee: 140, threshold: 2000 }
-    const est = (over = {}) =>
-        estimateShipping({ subtotal: 0, hasQuoteItems: false, ...settings, ...over })
+    const rule = { fee: 140, threshold: 2000 }
+    const est = ({ subtotal = 0, hasQuoteItems = false, ...over } = {}) =>
+        estimateShipping({ subtotal, hasQuoteItems, rule: { ...rule, ...over } })
 
     describe('設定不完整', () => {
-        test('given_運費未設定_will_回unavailable', () => {
-            expect(est({ fee: null }).state).toBe(SHIPPING.unavailable)
+        test('given_規則為null_will_回unavailable', () => {
+            // 設定是否完整由 settings store 的 shippingRule 認定，缺任一值就是 null
+            expect(estimateShipping({ subtotal: 0, hasQuoteItems: false, rule: null }).state)
+                .toBe(SHIPPING.unavailable)
         })
 
-        test('given_免運門檻未設定_will_回unavailable', () => {
-            expect(est({ threshold: null }).state).toBe(SHIPPING.unavailable)
+        test('given_運費設為0_will_直接免運而不是收0元還叫人湊門檻', () => {
+            // 0 是合法設定值（全站免運促銷），不可與「沒設定」混為一談。
+            // 也不能回 charged：那會渲染成「NT$0，再買 NT$1,900 免運」，
+            // 金額沒錯但那句加購提示在騙人——湊滿了也省不到半毛。
+            expect(est({ fee: 0, subtotal: 100 }).state).toBe(SHIPPING.free)
         })
 
-        test('given_運費設為0_will_不是unavailable而是真的免運促銷', () => {
-            // 0 是合法設定值（全站免運），不可與「沒設定」混為一談
-            expect(est({ fee: 0, subtotal: 100 })).toEqual({
-                state: SHIPPING.charged, amount: 0, gap: 1900,
-            })
+        test('given_運費0又含詢價品項_will_仍然免運', () => {
+            expect(est({ fee: 0, subtotal: 100, hasQuoteItems: true }).state).toBe(SHIPPING.free)
         })
     })
 
@@ -179,8 +181,9 @@ describe('estimateShipping', () => {
             expect(est({ subtotal: 2500, hasQuoteItems: true }).state).toBe(SHIPPING.free)
         })
 
-        test('given_設定不完整又有詢價品項_will_unavailable優先', () => {
-            expect(est({ fee: null, hasQuoteItems: true }).state).toBe(SHIPPING.unavailable)
+        test('given_規則為null又有詢價品項_will_unavailable優先', () => {
+            expect(estimateShipping({ subtotal: 0, hasQuoteItems: true, rule: null }).state)
+                .toBe(SHIPPING.unavailable)
         })
     })
 })
