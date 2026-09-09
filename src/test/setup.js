@@ -44,12 +44,26 @@ class MemoryStorage {
     }
 }
 
-globalThis.localStorage = new MemoryStorage()
+/**
+ * 用 defineProperty 而不是直接指派：元件測試跑在 jsdom（見 OrderDetail.test.js
+ * 的 docblock），那裡的 window.localStorage 是唯讀 getter，直接指派會拋
+ * 「Cannot set property localStorage of [object Window] which has only a getter」。
+ * jsdom 自己那份也不能用——它沒有 failNextSetItem，寫入永遠成功。
+ */
+const installMemoryStorage = () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+        value: new MemoryStorage(),
+        writable: true,
+        configurable: true,
+    })
+}
+
+installMemoryStorage()
 
 beforeEach(() => {
     // 換一個全新的實例而不是 clear()：後者不會重設 failNextSetItem 的旗標，
     // 一個測試設了卻沒用到就會滲進下一個測試
-    globalThis.localStorage = new MemoryStorage()
+    installMemoryStorage()
     // store 的失敗路徑會 console.error，那是刻意的行為，不需要噴進測試輸出
     vi.spyOn(console, 'error').mockImplementation(() => {})
 })
