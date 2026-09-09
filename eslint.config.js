@@ -13,6 +13,10 @@ import globals from 'globals'
  *
  * 要收緊請從個別規則加起，不要整包換成更嚴的 preset。若哪天要導入排版統一，
  * 該用 formatter（prettier）在存檔時自動處理，而不是用 linter 事後罵人。
+ *
+ * **本專案沒有 warning 層級**：規則不是 error 就是關掉。`npm run lint` 帶
+ * `--max-warnings 0`，所以就算哪天有人把某條設成 warn，也一樣擋得住 CI。
+ * 理由與上面選 essential 是同一個——會被習慣性忽略的警告，等於沒有警告。
  */
 export default [
     {
@@ -32,9 +36,13 @@ export default [
         },
         rules: {
             // essential 不含這條，但 v-html 是 stored XSS 的主要入口，值得一直盯著。
-            // 現有唯一一處（ProductDetail）已經過 DOMPurify，就地標了 disable 並註明原因；
-            // 之後任何新的 v-html 都會在這裡被攔下來要求說明。
-            'vue/no-v-html': 'warn',
+            // 現有唯一一處（ProductDetail）已經過 DOMPurify，就地標了 disable 並註明原因。
+            //
+            // ⚠️ 必須是 error 不能是 warn。#18 原本設 warn，但 `eslint .` 遇到 warning
+            // 的 exit code 是 0——新增一個未豁免的 v-html，CI 照樣綠燈通過。
+            // 「會被攔下來要求說明」這個保證，只有 error 才成立。
+            // 要放行請就地標 eslint-disable-next-line 並寫清楚為什麼安全。
+            'vue/no-v-html': 'error',
         },
     },
 
