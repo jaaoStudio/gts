@@ -202,11 +202,7 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
    已這樣抓到過:pull 失敗後 `.env` 留下從沒跑起來的 tag、回滾因此回報了一個線上不存在
    的版本(見雷區 0 下方的 `.env` 警告)。
 
-2. **改完必須重新 `scp` 同步到 VM。** `deploy/**` 在 `paths-ignore` 內,不會經 CI 更新。
-   三支要一起放:
-   ```bash
-   scp deploy/{deploy.sh,rollback.sh,lib-slot.sh} hetzner:~/gts-web/
-   ```
+2. **改完必須重新 `scp` 同步到 VM**——指令與「為什麼三支要一起放」見上面〈部署流程〉那段。
 
 3. **動正式機一律「先只讀蒐證 + 備份,再動」。** 順序是:讀狀態 → `cp -p` 到
    `~/gts-web/.bak-$(date +%Y%m%d-%H%M%S)/` → 再覆寫 → 用 md5 核對兩邊一致。

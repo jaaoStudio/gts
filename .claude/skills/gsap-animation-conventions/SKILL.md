@@ -33,14 +33,40 @@ GSAP **Draggable + InertiaPlugin**：在 throw 進行中快速連續觸控，
 任何餵進 `gsap.set()` 的計算值，**若源頭來自 Draggable 或 `getProperty`，都要先
 `Number.isFinite()` 把關**——在**寫入前**擋掉，不要寫入後補救（補救不了）。
 
-需要復原被汙染的元素時：
+已被汙染的元素要救回來，**必須清掉快取再重建，單純寫入正確值無效**——而且 `clearProps`
+之後要把原本的基準 transform 重新套回去，只 clear 不重建等於把元素丟在未定位的狀態：
 
 ```js
-gsap.set(el, { clearProps: 'all' })   // 清掉被汙染的快取，再重建
+gsap.set(cards, { clearProps: 'all' })
+gsap.set(cards, { xPercent: -50, yPercent: -50 })   // ← 這行不能省
 ```
 
-實作範例見 `src/components/HeroProductRing.vue` 的 `layout()`（`Number.isFinite(rotation)`
-的守衛）與 `recover()`。
+實作見 `src/components/HeroProductRing.vue` 的 `layout()` / `fromProxy()` /
+`recover()` / `autoAdvance()`。
+
+## ⚠️ 觸控會送 `mouseenter`，但常常不送 `mouseleave`
+
+hover 造成的狀態（暫停自動輪播、暫停漂浮）在觸控裝置上會**卡在「進入」那一側**
+——`hovering` 永遠是 `true`，自動播放再也不會恢復。
+
+解法是只在真的有 hover 指標的裝置上理會 hover：
+
+```js
+const canHover = window.matchMedia('(hover: hover)').matches
+```
+
+見 `HeroProductRing.vue` 的 `onCardEnter` / `onCardLeave`。
+
+## ⚠️ IntersectionObserver 快速捲動會一次送多筆 entry
+
+只讀 `entries[0]` 會拿到**過期的那一筆**，元素於是卡在錯的分支（例如捲回畫面內了卻
+仍停在「離開視窗」的暫停狀態，而且不會自癒）。一律取最後一筆：
+
+```js
+const entry = entries[entries.length - 1]
+```
+
+見 `HeroProductRing.vue` 的 IntersectionObserver 與 `src/directives/reveal.js`。
 
 ## ⚠️ 用 headless Chrome 截圖驗證動畫：不要用 `--virtual-time-budget`
 

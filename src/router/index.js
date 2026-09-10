@@ -121,7 +121,7 @@ const router = createRouter({
 //
 // 前台沒有「管理員」這個角色概念——後台作業一律在 Directus 自己的管理介面完成。
 // 曾經有過 requiresAdmin 與 /admin 路由，但那個判斷在 Directus 11 之後恆為 false，
-// 見 docs/gotchas.md。要重新引入前，先讀那一節。
+// 見 .claude/skills/routing-and-auth。要重新引入前，先讀那一節。
 router.beforeEach(async (to) => {
     if (to.meta.requiresAuth) {
         const { useAuthStore } = await import('../stores/auth')
