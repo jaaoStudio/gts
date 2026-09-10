@@ -1,16 +1,10 @@
 import { beforeEach, vi } from 'vitest'
 
 /**
- * 測試環境是 node，沒有 localStorage。order store 的 _persist() 會用到它。
+ * 測試環境是 node，沒有 localStorage（order store 的 _persist() 會用到）。
  *
- * 補一個記憶體版而不是改用 jsdom：這裡要測的是算錢與失敗路徑的邏輯，
- * 拉進整個 DOM 實作只為了一個 key-value 儲存並不划算。
- *
- * 這個 fake 刻意只實作 Storage 的介面，不帶任何測試專用的控制開關。
- * 要讓寫入失敗（測 _persist() 的無痕模式／配額滿分支）就在該測試裡用 vitest
- * 現成的機制：`vi.spyOn(localStorage, 'setItem').mockImplementationOnce(...)`。
- * 先前這裡有一個 failNextSetItem() 的黏性旗標，結果為了防它滲進下一個測試又得
- * 在 beforeEach 補一層重建——一個特例長出第二個特例來收拾自己。
+ * 刻意只實作 Storage 介面，不加測試專用的控制開關——要讓寫入失敗就在該測試裡
+ * 用 `vi.spyOn(localStorage, 'setItem').mockImplementationOnce(...)`。
  */
 class MemoryStorage {
     #data = new Map()

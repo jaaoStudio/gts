@@ -20,16 +20,9 @@ NEXT_UPPER=${NEXT^^}
 
 echo "▶ 目前: $CURRENT → 部署到: $NEXT (tag: $NEW_TAG)"
 
-# 1.5 同一個 tag 不重複部署。
-#
-# 重複部署會把流量切到另一個 slot，而那個 slot 隨即被同一版蓋掉——rollback
-# 目標於是從「前一版」變成「同一版」，回滾等於沒有回滾。這個坑在 Actions 上
-# 看不出來（兩次都綠燈），要等到真的需要回滾時才會發現退不回去。
-#
-# 這是 workflow 端 freshness 檢查之外的第二道防線：那一關擋的是「舊 commit
-# 蓋掉新的」，這一關擋的是「同一版把 rollback 目標吃掉」。
-#
-# `|| true`：讀不到就當空字串繼續——這道守衛是加分項，不該成為部署的單點故障。
+# 1.5 同一個 tag 不重複部署：否則會把流量切到另一個 slot 再用同一版蓋掉它，
+# rollback 目標就從「前一版」變成「同一版」。
+# `|| true`：讀不到就跳過守衛——它是加分項，不該成為部署的單點故障。
 ACTIVE=$(active_tag || true)
 if [ -n "$ACTIVE" ] && [ "$NEW_TAG" = "$ACTIVE" ]; then
   echo "⏭ ${NEW_TAG} 已經是目前對外的版本，跳過部署。"

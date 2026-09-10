@@ -157,8 +157,7 @@
                 <p class="mt-0.5 font-mono text-xs text-steel-400">× {{ item.quantity }}</p>
               </div>
               <div class="text-right">
-                <!-- data-testid 是給 OrderDetail.test.js 的穩定抓手：那支測試驗的是
-                     「逐行加起來等於小計」，不該因為改個字重或換掉外層排版就壞掉 -->
+                <!-- data-testid：OrderDetail.test.js 的穩定抓手，勿移除 -->
                 <p data-testid="line-amount" class="font-mono text-sm font-bold text-steel-900">{{ itemTotal(item) }}</p>
                 <!-- 老闆改過價才顯示原價，讓調整是透明的 -->
                 <p

@@ -314,13 +314,7 @@ describe('品項增刪', () => {
 })
 
 describe('_persist 寫入失敗（無痕模式／配額滿）', () => {
-    /**
-     * 讓下一次寫入失敗一次。真實瀏覽器在無痕模式或配額滿時丟的是
-     * QuotaExceededError，這裡照樣命名，讓失敗長得像它實際的樣子。
-     *
-     * 用 vitest 現成的 spy 而不是在 src/test/setup.js 的 fake 上加開關：
-     * 那個 fake 是所有測試共用的，一個測試的需求不該變成它的公開 API。
-     */
+    // 讓下一次寫入失敗一次。命名照真實瀏覽器（無痕模式／配額滿丟 QuotaExceededError）。
     const failNextWrite = () =>
         vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
             const err = new Error('無法寫入：儲存空間已滿或處於無痕模式')
