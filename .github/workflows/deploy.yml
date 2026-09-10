@@ -73,18 +73,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 需要完整歷史：腳本要 diff 本次 SHA 與 main HEAD 之間的變更檔案，
+          # 預設的 depth=1 只有一個 commit，diff 不出東西
+          fetch-depth: 0
 
-      - name: 確認這個 commit 仍是 main 的 HEAD
+      - name: 確認這個 commit 仍值得部署
         id: check
         run: |
-          git fetch --depth=1 origin main
-          HEAD_SHA=$(git rev-parse FETCH_HEAD)
-          if [ "$HEAD_SHA" = "$GITHUB_SHA" ]; then
+          set +e
+          .github/scripts/deploy-freshness.sh "$GITHUB_SHA"
+          CODE=$?
+          set -e
+          if [ "$CODE" -eq 0 ]; then
             echo "stale=false" >> "$GITHUB_OUTPUT"
-            echo "✅ $GITHUB_SHA 仍是 main 的 HEAD，繼續部署"
-          else
+          elif [ "$CODE" -eq 10 ]; then
             echo "stale=true" >> "$GITHUB_OUTPUT"
-            echo "::notice title=跳過部署::main 已前進到 ${HEAD_SHA}，本 run 的 ${GITHUB_SHA} 已過期。跳過建置與流量切換——這不是失敗。"
+            echo "::notice title=跳過部署::本次 commit 已過期，較新的 run 會接手。這不是失敗。"
+          else
+            # 腳本自己壞了。這種情況不能當成「已過期」默默跳過，也不能當成
+            # 「還很新」照樣部署——兩種猜測都可能蓋錯版本，直接讓它紅。
+            echo "::error title=過期檢查失敗::deploy-freshness.sh 離開碼 ${CODE}，無法判斷是否該部署。"
+            exit 1
           fi
 
   build-and-deploy:
@@ -96,6 +106,8 @@ jobs:
       # 避免 tag 被移動導致 CI 執行到未預期的程式碼。升版時兩者要一起改。
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # 下面那道最後檢查同樣要 diff 兩個 commit
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
@@ -126,6 +138,27 @@ jobs:
             VITE_DIRECTUS_PUBLIC_URL=${{ secrets.VITE_DIRECTUS_PUBLIC_URL }}
           cache-from: type=registry,ref=${{ env.IMAGE }}:cache
           cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
+
+      # 最後一道，就貼在切流量之前。
+      #
+      # freshness job 的結果會被快取：若本 run 的 freshness 曾經通過、而
+      # build-and-deploy 失敗，之後點「Re-run failed jobs」只會重跑失敗的 job
+      # 與其下游——freshness 是成功的，不會重跑，於是沿用舊的 stale=false。
+      # 期間若已有較新的版本上線，這一路就會把正式站蓋回舊版。
+      #
+      # 這裡刻意用「紅燈」而不是 freshness job 那種 no-op skip：走到這裡代表
+      # 有人手動重跑了一個過期的部署，該讓他知道被拒絕，而不是給一個
+      # 什麼都沒做卻全綠的 run。
+      - name: 切流量前再確認一次（擋 re-run 繞過 freshness）
+        run: |
+          set +e
+          .github/scripts/deploy-freshness.sh "$GITHUB_SHA"
+          CODE=$?
+          set -e
+          if [ "$CODE" -ne 0 ]; then
+            echo "::error title=拒絕部署過期版本::這個 commit 已不是要上線的版本（離開碼 ${CODE}）。若確實要部署它，請對最新 commit 重跑整個 workflow，或直接推一個新 commit。"
+            exit 1
+          fi
 
       - name: Deploy (blue-green switch)
         # 自己 ssh，不依賴第三方 action（私鑰只在本步驟指令內使用）
