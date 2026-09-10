@@ -19,15 +19,16 @@ echo "▶ 切回 $PREV..."
 sed -i "s/service: gts-frontend-.*/service: gts-frontend-${PREV}@docker/" "$TRAEFIK_DYNAMIC"
 
 # ACTIVE_TAG 要跟著切，否則它會停在回滾前那一版。
-# deploy.sh 的同版守衛已改成讀 ${CURRENT_UPPER}_TAG（實際服務的 slot）而不是
-# 這個欄位，所以這裡不同步不會造成誤判；但 .env 註解說它是「目前對外的 tag」，
-# 留一個對不上的數字給人看，遲早會有人照著它下判斷。
-PREV_UPPER=$(echo "$PREV" | tr '[:lower:]' '[:upper:]')
-PREV_TAG=$(grep "^${PREV_UPPER}_TAG=" .env | cut -d= -f2- || true)
+#
+# ⚠️ 版本從**容器實際的 image** 讀，不是讀 .env 的 ${PREV}_TAG。後者是「打算跑
+# 的」——部署若在 pull／up 之後失敗，.env 會留下一個從沒跑起來的 tag，照它寫
+# 就會回報一個線上根本不存在的版本（見 lib-slot.sh 的 slot_image_tag 說明）。
+PREV_TAG=$(slot_image_tag "$PREV" || true)
 if [ -n "$PREV_TAG" ]; then
   sed -i "s/^ACTIVE_TAG=.*/ACTIVE_TAG=${PREV_TAG}/" .env
   echo "✅ 已切回 $PREV (${PREV_TAG})"
 else
   echo "✅ 已切回 $PREV"
-  echo "⚠️  .env 讀不到 ${PREV_UPPER}_TAG，ACTIVE_TAG 未更新（流量已切，僅追蹤欄位失準）"
+  echo "⚠️  讀不到 ${PREV} 容器的 image tag，ACTIVE_TAG 未更新。"
+  echo "    流量已切,但請自行確認版本：docker inspect gts_web_store_${PREV} --format '{{.Config.Image}}'"
 fi

@@ -37,6 +37,35 @@ current_slot() {
     printf '%s' "$found"
 }
 
+# 某個 slot **實際正在跑**的 image tag。
+#
+# ⚠️ 不要用 .env 的 ${SLOT}_TAG 代替——那是「打算跑的」不是「實際在跑的」。
+# deploy.sh 必須先把 tag 寫進 .env,compose 才解析得出 image,所以只要部署在
+# pull／up 之後失敗,.env 就會留下一個從沒跑起來的 tag。實測重現過：
+#
+#   blue=A green=B 流量在 blue → 部署 C：.env 先寫 GREEN_TAG=C,接著 pull 失敗
+#   → green 實際仍跑 B,但 .env 說 C → 此時回滾到 green 會回報「已切回 (C)」
+#
+# 容器實際的 image 才是真相。判不出來就回非 0,呼叫端自己決定怎麼處理。
+slot_image_tag() {
+    local slot="$1"
+    local image
+
+    image=$(docker inspect "gts_web_store_${slot}" --format '{{.Config.Image}}' 2>/dev/null || true)
+
+    # 沒有冒號代表沒帶 tag（例如隱含 :latest），此時 ##*: 會回整串 image 名,
+    # 那不是 tag,寧可回報失敗
+    case "$image" in
+        *:*)
+            printf '%s' "${image##*:}"
+            ;;
+        *)
+            echo "❌ 讀不到 gts_web_store_${slot} 的 image tag（得到 [${image}]）" >&2
+            return 1
+            ;;
+    esac
+}
+
 # 另一個 slot（要部署進去、或要回滾過去的那個）
 other_slot() {
     case "$1" in

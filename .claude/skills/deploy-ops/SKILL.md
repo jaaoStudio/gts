@@ -74,21 +74,38 @@ for h in gtxin.com.tw core.gtxin.com.tw; do
 ```bash
 ssh hetzner 'cd ~/gts-web
   echo "--- 流量 slot(兩行應一致) ---"; grep "service: gts-frontend-" /opt/traefik/dynamic/gts.yml
-  echo "--- tag ---"; grep -E "^(BLUE|GREEN|ACTIVE)_TAG=" .env
-  echo "--- 容器 ---"; docker ps --format "{{.Names}}\t{{.Status}}\t{{.Image}}" | grep gts_web_store'
+  echo "--- 容器實際跑的 image(真相) ---"
+  for s in blue green; do printf "%-6s %s\n" "$s" "$(docker inspect gts_web_store_$s --format "{{.Config.Image}} {{.State.Status}} {{.State.Health.Status}}")"; done
+  echo "--- .env(僅參考,見下方警告) ---"; grep -E "^(BLUE|GREEN|ACTIVE)_TAG=" .env'
 ```
 
-健康的樣子:
+⚠️ **`.env` 的 `*_TAG` 是「打算跑的」不是「實際在跑的」。** `deploy.sh` 必須先把 tag 寫進 `.env`,compose 才解析得出 image,所以部署只要在 pull／up 之後失敗,`.env` 就會留下一個從沒跑起來的 tag。**要判斷版本一律看 `docker inspect` 的 `.Config.Image`。**
 
-- 兩個 slot 都 `healthy`,**live 的那個 uptime 較短**(剛部署),閒置的是前一版
-- `ACTIVE_TAG` == live slot 的 `*_TAG`,且等於最後一次部署的 commit
-- **閒置 slot 的 uptime 若停在幾週前 → 藍綠已失效**,每次都打進 live slot
+判準要看情況,沒有單一通則:
+
+| 狀態 | 該看到什麼 |
+|---|---|
+| **剛成功部署、之後沒回滾** | 兩個 slot 都 `healthy`;live 的 uptime 較短、image 等於最後一次部署的 commit;閒置的是前一版 |
+| **剛回滾之後** | live 的 uptime **反而較長**(回滾目標的容器本來就比較舊),image 是**回滾目標的版本**——不是最後一次部署的 commit。這是正常的,不要當成異常 |
+| **很久沒部署** | 兩個 slot uptime 都很長。之後成功部署一次,閒置那個 uptime 依然很長——**也是正常的**,不能因此斷言失效 |
+
+所以「閒置 slot uptime 很舊」**單獨不足以判定藍綠失效**。真正可靠的訊號是**連續幾次部署有沒有交替 slot**:
+
+```bash
+# 近幾次部署各自打進哪個 slot（看 deploy.sh 的第一行輸出）
+gh run list --workflow deploy.yml --limit 6 --json databaseId --jq '.[].databaseId' \
+  | xargs -I{} sh -c 'gh run view {} --log 2>/dev/null | grep -m1 "▶ 目前:"'
+```
+
+- 正常:`blue → green → blue → green` 交替
+- **失效:`blue → blue → blue`**(雷區 0 那三週的實況)
 
 也可以直接用腳本自己的判斷來問(只讀,不改任何狀態):
 
 ```bash
 ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
-  C=$(current_slot /opt/traefik/dynamic/gts.yml); echo "current=$C  next=$(other_slot "$C")"'
+  C=$(current_slot /opt/traefik/dynamic/gts.yml)
+  echo "current=$C ($(slot_image_tag "$C"))  next=$(other_slot "$C") ($(slot_image_tag "$(other_slot "$C")"))"'
 ```
 
 ## 回滾(三層,由輕到重)
@@ -99,8 +116,14 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
 | 整個藍綠架構要退回舊單容器 | `ssh hetzner 'cp /opt/traefik/dynamic/gts.yml.phase1.bak /opt/traefik/dynamic/gts.yml'`(切回 `gts_store_frontend:0.0.5`,該容器仍 running) |
 | Traefik 本身有問題,退回舊 NPM 代理 | `ssh hetzner 'docker stop traefik && docker start nginx_proxy_manager'` |
 
-> **按第 1 層之前先確認閒置 slot 是「前一版」**,不是幾週前的舊版——雷區 0 那段期間閒置 slot 停在三週前,按下去會把站退回三週前。用上面「確認藍綠機制真的在運作」那組指令看 `.env` 的 tag 與容器 uptime。
-> `rollback.sh` 現在會同步更新 `ACTIVE_TAG`(2026-09-10 加),所以回滾後那個欄位仍可信。
+> **按第 1 層之前先確認閒置 slot 跑的是你要退回的版本。** 雷區 0 那段期間閒置 slot 停在三週前,按下去會把站退回三週前。
+> 確認方式**只看容器實際的 image**,不要看 `.env`:
+>
+> ```bash
+> ssh hetzner 'docker inspect gts_web_store_green gts_web_store_blue --format "{{.Name}} {{.Config.Image}}"'
+> ```
+>
+> `rollback.sh` 會同步更新 `ACTIVE_TAG`,而且(2026-09-10 修)它讀的是**容器實際的 image**而不是 `.env`——否則「上次部署失敗過的 slot」會讓它回報一個線上根本不存在的版本。即便如此,`ACTIVE_TAG` 仍只是給人看的追蹤欄位,**判斷版本請一律回到 `docker inspect`**。
 
 > 舊 `gts_store_frontend` 與 `nginx_proxy_manager` 是遷移期的安全網,**確認穩定後可清掉**(清掉後上面第 2、3 層回滾就失效)。
 

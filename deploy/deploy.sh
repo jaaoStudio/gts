@@ -38,10 +38,11 @@ echo "▶ 目前: $CURRENT → 部署到: $NEXT (tag: $NEW_TAG)"
 #     • 部署 A：守衛放行，把另一 slot 的 B 覆寫成 A，兩個 slot 都變 A，回滾目標消失
 # CURRENT 是從 Traefik 檔讀出來的實際流量去向，${CURRENT_UPPER}_TAG 才是真相。
 #
-# `|| true` 是必要的：腳本開頭是 set -euo pipefail，若 .env 缺這一行，
-# grep 回 1 會讓整個部署在這裡中止。這道守衛是加分項，不該成為單點故障。
-CURRENT_UPPER=$(echo "$CURRENT" | tr '[:lower:]' '[:upper:]')
-ACTIVE=$(grep "^${CURRENT_UPPER}_TAG=" .env | cut -d= -f2- || true)
+# 版本同樣從**容器實際的 image** 讀，不是 .env。回滾到一個「上次部署失敗過」
+# 的 slot 之後，該 slot 的 ${SLOT}_TAG 會是那個從沒跑起來的 tag，照它判斷會
+# 誤判（見 lib-slot.sh 的 slot_image_tag 說明）。
+# `|| true`：讀不到就當空字串繼續——這道守衛是加分項，不該成為部署的單點故障。
+ACTIVE=$(slot_image_tag "$CURRENT" || true)
 if [ -n "$ACTIVE" ] && [ "$NEW_TAG" = "$ACTIVE" ]; then
   echo "⏭ ${NEW_TAG} 已經是目前對外的版本，跳過部署。"
   echo "   流量留在 ${CURRENT}，${NEXT} 保持為 rollback 目標。"
