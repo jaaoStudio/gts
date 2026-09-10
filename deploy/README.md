@@ -4,9 +4,15 @@
 
 ```
 push main ──▶ GitHub Actions
+                ├─ test：npm ci → lint → test（紅了就不部署）
+                ├─ freshness：這個 commit 還值得部署嗎？
+                │    └─ 已過期 ▶ 整個 build-and-deploy job skip（不是 failed）
                 ├─ build 前端 image（Vite→nginx，VITE 變數用 build args 烘進去）
                 ├─ push 到 Harbor（:{sha} + :latest）
+                ├─ 切流量前再檢查一次 freshness（擋 re-run 繞過上面那道的快取結果）
                 └─ SSH 進 VM ▶ ~/gts-web/deploy.sh {sha}
+                                   ├─ 判斷目前 slot（lib-slot.sh）
+                                   ├─ 同版就跳過（避免吃掉回滾目標）
                                    ├─ 部署到閒置 slot（blue/green）
                                    ├─ 等 healthcheck 通過
                                    └─ 改 Traefik dynamic 檔切流量（秒切、可秒回滾）
@@ -14,8 +20,47 @@ push main ──▶ GitHub Actions
 外部流量：Cloudflare ─▶ Traefik(:443, DNS-01 憑證) ─▶ 當前 slot 的 nginx ─▶ /api 反代 directus_app:8055
 ```
 
+> `concurrency: deploy-main` 只保證不同時跑，**不保證版本順序**（佇列依進入等待的時間，
+> 不是 commit 順序）。「最新 commit 最後生效」靠的是上面那兩道 freshness 檢查。
+
 - blue / green 兩個 slot 常駐，Traefik 的 `service: gts-frontend-<color>@docker` 決定流量。
 - rollback = 把該行切回另一色（前一版還在跑，秒切）。
+
+---
+
+## `.env` 的定位：它記的是「打算跑的」，不是「實際在跑的」
+
+**要判斷某個 slot 現在跑哪一版，一律看容器實際的 image，不要看 `.env`。**
+
+```bash
+docker inspect gts_web_store_blue gts_web_store_green --format '{{.Name}} {{.Config.Image}}'
+```
+
+原因在流程順序上：`deploy.sh` 必須**先**把 tag 寫進 `.env`，`docker compose` 才解析得出要拉哪顆 image。所以只要部署在那之後失敗（pull 失敗、healthcheck 逾時、image 壞掉），`.env` 就會留下一個**從沒跑起來的 tag**：
+
+```
+初始：blue 跑 A、green 跑 B，流量在 blue
+部署 C：.env 先寫入 GREEN_TAG=C → pull 失敗、部署中止
+結果：.env 說 GREEN_TAG=C，但 green 實際仍跑 B
+```
+
+此時若回滾到 green，光看 `.env` 會以為線上是 C——而 C 從來沒上線過。
+（2026-09-10 修好：`rollback.sh` 與 `deploy.sh` 的同版守衛都改讀容器實際 image，
+見 `lib-slot.sh` 的 `slot_image_tag()`。）
+
+| 欄位 | 意義 | 可信度 |
+|---|---|---|
+| `BLUE_TAG` / `GREEN_TAG` | compose 要拉的 image tag（**部署意圖**） | 部署成功時才等於現實 |
+| `ACTIVE_TAG` | 目前對外版本，`deploy.sh`／`rollback.sh` 維護 | 僅供人看的追蹤欄位 |
+| `docker inspect` 的 `.Config.Image` | 容器實際跑的 image | **唯一真相** |
+
+腳本裡要用就呼叫 `slot_image_tag`：
+
+```bash
+cd ~/gts-web && . ./lib-slot.sh
+C=$(current_slot /opt/traefik/dynamic/gts.yml)
+echo "對外：$C ($(slot_image_tag "$C"))   閒置：$(other_slot "$C") ($(slot_image_tag "$(other_slot "$C")"))"
+```
 
 ---
 
@@ -38,15 +83,24 @@ docker network connect traefik-net directus_app   # 若還沒在上面
 把本 `deploy/` 內容放到 VM：
 ```bash
 mkdir -p ~/gts-web
-# docker-compose.yml / deploy.sh / rollback.sh / .env.example → ~/gts-web/
-cp docker-compose.yml deploy.sh rollback.sh .env.example ~/gts-web/
+cp docker-compose.yml deploy.sh rollback.sh lib-slot.sh .env.example ~/gts-web/
 cd ~/gts-web
 cp .env.example .env && vi .env          # 填 REMOTE_REGISTRY_IP，其餘先留 latest
-chmod +x deploy.sh rollback.sh
+chmod +x deploy.sh rollback.sh lib-slot.sh
 
 # Traefik router
 sudo cp traefik-dynamic/gts.yml /opt/traefik/dynamic/gts.yml
 ```
+
+> ⚠️ **`lib-slot.sh` 一定要一起放。** `deploy.sh` 與 `rollback.sh` 都 source 它取得
+> slot 判斷；少了它兩支都會因 source 失敗而中止（刻意的：寧可不部署，也不要在
+> 判不出 slot 的情況下亂寫 Traefik 設定）。
+>
+> 之後修改這三支也一樣——`deploy/**` 在 workflow 的 `paths-ignore` 內，**不會**經 CI
+> 自動更新，必須手動同步：
+> ```bash
+> scp deploy/{deploy.sh,rollback.sh,lib-slot.sh} <vm>:~/gts-web/
+> ```
 
 ### 4. DNS
 Cloudflare 加 `gtxin.com.tw` / `core.gtxin.com.tw` A record 指向新 VM（DNS-01 憑證，橘雲/灰雲都可）。
@@ -78,4 +132,18 @@ docker compose ps                        # 兩個都 healthy
 ## 日常操作
 - **部署**：merge 到 `main` → 自動跑。
 - **回滾**：GitHub → Actions → **Rollback** → Run；或 VM 上 `~/gts-web/rollback.sh`。
+  - ⚠️ **按之前先確認閒置 slot 跑的是你要退回的版本**（看 `.Config.Image`，不是 `.env`）。
 - **看目前哪色**：`grep service /opt/traefik/dynamic/gts.yml`
+  - 該檔有**兩處** `gts-frontend-*`（正式 router 與舊網域轉址 router），兩處應一致。
+    腳本用 `sort -u` 收重複；若不一致會直接報錯而不是猜——曾經因為沒處理這點，
+    slot 判斷永遠失敗、每次都部署到 live slot，藍綠與回滾同時失效三週。
+- **看目前跑哪版**：見上方「`.env` 的定位」——用 `docker inspect`，不要用 `.env`。
+- **確認藍綠真的在交替**（部署類失效幾乎都是靜默的，Actions 一路綠燈）：
+  ```bash
+  gh run list --workflow deploy.yml --limit 6 --json databaseId --jq '.[].databaseId' \
+    | xargs -I{} sh -c 'gh run view {} --log 2>/dev/null | grep -m1 "▶ 目前:"'
+  ```
+  正常會看到 `blue → green → blue` 交替；連續同色代表 slot 判斷壞了。
+
+> 更完整的線上實況、除錯手法與踩過的雷，見 `.claude/skills/deploy-ops/SKILL.md`。
+> 本檔只負責「新機從零裝起來」。
