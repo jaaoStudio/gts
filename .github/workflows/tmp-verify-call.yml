@@ -1,9 +1,0 @@
-# 暫時性：驗證 deploy.yml 的 `uses: ./.github/workflows/test.yml` 這個機制真的可行。
-# deploy.yml 只在 push to main 觸發，沒辦法在 PR 上驗到；這支用同樣的方式呼叫，
-# 驗完就刪。
-name: TMP verify workflow_call
-on:
-  pull_request:
-jobs:
-  called-test:
-    uses: ./.github/workflows/test.yml
