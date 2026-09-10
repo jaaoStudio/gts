@@ -7,11 +7,17 @@ NEW_TAG="${1:?需要傳入 image tag}"
 COMPOSE_DIR=~/gts-web
 TRAEFIK_DYNAMIC=/opt/traefik/dynamic/gts.yml
 
+# slot 判斷共用 lib-slot.sh。讀不到就讓 set -e 直接中止——寧可不部署，
+# 也不要在判不出 slot 的情況下亂寫（同步到 VM 時三支要一起放）。
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib-slot.sh
+. "$SCRIPT_DIR/lib-slot.sh"
+
 cd "$COMPOSE_DIR"
 
 # 1. 判斷目前 active slot（讀 Traefik dynamic 檔）
-CURRENT=$(grep "service: gts-frontend-" "$TRAEFIK_DYNAMIC" | grep -o 'blue\|green')
-if [ "$CURRENT" = "blue" ]; then NEXT=green; else NEXT=blue; fi
+CURRENT=$(current_slot "$TRAEFIK_DYNAMIC")
+NEXT=$(other_slot "$CURRENT")
 NEXT_UPPER=$(echo "$NEXT" | tr '[:lower:]' '[:upper:]')
 
 echo "▶ 目前: $CURRENT → 部署到: $NEXT (tag: $NEW_TAG)"

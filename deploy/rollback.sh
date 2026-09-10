@@ -5,10 +5,15 @@ set -euo pipefail
 COMPOSE_DIR=~/gts-web
 TRAEFIK_DYNAMIC=/opt/traefik/dynamic/gts.yml
 
+# 與 deploy.sh 共用 slot 判斷，見 lib-slot.sh 開頭那段「壞了三週」的說明
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib-slot.sh
+. "$SCRIPT_DIR/lib-slot.sh"
+
 cd "$COMPOSE_DIR"
 
-CURRENT=$(grep "service: gts-frontend-" "$TRAEFIK_DYNAMIC" | grep -o 'blue\|green')
-if [ "$CURRENT" = "blue" ]; then PREV=green; else PREV=blue; fi
+CURRENT=$(current_slot "$TRAEFIK_DYNAMIC")
+PREV=$(other_slot "$CURRENT")
 
 echo "▶ 切回 $PREV..."
 sed -i "s/service: gts-frontend-.*/service: gts-frontend-${PREV}@docker/" "$TRAEFIK_DYNAMIC"
