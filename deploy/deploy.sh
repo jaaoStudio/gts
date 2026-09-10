@@ -16,6 +16,24 @@ NEXT_UPPER=$(echo "$NEXT" | tr '[:lower:]' '[:upper:]')
 
 echo "▶ 目前: $CURRENT → 部署到: $NEXT (tag: $NEW_TAG)"
 
+# 1.5 同一個 tag 不重複部署。
+#
+# 重複部署會把流量切到另一個 slot，而那個 slot 隨即被同一版蓋掉——rollback
+# 目標於是從「前一版」變成「同一版」，回滾等於沒有回滾。這個坑在 Actions 上
+# 看不出來（兩次都綠燈），要等到真的需要回滾時才會發現退不回去。
+#
+# 這是 workflow 端 freshness 檢查之外的第二道防線：那一關擋的是「舊 commit
+# 蓋掉新的」，這一關擋的是「同一版把 rollback 目標吃掉」。
+# `|| true` 是必要的：腳本開頭是 set -euo pipefail，若 .env 裡沒有 ACTIVE_TAG
+# 那一行（舊的 .env、或手動編輯時漏掉），grep 回 1 會讓整個部署在這裡中止。
+# 讀不到就當成空字串繼續——這道守衛是加分項，不該成為部署的單點故障。
+ACTIVE=$(grep '^ACTIVE_TAG=' .env | cut -d= -f2- || true)
+if [ -n "$ACTIVE" ] && [ "$NEW_TAG" = "$ACTIVE" ]; then
+  echo "⏭ ${NEW_TAG} 已經是目前對外的版本，跳過部署。"
+  echo "   流量留在 ${CURRENT}，${NEXT} 保持為 rollback 目標。"
+  exit 0
+fi
+
 # 2. 更新 next slot 的 tag 到 .env
 sed -i "s/^${NEXT_UPPER}_TAG=.*/${NEXT_UPPER}_TAG=${NEW_TAG}/" .env
 

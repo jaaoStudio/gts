@@ -18,8 +18,11 @@ on:
 # 線上就會退回舊 code——而 Actions 上**兩個 run 都是綠燈**，沒有任何錯誤訊息。
 #
 # cancel-in-progress 刻意設為 false（排隊，不取消）：取消可能打斷正在進行的
-# 藍綠切換，留下半套狀態。排隊的話舊的先跑完、新的後蓋上，最新的 commit 一定
-# 最後生效，代價只是線上會短暫停在舊版本幾分鐘。
+# 藍綠切換，留下半套狀態。
+#
+# ⚠️ 但這裡只有互斥，**沒有版本順序保證**。GitHub 的佇列是 FIFO 依「進入等待
+# 的時間」，不是 commit 順序；手動重跑一個舊 commit 的 workflow 也照樣會排進來。
+# 「最新的 commit 一定最後生效」要靠下面的 freshness job，不是靠這個區塊。
 concurrency:
   group: deploy-main
   cancel-in-progress: false
@@ -53,8 +56,40 @@ jobs:
       - name: Test
         run: npm test
 
-  build-and-deploy:
+  # 過期檢查。concurrency 只保證不同時跑，不保證誰先誰後：
+  #
+  #   • 排隊期間 main 可能已經往前走，於是排在後面執行的反而是舊 commit
+  #   • 手動重跑一個舊 commit 的 workflow，也會把正式站蓋回那一版
+  #
+  # 兩種情況都會讓線上退回舊 code，而 Actions 上**全是綠燈**、沒有任何錯誤訊息。
+  # 這一關把「本 run 的 commit 已經不是 main 的 HEAD」判定為 no-op：
+  # build-and-deploy 整個 job 被 skip（顯示為 skipped，不是 failed），
+  # 因為那不是壞掉，是這次部署已經沒有意義了。
+  freshness:
     needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.check.outputs.stale }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 確認這個 commit 仍是 main 的 HEAD
+        id: check
+        run: |
+          git fetch --depth=1 origin main
+          HEAD_SHA=$(git rev-parse FETCH_HEAD)
+          if [ "$HEAD_SHA" = "$GITHUB_SHA" ]; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+            echo "✅ $GITHUB_SHA 仍是 main 的 HEAD，繼續部署"
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=跳過部署::main 已前進到 ${HEAD_SHA}，本 run 的 ${GITHUB_SHA} 已過期。跳過建置與流量切換——這不是失敗。"
+          fi
+
+  build-and-deploy:
+    needs: [test, freshness]
+    if: needs.freshness.outputs.stale == 'false'
     runs-on: ubuntu-latest
     steps:
       # 以下 action 一律用 commit SHA 釘版（後方註解標對應 tag），
