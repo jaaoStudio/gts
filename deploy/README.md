@@ -145,5 +145,9 @@ docker compose ps                        # 兩個都 healthy
   ```
   正常會看到 `blue → green → blue` 交替；連續同色代表 slot 判斷壞了。
 
-> 更完整的線上實況、除錯手法與踩過的雷，見 `.claude/skills/deploy-ops/SKILL.md`。
-> 本檔只負責「新機從零裝起來」。
+> 更完整的**線上實際情況**（版本、流量在哪個 slot、哪些回滾層還活著）、除錯手法與踩過的雷，
+> 見 `.claude/skills/deploy-ops/SKILL.md`。本檔只負責「新機從零裝起來」。
+>
+> ⚠️ **回滾只剩兩層可用**（2026-09-10 實機確認）：`rollback.sh` 的 blue↔green 切換，
+> 以及退回 `nginx_proxy_manager`（降級，設定是換 gtxin 網域之前的）。
+> 舊文件寫的「切回 `gts_store_frontend`」那層**已失效**，該容器已不存在。
