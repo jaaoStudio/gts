@@ -1,9 +1,6 @@
 import directus from '../utils/directus'
 import { updateItem } from '@directus/sdk'
 
-/**
- * 允許使用者自行修改的欄位白名單
- */
 const EDITABLE_FIELDS = [
     'user_name',
     'phone',

@@ -1,28 +1,17 @@
 name: Test
 
-# 刻意不設 paths-ignore：這個 workflow 要當 branch protection 的 required check，
-# 而被 paths-ignore 跳過的 job 是「從未回報」而不是「通過」，純文件 PR 會卡住合不掉。
-# 測試只跑 ~250ms，全跑的成本遠低於例外規則的維護成本。
+# ⚠️ 刻意不設 paths-ignore：被它跳過的 job 狀態是「從未回報」而不是「通過」，
+# 當 required check 時純文件 PR 會卡住合不掉。
 on:
   pull_request:
-  # deploy.yml 的部署前關卡直接 `uses:` 這支，而不是自己複製一份同樣的步驟。
-  # 兩份的話 node 版本與 action SHA 就有四處要一起改（Dockerfile、package.json、
-  # 兩個 workflow），而且沒有東西會發現它們漂移——PR 與 main 就會被不同的
-  # 檢查把關，有人往這裡加一個步驟，main 的部署卻不會跑到。
-  workflow_call:
+  workflow_call:   # deploy.yml 的部署前關卡 uses 這支，不複製步驟（見 deploy.yml）
 
-# 同一支 PR 只留最新那次測試。這裡取消是安全的（測試沒有副作用，不像部署會切流量），
-# 舊 commit 的結果本來就沒有參考價值——required check 看的是最新 commit 的 run。
-# ⚠️ 與 deploy.yml 的 cancel-in-progress: false 是刻意的差別，別順手改成一致。
+# ⚠️ 與 deploy.yml 的 cancel-in-progress: false 是刻意的差別，別改成一致：
+# 測試沒有副作用，取消是安全的；部署會切流量，不能取消。
 #
-# `|| github.sha` 是給 workflow_call 用的：從 deploy.yml 呼叫時是 push 事件，
-# head_ref 為空，group 會退化成所有 main 部署共用一個而互相取消。用 sha 兜底
-# 讓每個 commit 各自成組。
-#
-# ⚠️ 實測到的行為：這個 group 是跟著「被呼叫的這支 workflow」算的，所以若同一個
-# 事件裡有兩個地方都跑到 test.yml（例如再多一支 workflow 也 `uses:` 它），
-# 兩者會落進同一組而互相 cancel。目前不會發生——PR 只有 test.yml 自己跑、
-# push to main 只有 deploy.yml 呼叫它。要再加呼叫端的話記得先處理這件事。
+# ⚠️ `|| github.sha`：被 workflow_call 呼叫時是 push 事件、head_ref 為空，
+# 沒有兜底會讓所有 main 部署共用一組而互相取消。
+# 同理，若再多一支 workflow 也 uses 這支，兩者會落進同一組互殺（已實測）。
 concurrency:
   group: test-${{ github.head_ref || github.sha }}
   cancel-in-progress: true

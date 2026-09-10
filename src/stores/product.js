@@ -22,14 +22,8 @@ export const useProductStore = defineStore('product', {
     }),
 
     getters: {
-        /**
-         * 是否有下一頁
-         */
         hasNextPage: (state) => state.currentPage < state.totalPages,
 
-        /**
-         * 是否有上一頁
-         */
         hasPrevPage: (state) => state.currentPage > 1,
     },
 
@@ -78,7 +72,6 @@ export const useProductStore = defineStore('product', {
                     return
                 }
 
-                // 統一呼叫 Service
                 const response = await productService.getFilteredProducts({
                     page: this.currentPage,
                     limit: this.itemsPerPage,
@@ -99,27 +92,18 @@ export const useProductStore = defineStore('product', {
             }
         },
 
-        /**
-         * 下一頁
-         */
         async nextPage() {
             if (this.hasNextPage) {
                 await this.fetchProducts(this.currentPage + 1, this.currentFilters)
             }
         },
 
-        /**
-         * 上一頁
-         */
         async prevPage() {
             if (this.hasPrevPage) {
                 await this.fetchProducts(this.currentPage - 1, this.currentFilters)
             }
         },
 
-        /**
-         * 跳轉到指定頁
-         */
         async goToPage(page) {
             if (page >= 1 && page <= this.totalPages) {
                 await this.fetchProducts(page, this.currentFilters)

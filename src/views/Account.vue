@@ -301,7 +301,6 @@ const form = reactive({
   billing_address: '',
 })
 
-// 將 Store 資料同步到表單
 function syncFormWithStore() {
   const c = authStore.customer || {}
   form.user_name = c.user_name || ''
