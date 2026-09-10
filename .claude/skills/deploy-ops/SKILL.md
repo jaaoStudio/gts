@@ -9,7 +9,7 @@ description: >-
 # GTS 正式站部署維運 runbook
 
 > 一次性「新機安裝」步驟看 `deploy/README.md`(正典)。本 skill 記**目前線上實況 + 日常操作 + 回滾 + 踩過的雷**。
-> 日期基準:2026-07-29 建立。斷言前先實機驗證(容器名/檔案可能已變)。
+> 日期基準:2026-07-29 建立,2026-09-10 更新(藍綠 slot 判斷修復 + 部署過期檢查)。斷言前先實機驗證(容器名/檔案可能已變)。
 
 ## 線上架構(現況)
 
@@ -35,11 +35,23 @@ Cloudflare(橘雲) ─▶ Traefik(:443, DNS-01 憑證 cf) ─┬─ gtxin.com.tw
 ## 部署流程(自動)
 
 **merge / push 到 `main`** → GitHub Actions(`.github/workflows/deploy.yml`):
-1. build 前端 image(build-args 烘 `VITE_DIRECTUS_URL=/api`、`VITE_DIRECTUS_PUBLIC_URL`)
-2. push `harbor.jaao.tw/gts/gts_web_store:{sha}` + `:latest`
-3. SSH(部署 key)進 VM 跑 `~/gts-web/deploy.sh {sha}`:部署到**閒置** slot → 等 healthcheck healthy → 改 `gts.yml` 切流量(Traefik file provider 自動 reload,秒切)
+1. `test` job:`npm ci` → `npm run lint` → `npm test`。紅了就不會部署(擋直接 push 到 main 與 merge 後才浮現的問題)
+2. `freshness` job:跑 `.github/scripts/deploy-freshness.sh`,確認這個 commit 還值得部署;過期就把 build-and-deploy 整個 job **skip**(顯示 skipped 不是 failed)
+3. build 前端 image(build-args 烘 `VITE_DIRECTUS_URL=/api`、`VITE_DIRECTUS_PUBLIC_URL`)
+4. push `harbor.jaao.tw/gts/gts_web_store:{sha}` + `:latest`
+5. **切流量前再跑一次 freshness 檢查**(擋「Re-run failed jobs」繞過第 2 步的快取結果)
+6. SSH(部署 key)進 VM 跑 `~/gts-web/deploy.sh {sha}`:部署到**閒置** slot → 等 healthcheck healthy → 改 `gts.yml` 切流量(Traefik file provider 自動 reload,秒切)
 
-> workflow `paths-ignore` 排除 `**.md`/`deploy/**` 等;**改 `deploy/` 下腳本不會觸發 build,需手動 scp 同步到 VM `~/gts-web/`**。
+**`concurrency: deploy-main` 只給互斥,不保證版本順序**——佇列是 FIFO 依「進入等待的時間」,不是 commit 順序,重跑舊 commit 也照樣排得進來。「最新的 commit 最後生效」靠的是 freshness 檢查,不是 concurrency。
+
+> workflow `paths-ignore` 排除 `**.md`/`deploy/**` 等;**改 `deploy/` 下腳本不會觸發 build,需手動 scp 同步到 VM `~/gts-web/`**:
+>
+> ```bash
+> scp deploy/{deploy.sh,rollback.sh,lib-slot.sh} hetzner:~/gts-web/
+> ```
+>
+> **三支要一起放**——少了 `lib-slot.sh`,另兩支會因 source 失敗而中止(刻意的:寧可不部署,也不要判不出 slot 就亂寫)。
+> `deploy-freshness.sh` 在 `.github/scripts/` 底下、跑在 runner 上,不需要同步到 VM。
 
 ## 日常操作(在本機跑,`ssh hetzner` 進 VM)
 
@@ -55,6 +67,47 @@ for h in gtxin.com.tw core.gtxin.com.tw; do
   ssh hetzner "curl -sk -o /dev/null -w '$h %{http_code}\n' --resolve $h:443:127.0.0.1 https://$h/"; done
 ```
 
+### 確認藍綠機制真的在運作(不要只看 Actions 綠燈)
+
+上面雷區 0 那個 bug 三週沒被發現,就是因為每次部署都是綠燈。**部署類的失效幾乎都是靜默的**,要驗就看實際狀態:
+
+```bash
+ssh hetzner 'cd ~/gts-web
+  echo "--- 流量 slot(兩行應一致) ---"; grep "service: gts-frontend-" /opt/traefik/dynamic/gts.yml
+  echo "--- 容器實際跑的 image(真相) ---"
+  for s in blue green; do printf "%-6s %s\n" "$s" "$(docker inspect gts_web_store_$s --format "{{.Config.Image}} {{.State.Status}} {{.State.Health.Status}}")"; done
+  echo "--- .env(僅參考,見下方警告) ---"; grep -E "^(BLUE|GREEN|ACTIVE)_TAG=" .env'
+```
+
+⚠️ **`.env` 的 `*_TAG` 是「打算跑的」不是「實際在跑的」。** `deploy.sh` 必須先把 tag 寫進 `.env`,compose 才解析得出 image,所以部署只要在 pull／up 之後失敗,`.env` 就會留下一個從沒跑起來的 tag。**要判斷版本一律看 `docker inspect` 的 `.Config.Image`。**
+
+判準要看情況,沒有單一通則:
+
+| 狀態 | 該看到什麼 |
+|---|---|
+| **剛成功部署、之後沒回滾** | 兩個 slot 都 `healthy`;live 的 uptime 較短、image 等於最後一次部署的 commit;閒置的是前一版 |
+| **剛回滾之後** | live 的 uptime **反而較長**(回滾目標的容器本來就比較舊),image 是**回滾目標的版本**——不是最後一次部署的 commit。這是正常的,不要當成異常 |
+| **很久沒部署** | 兩個 slot uptime 都很長。之後成功部署一次,閒置那個 uptime 依然很長——**也是正常的**,不能因此斷言失效 |
+
+所以「閒置 slot uptime 很舊」**單獨不足以判定藍綠失效**。真正可靠的訊號是**連續幾次部署有沒有交替 slot**:
+
+```bash
+# 近幾次部署各自打進哪個 slot（看 deploy.sh 的第一行輸出）
+gh run list --workflow deploy.yml --limit 6 --json databaseId --jq '.[].databaseId' \
+  | xargs -I{} sh -c 'gh run view {} --log 2>/dev/null | grep -m1 "▶ 目前:"'
+```
+
+- 正常:`blue → green → blue → green` 交替
+- **失效:`blue → blue → blue`**(雷區 0 那三週的實況)
+
+也可以直接用腳本自己的判斷來問(只讀,不改任何狀態):
+
+```bash
+ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
+  C=$(current_slot /opt/traefik/dynamic/gts.yml)
+  echo "current=$C ($(slot_image_tag "$C"))  next=$(other_slot "$C") ($(slot_image_tag "$(other_slot "$C")"))"'
+```
+
 ## 回滾(三層,由輕到重)
 
 | 情境 | 動作 |
@@ -63,9 +116,37 @@ for h in gtxin.com.tw core.gtxin.com.tw; do
 | 整個藍綠架構要退回舊單容器 | `ssh hetzner 'cp /opt/traefik/dynamic/gts.yml.phase1.bak /opt/traefik/dynamic/gts.yml'`(切回 `gts_store_frontend:0.0.5`,該容器仍 running) |
 | Traefik 本身有問題,退回舊 NPM 代理 | `ssh hetzner 'docker stop traefik && docker start nginx_proxy_manager'` |
 
+> **按第 1 層之前先確認閒置 slot 跑的是你要退回的版本。** 雷區 0 那段期間閒置 slot 停在三週前,按下去會把站退回三週前。
+> 確認方式**只看容器實際的 image**,不要看 `.env`:
+>
+> ```bash
+> ssh hetzner 'docker inspect gts_web_store_green gts_web_store_blue --format "{{.Name}} {{.Config.Image}}"'
+> ```
+>
+> `rollback.sh` 會同步更新 `ACTIVE_TAG`,而且(2026-09-10 修)它讀的是**容器實際的 image**而不是 `.env`——否則「上次部署失敗過的 slot」會讓它回報一個線上根本不存在的版本。即便如此,`ACTIVE_TAG` 仍只是給人看的追蹤欄位,**判斷版本請一律回到 `docker inspect`**。
+
 > 舊 `gts_store_frontend` 與 `nginx_proxy_manager` 是遷移期的安全網,**確認穩定後可清掉**(清掉後上面第 2、3 層回滾就失效)。
 
 ## 踩過的雷(重要)
+
+0. **slot 判斷不能只 `grep -o 'blue|green'`——這條讓藍綠整套失效了三週**(2026-09-10 修好)
+
+   `gts.yml` 裡 `gts-frontend-<slot>@docker` 出現在**兩個** router:正式的 `gts`(Host `gtxin.com.tw`)與舊網域轉址的 `legacy-front`(Host `gts.jaao.tw || jaao.tw`)。原本的寫法
+
+   ```bash
+   CURRENT=$(grep "service: gts-frontend-" "$f" | grep -o 'blue\|green')   # ❌
+   ```
+
+   會吐出**兩行**,`CURRENT` 實際是 `"blue\nblue"`,於是 `[ "$CURRENT" = "blue" ]` 永遠 false → `NEXT=blue` → **每次都部署到正在服務的那個 slot**。後果全部是靜默的:
+
+   - 沒有零停機(重建的是 live 容器)
+   - healthcheck 檢查的是已被覆蓋的 live slot;腳本印的「放棄部署(流量仍在 X)」是**假的**,流量早就在壞掉的新版上,而 `exit 1` 就把站留在壞的狀態
+   - Traefik 那行 `sed` 是 blue→blue,白做
+   - `rollback.sh` 算出 `PREV=blue` 切到自己,**回滾是 no-op**——出事按了沒反應
+
+   **而 Actions 上一路全綠**,三週都沒人發現。判斷已抽成 `deploy/lib-slot.sh` 的 `current_slot()` / `other_slot()`,用 `sort -u` 收重複;若兩個 router 真的指向不同 slot 則**明確報錯而不是猜**。
+
+   > 教訓兩點:①「兩份相同邏輯複製在兩個檔案」→ 這個 bug 一次弄壞 deploy 與 rollback 兩支。②**部署類的錯誤幾乎都是靜默的**,綠燈不代表機制在運作;要驗就 ssh 進去看容器 uptime 與 `.env` 的 tag。`green` 的 uptime 停在幾週前就是警訊。
 
 1. **Docker 29 卡 Traefik docker provider**:Docker 29 最低 API 1.40,Traefik v3.3~v3.5 的 docker client 卡在 1.24 協商失敗(狂洗 log)。**升到 v3.7.x 解決**(v3.7 是分水嶺),不需要動 daemon 的 `DOCKER_MIN_API_VERSION`。
 2. **藍綠 healthcheck 用 `localhost` 會 fail**:前端 `nginx/nginx.conf` 只 `listen 80`(無 IPv6),`localhost`→`::1` 連不到 → slot 卡 unhealthy。healthcheck 必須用 `127.0.0.1`(已修在 `deploy/docker-compose.yml`)。
@@ -113,8 +194,8 @@ docker push $IMG:<tag> && docker push $IMG:latest
 
 ## 關鍵位置速查
 
-- **repo**:`deploy/`(compose + deploy.sh + rollback.sh + README + traefik-dynamic/gts.yml)、`.github/workflows/deploy.yml`、`Dockerfile`、`nginx/nginx.conf`
-- **VM**:`/opt/traefik/`(Traefik)、`~/gts-web/`(藍綠 compose + 腳本 + .env)
+- **repo**:`deploy/`(compose + `deploy.sh` + `rollback.sh` + **`lib-slot.sh`** + README + traefik-dynamic/gts.yml)、`.github/workflows/deploy.yml`、**`.github/scripts/deploy-freshness.sh`**、`Dockerfile`、`nginx/nginx.conf`
+- **VM**:`/opt/traefik/`(Traefik)、`~/gts-web/`(藍綠 compose + **三支腳本** + .env;`.bak-*/` 是手動同步前的備份)
 - **GitHub Secrets**(`jaaoStudio/gts`):`HARBOR_URL/USER/PASSWORD`、`VM_HOST/USER/SSH_KEY`(部署 key `~/.ssh/gts-deploy`)、`VITE_DIRECTUS_PUBLIC_URL`
 - **SSH key 分工**:`~/.ssh/hetzner`=你自己登入;`~/.ssh/gts-deploy`=GitHub Actions 部署專用(要撤 CI 權限就從 VM authorized_keys 移掉這把)
 
