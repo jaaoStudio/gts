@@ -160,6 +160,50 @@ AdminCallback.vue → authStore.handleCallback()
 - **要優化先看 Worker log**：第二擊會 `console.log` 一筆 `sso_callback_upstream`
   （含 `ms`/`status`/`colo`/`ua`）。這是判斷還值不值得優化的唯一依據，不要憑感覺調。
 
+## 帳號登不進去：先查 `status` 與 `provider`，不要從程式碼找
+
+2026-09-07 為此繞了很多輪。這兩欄在 `directus_users`，**兩欄要一起看**，因為
+provider 的檢查排在 status 之前、會蓋掉 status 的錯誤訊息。
+
+> ⚠️ **先確認手上的 token**：repo 根目錄 `.env` 的 `DIRECTUS_AI_AGENT_TOKEN` 已失效（401）。
+> 能用的是 `.claude/skills/directus-schema-fetcher/.env` 的 `DIRECTUS_AI_TOKEN`。
+> 壞 token 的 401 在 `curl -s` 下看起來像空回應，**極易誤判成「查無此人」**——
+> 查詢一律加 `-w '[HTTP %{http_code}]'`。
+> （另外此 token 讀不到 `directus_users` 與 `roles`，403；那兩個要自己登入後台看。）
+
+### `status` 必須是 `active`
+
+非 active（`invited` / `suspended` / `draft`）時：
+
+- 密碼正確也登不進去——Directus 在**驗密碼之前**就擋掉
+- 「忘記密碼」**靜默不寄信**，畫面卻照樣顯示已寄出（防 email 列舉）
+
+第二點是好用的診斷手法：**去 Resend 看有沒有寄出紀錄**。查無該收件人＝Directus
+根本沒發請求＝`status` 不對。
+
+### `provider` 綁定登入方式，email 不是鍵
+
+後台手動建的帳號是 `default`（只認密碼），SSO 建的是 `google`（只認 Google）。
+email 一樣也不通，zh-TW 訊息是「此使用者屬於其他服務」（`INVALID_PROVIDER`）。
+這是刻意的安全設計，避免有人拿 OAuth 授權接管同 email 的密碼帳號。
+
+前台 storefront 只有 Google 入口（`AdminLogin.vue` 無密碼表單），所以
+**`provider = 'default'` 的帳號前台一定進不去**，只能進後台。
+
+### 改成 Google 登入的正確做法（已實測）
+
+兩欄要同時設，缺一不可：
+
+```json
+{"provider": "google", "external_identifier": "<該帳號的 email>"}
+```
+
+**這座 Directus 用 email 當識別鍵，不是 Google 的 `sub`**——不必去撈 OAuth 回應裡的 sub，
+照抄一筆已知可登入的記錄即可。改完密碼登入會失效（provider 單選），
+退回就是 `{"provider":"default","external_identifier":null}`。
+
+> 驗證方式：先拿一個自己控制得到的 Google 帳號改改看、實際登入過，確認可行再套到目標帳號。
+
 ## 角色與導向
 
 | 角色 | `role.admin_access` | 登入後導向 | 可存取 |
