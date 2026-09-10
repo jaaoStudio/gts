@@ -34,27 +34,11 @@ env:
 jobs:
   # 部署前的關卡。PR 上的測試由 test.yml 負責，這裡擋的是「直接 push 到 main」
   # 以及 merge 之後才浮現的問題——沒有這一關，紅燈的 main 仍會被推上正式站。
+  #
+  # 直接 uses 同一支 workflow，不複製步驟：PR 與部署必須跑「同一套」檢查，
+  # 而複製出來的兩份沒有東西會發現它們漂移。
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          # 與 Dockerfile 的 node:24-alpine、package.json 的 engines.node 對齊，三處要一起改
-          node-version: 24
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+    uses: ./.github/workflows/test.yml
 
   # 過期檢查。concurrency 只保證不同時跑，不保證誰先誰後：
   #
@@ -65,8 +49,10 @@ jobs:
   # 這一關把「本 run 的 commit 已經不是 main 的 HEAD」判定為 no-op：
   # build-and-deploy 整個 job 被 skip（顯示為 skipped，不是 failed），
   # 因為那不是壞掉，是這次部署已經沒有意義了。
+  # 刻意不設 `needs: test`：這個檢查只做 git fetch + git diff，不吃 test 的任何產物。
+  # 掛上去等於白等（實測 test 15s + 一次 job 派工約 4s 都加進部署的關鍵路徑）。
+  # 由 build-and-deploy 的 `needs: [test, freshness]` 同時擋這兩件，兩者並行即可。
   freshness:
-    needs: test
     runs-on: ubuntu-latest
     outputs:
       stale: ${{ steps.check.outputs.stale }}
@@ -98,6 +84,7 @@ jobs:
           fi
 
   build-and-deploy:
+    # 兩者都要列——freshness 已不再 needs: test，所以 test 不會被隱含帶進來
     needs: [test, freshness]
     if: needs.freshness.outputs.stale == 'false'
     runs-on: ubuntu-latest
@@ -109,9 +96,10 @@ jobs:
         with:
           fetch-depth: 0   # 下面那道最後檢查同樣要 diff 兩個 commit
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-
+      # ⚠️ 這裡原本有一步 `Set up QEMU`。amd64-only 的 build 跑在 x86_64 runner 上
+      # 不需要 binfmt 模擬，那一步只是去拉 tonistiigi/binfmt image（實測 4～15 秒，
+      # 佔部署總時間最多兩成）。若哪天把下面的 platforms 改成 linux/arm64，
+      # 要把它加回來。
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
@@ -149,16 +137,14 @@ jobs:
       # 這裡刻意用「紅燈」而不是 freshness job 那種 no-op skip：走到這裡代表
       # 有人手動重跑了一個過期的部署，該讓他知道被拒絕，而不是給一個
       # 什麼都沒做卻全綠的 run。
+      # 這裡不必區分離開碼 10（過期）與其他（腳本壞了）——兩種都不該部署。
+      # 預設 shell 是 `bash -e`，腳本非 0 本身就會讓步驟紅，只需補上說明。
       - name: 切流量前再確認一次（擋 re-run 繞過 freshness）
         run: |
-          set +e
-          .github/scripts/deploy-freshness.sh "$GITHUB_SHA"
-          CODE=$?
-          set -e
-          if [ "$CODE" -ne 0 ]; then
-            echo "::error title=拒絕部署過期版本::這個 commit 已不是要上線的版本（離開碼 ${CODE}）。若確實要部署它，請對最新 commit 重跑整個 workflow，或直接推一個新 commit。"
+          .github/scripts/deploy-freshness.sh "$GITHUB_SHA" || {
+            echo "::error title=拒絕部署過期版本::這個 commit 已不是要上線的版本（離開碼 $?）。若確實要部署它，請對最新 commit 重跑整個 workflow，或直接推一個新 commit。"
             exit 1
-          fi
+          }
 
       - name: Deploy (blue-green switch)
         # 自己 ssh，不依賴第三方 action（私鑰只在本步驟指令內使用）

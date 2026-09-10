@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-// utils/directus 會在載入時用 import.meta.env 建 SDK client，node 環境下沒有那些
-// 變數會直接爆掉。這裡只需要 getAssetUrl 的行為，整個模組換掉最省事。
-vi.mock('../utils/directus', () => ({
-    default: {},
-    getAssetUrl: (id) => (id ? `https://assets.test/${id}` : null),
-}))
+// 替身在 src/utils/__mocks__/directus.js（多個測試檔共用，理由見那支檔案）
+vi.mock('../utils/directus')
 
 vi.mock('../services/orderService', () => ({
     orderService: {
@@ -318,9 +314,23 @@ describe('品項增刪', () => {
 })
 
 describe('_persist 寫入失敗（無痕模式／配額滿）', () => {
+    /**
+     * 讓下一次寫入失敗一次。真實瀏覽器在無痕模式或配額滿時丟的是
+     * QuotaExceededError，這裡照樣命名，讓失敗長得像它實際的樣子。
+     *
+     * 用 vitest 現成的 spy 而不是在 src/test/setup.js 的 fake 上加開關：
+     * 那個 fake 是所有測試共用的，一個測試的需求不該變成它的公開 API。
+     */
+    const failNextWrite = () =>
+        vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+            const err = new Error('無法寫入：儲存空間已滿或處於無痕模式')
+            err.name = 'QuotaExceededError'
+            throw err
+        })
+
     test('given_localStorage寫入失敗_will_記憶體中的訂購單仍然可用', () => {
         const s = useOrderStore()
-        localStorage.failNextSetItem()
+        failNextWrite()
 
         // add() 內部會呼叫 _persist()，寫入在這一步失敗
         s.add(product(), addableVariant(), 2)
@@ -335,7 +345,7 @@ describe('_persist 寫入失敗（無痕模式／配額滿）', () => {
 
     test('given_localStorage寫入失敗_will_記錄錯誤而不是往上拋', () => {
         const s = useOrderStore()
-        localStorage.failNextSetItem()
+        failNextWrite()
 
         // 沒被吞掉的話這一行會炸——呼叫端沒有任何 try/catch
         expect(() => s.add(product(), addableVariant(), 1)).not.toThrow()
@@ -346,7 +356,7 @@ describe('_persist 寫入失敗（無痕模式／配額滿）', () => {
         const s = useOrderStore()
         s.add(product(), addableVariant(), 1)   // 這次寫得進去
 
-        localStorage.failNextSetItem()
+        failNextWrite()
         s.updateQuantity(1, 5)                  // 這次寫不進去
 
         expect(s.items[0].quantity).toBe(5)      // 記憶體是新的

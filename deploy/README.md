@@ -51,15 +51,18 @@ docker inspect gts_web_store_blue gts_web_store_green --format '{{.Name}} {{.Con
 | 欄位 | 意義 | 可信度 |
 |---|---|---|
 | `BLUE_TAG` / `GREEN_TAG` | compose 要拉的 image tag（**部署意圖**） | 部署成功時才等於現實 |
-| `ACTIVE_TAG` | 目前對外版本，`deploy.sh`／`rollback.sh` 維護 | 僅供人看的追蹤欄位 |
 | `docker inspect` 的 `.Config.Image` | 容器實際跑的 image | **唯一真相** |
 
-腳本裡要用就呼叫 `slot_image_tag`：
+> `.env` 原本還有一個 `ACTIVE_TAG` 記「目前對外的版本」。**已移除**——沒有任何程式讀它，
+> 而它在部署失敗或回滾後就會與現實脫節，於是唯一的作用是騙看到它的人。
+> 快取一個會過期的答案，只會製造「快取與現實不符」那一整類 bug；現算就沒有這個問題。
+
+要問「現在線上是哪一版」就呼叫 `active_tag`（它現算，不讀任何欄位）：
 
 ```bash
 cd ~/gts-web && . ./lib-slot.sh
-C=$(current_slot /opt/traefik/dynamic/gts.yml)
-echo "對外：$C ($(slot_image_tag "$C"))   閒置：$(other_slot "$C") ($(slot_image_tag "$(other_slot "$C")"))"
+echo "對外：$(current_slot) ($(active_tag))"
+echo "閒置：$(other_slot "$(current_slot)") ($(slot_image_tag "$(other_slot "$(current_slot)")"))"
 ```
 
 ---

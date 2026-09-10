@@ -41,11 +41,9 @@ export const lineTotal = (item) => {
 // ⚠️ 用 `items ?? []` 而不是預設參數 `(items = [])`：預設參數只對 `undefined` 生效，
 // Directus 若把空關聯回成 `items: null`，預設值不會啟動而是直接對 null 呼叫 reduce。
 // 呼叫端是 `order.value?.items` 透傳，兩種值都可能進來。
+// 未報價的行 lineTotal 是 null，`?? 0` 讓它不影響加總（等同跳過）
 export const confirmedSubtotal = (items) =>
-    (items ?? []).reduce((sum, it) => {
-        const total = lineTotal(it)
-        return total == null ? sum : sum + total
-    }, 0)
+    (items ?? []).reduce((sum, it) => sum + (lineTotal(it) ?? 0), 0)
 
 /**
  * 預估運費的結果。狀態明確分開，呼叫端不必自己從數字反推該顯示什麼。

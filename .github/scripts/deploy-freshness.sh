@@ -34,9 +34,10 @@ fi
 #     'docs/**' → ^docs/   'deploy/**' → ^deploy/
 IGNORE_RE='(\.md$|^\.claude/|^docs/|^deploy/)'
 
-CHANGED=$(git diff --name-only "${THIS_SHA}..${HEAD_SHA}")
-RELEVANT=$(printf '%s\n' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
-RELEVANT=$(printf '%s' "$RELEVANT" | tr -d '[:space:]')
+# 過濾只做一次，結果留著用——先前這裡跑了兩次同樣的 grep（一次拿來判斷、
+# 一次拿來印出清單），於是這個「邏輯只寫一份」的腳本自己內部就有兩個
+# 要同步修改的地方。命令替換本來就會去掉尾端換行，不需要再 tr 一遍。
+RELEVANT=$(git diff --name-only "${THIS_SHA}..${HEAD_SHA}" | grep -vE "$IGNORE_RE" || true)
 
 if [ -z "$RELEVANT" ]; then
     echo "✅ main 已前進到 ${HEAD_SHA}，但這之間只有不影響部署的變更（文件／VM 腳本）"
@@ -45,6 +46,6 @@ if [ -z "$RELEVANT" ]; then
 fi
 
 echo "⏭ main 已前進到 ${HEAD_SHA}，且含有與部署相關的變更："
-printf '%s\n' "$CHANGED" | grep -E -v "$IGNORE_RE" | sed 's/^/     /'
+printf '%s\n' "$RELEVANT" | sed 's/^/     /'
 echo "   ${THIS_SHA} 已過期，交給較新的 run 去部署。"
 exit 10

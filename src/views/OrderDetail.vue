@@ -157,7 +157,9 @@
                 <p class="mt-0.5 font-mono text-xs text-steel-400">× {{ item.quantity }}</p>
               </div>
               <div class="text-right">
-                <p class="font-mono text-sm font-bold text-steel-900">{{ itemTotal(item) }}</p>
+                <!-- data-testid 是給 OrderDetail.test.js 的穩定抓手：那支測試驗的是
+                     「逐行加起來等於小計」，不該因為改個字重或換掉外層排版就壞掉 -->
+                <p data-testid="line-amount" class="font-mono text-sm font-bold text-steel-900">{{ itemTotal(item) }}</p>
                 <!-- 老闆改過價才顯示原價，讓調整是透明的 -->
                 <p
                   v-if="item.confirmed_price != null && item.confirmed_price !== item.unit_price"
@@ -191,7 +193,7 @@
           >
             <div class="flex justify-between">
               <dt class="text-steel-500">確認後小計</dt>
-              <dd class="font-mono text-steel-700">NT${{ confirmedSubtotal.toLocaleString() }}</dd>
+              <dd data-testid="confirmed-subtotal" class="font-mono text-steel-700">NT${{ confirmedSubtotal.toLocaleString() }}</dd>
             </div>
             <div v-if="order.shipping_fee != null" class="flex justify-between">
               <dt class="text-steel-500">運費</dt>

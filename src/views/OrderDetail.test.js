@@ -12,10 +12,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 
-vi.mock('../utils/directus', () => ({
-    default: {},
-    getAssetUrl: (id) => (id ? `https://assets.test/${id}` : null),
-}))
+// 替身在 src/utils/__mocks__/directus.js（多個測試檔共用，理由見那支檔案）
+vi.mock('../utils/directus')
 
 vi.mock('vue-router', () => ({
     useRoute: () => ({ params: { id: '1' } }),
@@ -76,19 +74,22 @@ const renderOrder = async (items) => {
 }
 
 /**
- * 每一行右側那個粗體金額節點（line-through 的原價不算）。
- * 逐行金額的 DOM 結構知識只放這一處，改版時不必同步修改多個 selector。
+ * 抓手用 data-testid，不用 Tailwind class。
+ *
+ * 先前是 `findAll('li .text-right > p.font-bold')`——組成它的全是純表現層的東西
+ * （排版容器、字重）。這支測試驗的是「逐行加起來等於小計」，卻會因為有人改個
+ * 字重或把 flex 換成 grid 而失敗，而且失敗訊息指向錯的地方（selector 抓不到
+ * 就直接 undefined 爆掉）。那種紅燈遲早會讓人把測試刪掉。
+ * vite.config.js 也寫了同一件事：不讓測試跟 class 名稱之類的版面細節耦合。
  */
-const lineAmountNodes = (wrapper) => wrapper.findAll('li .text-right > p.font-bold')
+const lineAmountNodes = (wrapper) => wrapper.findAll('[data-testid="line-amount"]')
 
 /** 逐行金額，已解析成數字；「待報價」為 null */
 const lineAmounts = (wrapper) => lineAmountNodes(wrapper).map((p) => parseAmount(p.text()))
 
 /** 「確認後小計」那一列的數字 */
-const subtotalShown = (wrapper) => {
-    const row = wrapper.findAll('dl div').find((d) => d.text().includes('確認後小計'))
-    return parseAmount(row.find('dd').text())
-}
+const subtotalShown = (wrapper) =>
+    parseAmount(wrapper.get('[data-testid="confirmed-subtotal"]').text())
 
 beforeEach(() => {
     setActivePinia(createPinia())

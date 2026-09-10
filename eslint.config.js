@@ -43,14 +43,11 @@ export default [
             // 「會被攔下來要求說明」這個保證，只有 error 才成立。
             // 要放行請就地標 eslint-disable-next-line 並寫清楚為什麼安全。
             'vue/no-v-html': 'error',
-        },
-    },
 
-    {
-        // 元件名稱單字即可。這條規則是為了避開與 HTML 元素撞名，但本專案的
-        // Home / Products / Footer 都是路由頁面、命名一致且不會被當成自訂元素註冊。
-        files: ['**/*.vue'],
-        rules: {
+            // 元件名稱單字即可。這條規則是為了避開與 HTML 元素撞名，但本專案的
+            // Home / Products / Footer 都是路由頁面、命名一致且不會被當成自訂元素註冊。
+            // 不必為它另開一個 files: ['**/*.vue'] 的區塊——vue 的規則本來就只在
+            // Vue 檔上作用，多一層 config 只是讓「這條規則到底生不生效」更難追。
             'vue/multi-word-component-names': 'off',
         },
     },
