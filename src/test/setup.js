@@ -8,12 +8,30 @@ import { beforeEach, vi } from 'vitest'
  */
 class MemoryStorage {
     #data = new Map()
+    #failNextSet = false
+
+    /**
+     * 讓下一次 setItem 拋錯一次。
+     *
+     * 沒有這個開關，`_persist()` 的 catch（無痕模式／配額滿）在測試裡永遠走不到——
+     * Map.set 不會失敗，所以那條路徑等於沒被覆蓋。真實瀏覽器丟的是
+     * QuotaExceededError，這裡照樣命名，讓失敗長得像它實際的樣子。
+     */
+    failNextSetItem() {
+        this.#failNextSet = true
+    }
 
     getItem(key) {
         return this.#data.has(key) ? this.#data.get(key) : null
     }
 
     setItem(key, value) {
+        if (this.#failNextSet) {
+            this.#failNextSet = false
+            const err = new Error('無法寫入：儲存空間已滿或處於無痕模式')
+            err.name = 'QuotaExceededError'
+            throw err
+        }
         this.#data.set(key, String(value))
     }
 
@@ -26,10 +44,26 @@ class MemoryStorage {
     }
 }
 
-globalThis.localStorage = new MemoryStorage()
+/**
+ * 用 defineProperty 而不是直接指派：元件測試跑在 jsdom（見 OrderDetail.test.js
+ * 的 docblock），那裡的 window.localStorage 是唯讀 getter，直接指派會拋
+ * 「Cannot set property localStorage of [object Window] which has only a getter」。
+ * jsdom 自己那份也不能用——它沒有 failNextSetItem，寫入永遠成功。
+ */
+const installMemoryStorage = () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+        value: new MemoryStorage(),
+        writable: true,
+        configurable: true,
+    })
+}
+
+installMemoryStorage()
 
 beforeEach(() => {
-    globalThis.localStorage.clear()
+    // 換一個全新的實例而不是 clear()：後者不會重設 failNextSetItem 的旗標，
+    // 一個測試設了卻沒用到就會滲進下一個測試
+    installMemoryStorage()
     // store 的失敗路徑會 console.error，那是刻意的行為，不需要噴進測試輸出
     vi.spyOn(console, 'error').mockImplementation(() => {})
 })

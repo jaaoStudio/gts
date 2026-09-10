@@ -316,3 +316,41 @@ describe('品項增刪', () => {
         expect(s.items).toEqual([])
     })
 })
+
+describe('_persist 寫入失敗（無痕模式／配額滿）', () => {
+    test('given_localStorage寫入失敗_will_記憶體中的訂購單仍然可用', () => {
+        const s = useOrderStore()
+        localStorage.failNextSetItem()
+
+        // add() 內部會呼叫 _persist()，寫入在這一步失敗
+        s.add(product(), addableVariant(), 2)
+
+        // catch 裡的註解對客人的承諾就是這句：「記憶體中的訂購單仍可用，
+        // 只是重整後會消失」。前半段必須成立，否則無痕模式的客人加了東西
+        // 會當場看到購物車空的。
+        expect(s.items).toHaveLength(1)
+        expect(s.items[0].quantity).toBe(2)
+        expect(s.count).toBe(2)
+    })
+
+    test('given_localStorage寫入失敗_will_記錄錯誤而不是往上拋', () => {
+        const s = useOrderStore()
+        localStorage.failNextSetItem()
+
+        // 沒被吞掉的話這一行會炸——呼叫端沒有任何 try/catch
+        expect(() => s.add(product(), addableVariant(), 1)).not.toThrow()
+        expect(console.error).toHaveBeenCalled()
+    })
+
+    test('given_寫入失敗後重整_will_該次變更消失但不留下壞資料', () => {
+        const s = useOrderStore()
+        s.add(product(), addableVariant(), 1)   // 這次寫得進去
+
+        localStorage.failNextSetItem()
+        s.updateQuantity(1, 5)                  // 這次寫不進去
+
+        expect(s.items[0].quantity).toBe(5)      // 記憶體是新的
+        // 重整後回到上一次成功寫入的狀態——是舊資料，但不是壞資料
+        expect(itemsAfterReload()[0].quantity).toBe(1)
+    })
+})
