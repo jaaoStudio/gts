@@ -8,25 +8,39 @@ description: >-
 
 # GTS 正式站部署維運 runbook
 
-> 一次性「新機安裝」步驟看 `deploy/README.md`(正典)。本 skill 記**目前線上實況 + 日常操作 + 回滾 + 踩過的雷**。
-> 日期基準:2026-07-29 建立,2026-09-10 更新(藍綠 slot 判斷修復 + 部署過期檢查)。斷言前先實機驗證(容器名/檔案可能已變)。
+> 一次性「新機安裝」步驟看 `deploy/README.md`(正典)。本 skill 記**目前線上實際情況 + 日常操作 + 回滾 + 踩過的雷**。
+>
+> 「線上實際情況」= 正式機當下真實的狀態(版本、流量在哪、哪些容器還活著),不是設計意圖也不是歷史快照。這類事實會隨時間變,**斷言前先實機驗證**——下面每一項都標了最後驗證日期。
+>
+> 日期基準:2026-07-29 建立。最後實機驗證:**2026-09-10**(藍綠 slot 判斷修復 + 部署過期檢查;同時發現第 2 層回滾已失效、憑證到期日與舊記錄不符)。
 
-## 線上架構(現況)
+## 線上架構(2026-09-10 實機驗證)
 
 ```
-Cloudflare(橘雲) ─▶ Traefik(:443, DNS-01 憑證 cf) ─┬─ gtxin.com.tw ─▶ gts-frontend-blue@docker(藍綠 slot)
+Cloudflare(橘雲) ─▶ Traefik(:443, DNS-01 憑證 cf) ─┬─ gtxin.com.tw ─▶ gts-frontend-<當前 slot>@docker
   VM: 46.225.53.14                                   └─ core.gtxin.com.tw ─▶ directus_app:8055(file router)
   (ssh hetzner, key ~/.ssh/hetzner)
 ```
 
-- **反向代理**:Traefik **v3.7.9**,設定在 VM `/opt/traefik/`(檔案式:`traefik.yml` 靜態 + `dynamic/gts.yml` + `acme.json` + `.env` 放 `CF_DNS_API_TOKEN`)。憑證 Cloudflare DNS-01,resolver 名 `cf`。
+⚠️ 上圖刻意不寫死顏色。**流量所在的 slot 每次部署都會換**,別把某一色當常態(這份文件先前寫死 `blue`,而實際已經是 `green`)。要問就跑:
+
+```bash
+ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh && current_slot /opt/traefik/dynamic/gts.yml'
+```
+
+- **反向代理**:Traefik **v3.7.9**(codename langres),設定在 VM `/opt/traefik/`(檔案式:`traefik.yml` 靜態 + `dynamic/gts.yml` + `acme.json` + `.env` 放 `CF_DNS_API_TOKEN`)。憑證 Cloudflare DNS-01,resolver 名 `cf`。
+- **Docker**:**29.6.2**(這個大版本會卡舊 Traefik 的 docker provider,見雷區 1)。
 - **前端**:藍綠雙 slot `gts_web_store_blue` / `gts_web_store_green`(image `harbor.jaao.tw/gts/gts_web_store:<tag>`),同時常駐,`dynamic/gts.yml` 的 `service: gts-frontend-<color>@docker` 那行決定流量。
-- **後端**:`directus_app`(Directus 11)+ `directus_db`(postgres 15)+ `directus_cache`(redis)。
+- **後端**:`directus_app`(**directus/directus:11.5.1**)+ `directus_db`(**postgres:15-alpine**)+ `directus_cache`(**redis:6-alpine**)。
 - 所有服務容器都在 external network **`traefik-net`**。前端 nginx 靠 `directus_app:8055` 反代 `/api`。
 - **舊網域 `jaao.tw` 已棄用**,`dynamic/gts.yml` 內僅保留 301 轉址
   (`gts.jaao.tw`/`jaao.tw` → `gtxin.com.tw`、`gts-core.jaao.tw` → `core.gtxin.com.tw`)。
-  ⚠️ 其憑證有效至 **2026-11-19**,且現行 Cloudflare token **已不含 `jaao.tw` zone**、無法續簽,
-  到期後轉址失效,屆時直接刪掉那兩條 router 即可。
+  ⚠️ 憑證實際到期 **2026-10-27**(2026-09-10 實測 `openssl s_client` 的 `notAfter`;
+  本文件先前寫 2026-11-19,是錯的)。現行 Cloudflare token **已不含 `jaao.tw` zone**、無法續簽,
+  到期後轉址失效,屆時直接刪掉那兩條 router 即可。查法:
+  ```bash
+  ssh hetzner 'echo | openssl s_client -connect 127.0.0.1:443 -servername jaao.tw 2>/dev/null | openssl x509 -noout -enddate'
+  ```
   ⚠️ 新舊網域**必須拆成不同 router**:寫在同一條 rule 會讓 Traefik 去要一張同時涵蓋兩者的
   憑證而失敗,連帶整個 router 不可用。
 - **郵件**:Directus 走 Resend SMTP relay(`smtp.resend.com:587`,帳號固定字串 `resend`,
@@ -110,11 +124,17 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
 
 ## 回滾(三層,由輕到重)
 
-| 情境 | 動作 |
-|---|---|
-| 新版前端有問題(同架構) | `ssh hetzner '~/gts-web/rollback.sh'`(blue↔green 秒切回前一版) |
-| 整個藍綠架構要退回舊單容器 | `ssh hetzner 'cp /opt/traefik/dynamic/gts.yml.phase1.bak /opt/traefik/dynamic/gts.yml'`(切回 `gts_store_frontend:0.0.5`,該容器仍 running) |
-| Traefik 本身有問題,退回舊 NPM 代理 | `ssh hetzner 'docker stop traefik && docker start nginx_proxy_manager'` |
+| 層 | 情境 | 動作 | 2026-09-10 狀態 |
+|---|---|---|---|
+| 1 | 新版前端有問題(同架構) | `ssh hetzner '~/gts-web/rollback.sh'`(blue↔green 秒切回前一版) | ✅ **可用**(當日實測切換成功) |
+| 2 | ~~退回舊單容器~~ | ~~`cp gts.yml.phase1.bak gts.yml`~~ | ❌ **已失效** |
+| 3 | Traefik 本身有問題,退回舊 NPM 代理 | `ssh hetzner 'docker stop traefik && docker start nginx_proxy_manager'` | ⚠️ **降級**,見下 |
+
+⚠️ **第 2 層已經不能用了。** `gts.yml.phase1.bak` 還在 `/opt/traefik/dynamic/`,但它指向的 **`gts_store_frontend` 容器已經不存在**(2026-09-10 `docker ps -a` 確認,連 exited 的都沒有)。照著它做會把 Traefik 指到一個不存在的後端 → **站直接掛**,比原本的問題更糟。要嘛把那個 `.bak` 刪掉,要嘛就記住只剩第 1、3 層。
+
+⚠️ **第 3 層是降級狀態。** `nginx_proxy_manager` 仍在(`Exited (0)` 已 6 週,`docker start` 起得來),但它的設定是**換 gtxin 網域之前**的,起來之後代理的是舊網域組態,不會是現在的 `gtxin.com.tw` / `core.gtxin.com.tw`。當「Traefik 整個壞掉」的最後手段可以,但別預期它一切就恢復正常。
+
+> `/opt/traefik/dynamic/` 另有 `gts.yml.bak-before-gtxin`(2026-09-07),那是換網域前的組態,同樣**不是**可用的回滾目標——還原它會把網域改回舊的。
 
 > **按第 1 層之前先確認閒置 slot 跑的是你要退回的版本。** 雷區 0 那段期間閒置 slot 停在三週前,按下去會把站退回三週前。
 > 確認方式**只看容器實際的 image**,不要看 `.env`:
@@ -125,7 +145,7 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
 >
 > `rollback.sh` 會同步更新 `ACTIVE_TAG`,而且(2026-09-10 修)它讀的是**容器實際的 image**而不是 `.env`——否則「上次部署失敗過的 slot」會讓它回報一個線上根本不存在的版本。即便如此,`ACTIVE_TAG` 仍只是給人看的追蹤欄位,**判斷版本請一律回到 `docker inspect`**。
 
-> 舊 `gts_store_frontend` 與 `nginx_proxy_manager` 是遷移期的安全網,**確認穩定後可清掉**(清掉後上面第 2、3 層回滾就失效)。
+> 遷移期的安全網現在只剩 `nginx_proxy_manager`(第 3 層,降級)。`gts_store_frontend` 已經被清掉了——**清的時候沒有一併更新這份文件**,於是「第 2 層回滾」在文件上又活了六週。清安全網時記得同步改這裡。
 
 ## 踩過的雷(重要)
 

@@ -1,21 +1,16 @@
 // @vitest-environment jsdom
 //
-// 唯一需要 DOM 的測試檔。其餘測試維持 node 環境（見 vite.config.js）——
-// 這裡用 docblock 單獨切換，而不是把整個專案的環境換成 jsdom。
+// 唯一需要 DOM 的測試檔，用 docblock 單獨切到 jsdom（專案預設仍是 node）。
 //
-// 存在的理由（#13）：orderTotals 的測試守得住「confirmedSubtotal 是 lineTotal
-// 的加總」，但守不住「明細頁真的用了 lineTotal」。把 itemTotal() 改回自己乘一次，
-// 逐行金額就與小計脫鉤，而純函式的測試全綠——那正是 GTS-260907-0039 的形狀。
-// 這個檔案驗的是渲染出來的數字，是唯一能接住那條的層級。
+// 存在的理由（#13）：純函式測試守得住「confirmedSubtotal 是 lineTotal 的加總」，
+// 但守不住「明細頁真的用了 lineTotal」。只有驗渲染結果才接得住那條。
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 
-vi.mock('../utils/directus', () => ({
-    default: {},
-    getAssetUrl: (id) => (id ? `https://assets.test/${id}` : null),
-}))
+// 替身在 src/utils/__mocks__/directus.js（多個測試檔共用，理由見那支檔案）
+vi.mock('../utils/directus')
 
 vi.mock('vue-router', () => ({
     useRoute: () => ({ params: { id: '1' } }),
@@ -75,20 +70,16 @@ const renderOrder = async (items) => {
     return wrapper
 }
 
-/**
- * 每一行右側那個粗體金額節點（line-through 的原價不算）。
- * 逐行金額的 DOM 結構知識只放這一處，改版時不必同步修改多個 selector。
- */
-const lineAmountNodes = (wrapper) => wrapper.findAll('li .text-right > p.font-bold')
+// 抓手用 data-testid 而非 Tailwind class：這支驗的是金額，不該因為改字重或
+// 換排版而失敗（vite.config.js 也寫了不讓測試跟版面細節耦合）。
+const lineAmountNodes = (wrapper) => wrapper.findAll('[data-testid="line-amount"]')
 
 /** 逐行金額，已解析成數字；「待報價」為 null */
 const lineAmounts = (wrapper) => lineAmountNodes(wrapper).map((p) => parseAmount(p.text()))
 
 /** 「確認後小計」那一列的數字 */
-const subtotalShown = (wrapper) => {
-    const row = wrapper.findAll('dl div').find((d) => d.text().includes('確認後小計'))
-    return parseAmount(row.find('dd').text())
-}
+const subtotalShown = (wrapper) =>
+    parseAmount(wrapper.get('[data-testid="confirmed-subtotal"]').text())
 
 beforeEach(() => {
     setActivePinia(createPinia())
