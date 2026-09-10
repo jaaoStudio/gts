@@ -18,6 +18,11 @@ on:
 # `|| github.sha` 是給 workflow_call 用的：從 deploy.yml 呼叫時是 push 事件，
 # head_ref 為空，group 會退化成所有 main 部署共用一個而互相取消。用 sha 兜底
 # 讓每個 commit 各自成組。
+#
+# ⚠️ 實測到的行為：這個 group 是跟著「被呼叫的這支 workflow」算的，所以若同一個
+# 事件裡有兩個地方都跑到 test.yml（例如再多一支 workflow 也 `uses:` 它），
+# 兩者會落進同一組而互相 cancel。目前不會發生——PR 只有 test.yml 自己跑、
+# push to main 只有 deploy.yml 呼叫它。要再加呼叫端的話記得先處理這件事。
 concurrency:
   group: test-${{ github.head_ref || github.sha }}
   cancel-in-progress: true
