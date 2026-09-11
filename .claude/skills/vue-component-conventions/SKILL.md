@@ -92,8 +92,68 @@ import { PhArrowUpRight, PhMagnifyingGlass } from '@phosphor-icons/vue'
 ```
 
 - **不要為進場效果引入 GSAP ScrollTrigger** — 曾因觸發座標算錯導致區塊永久卡在 `opacity:0`（ADR 0002 第 6 點）。
-- GSAP 保留給真正的複雜動畫（如 `HeroProductRing`）。
-  ⚠️ 寫入 transform 前務必驗 `isFinite`：NaN 進 transform 會讓元素永久凍結且不自癒。
+- GSAP 保留給真正的複雜動畫（如 `HeroProductRing`）。**API 用法看全域 plugin
+  `gsap-skills`**；下面三節是本專案實際踩過、而官方文件沒有的東西。
+
+## ⚠️ NaN 進 transform 會永久凍結元素，而且不會自癒
+
+GSAP 寫出 `translate(NaNpx, NaNpx)` 這種無效 CSS 時，瀏覽器**整條 transform 拒收**並保留
+最後一次有效值；同時 GSAP 內部的快取矩陣被汙染，**之後每一次有效寫入也一併失效**。
+結果是元素永久凍結——**即使來源數值早已恢復正常也救不回來**。
+
+### 診斷特徵（2026-07 `HeroProductRing` 實測）
+
+這組特徵很容易誤導，四輪都猜錯過：
+
+- GSAP 內部值（`gsap.getProperty`）**持續正常變化** → 看起來「計算是對的」
+- 但 `getComputedStyle(el).transform` 與 `el.style.transform` 從某一刻起**完全凍結**
+- 不走 transform 的屬性（`opacity`）仍正常 → 容易誤判成「只有透明度在變」
+- 子元素若有獨立 tween（如內層漂浮動畫）**仍會動** → 更容易誤導成「不是凍結」
+
+### NaN 從哪來
+
+GSAP **Draggable + InertiaPlugin**：在 throw 進行中快速連續觸控，
+`gsap.getProperty(proxy, 'x')` 會回傳 `NaN`。
+
+### 怎麼防
+
+任何餵進 `gsap.set()` 的計算值，**若源頭來自 Draggable 或 `getProperty`，都要先
+`Number.isFinite()` 把關**——在**寫入前**擋掉，不要寫入後補救（補救不了）。
+
+已被汙染的元素要救回來，**必須清掉快取再重建，單純寫入正確值無效**——而且 `clearProps`
+之後要把原本的基準 transform 重新套回去，只 clear 不重建等於把元素丟在未定位的狀態：
+
+```js
+gsap.set(cards, { clearProps: 'all' })
+gsap.set(cards, { xPercent: -50, yPercent: -50 })   // ← 這行不能省
+```
+
+實作見 `src/components/HeroProductRing.vue` 的 `layout()` / `fromProxy()` /
+`recover()` / `autoAdvance()`。
+
+## ⚠️ 觸控會送 `mouseenter`，但常常不送 `mouseleave`
+
+hover 造成的狀態（暫停自動輪播、暫停漂浮）在觸控裝置上會**卡在「進入」那一側**
+——`hovering` 永遠是 `true`，自動播放再也不會恢復。
+
+解法是只在真的有 hover 指標的裝置上理會 hover：
+
+```js
+const canHover = window.matchMedia('(hover: hover)').matches
+```
+
+見 `HeroProductRing.vue` 的 `onCardEnter` / `onCardLeave`。
+
+## ⚠️ IntersectionObserver 快速捲動會一次送多筆 entry
+
+只讀 `entries[0]` 會拿到**過期的那一筆**，元素於是卡在錯的分支（例如捲回畫面內了卻
+仍停在「離開視窗」的暫停狀態，而且不會自癒）。一律取最後一筆：
+
+```js
+const entry = entries[entries.length - 1]
+```
+
+見 `HeroProductRing.vue` 的 IntersectionObserver 與 `src/directives/reveal.js`。
 
 ## 路由導航
 

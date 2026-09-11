@@ -53,7 +53,24 @@ curl -D - -o /dev/null -s \
 | computed style（`getComputedStyle`） | 「被覆蓋」 |
 
 結果是 `rot`／`gx0` 正常變化、但 `mtx`（實際 CSS transform）永久凍結 → 根因是 NaN 寫進
-transform（見 `.claude/skills/gsap-animation-conventions`）。**只記其中一個都定不了案。**
+transform（見 `.claude/skills/vue-component-conventions` 的進場動畫那節）。**只記其中一個都定不了案。**
+
+## ⚠️ 用 headless Chrome 截圖驗證動畫：不要用 `--virtual-time-budget`
+
+**它會讓 GSAP 停在動畫起始格。** 用它截 GTS 首頁時，hero 標題與整塊 copy 全是空白
+（`.hero-el` 停在 `opacity: 0`、SplitText 的行停在遮罩外），看起來像「動畫把內容弄不見了」
+的重大 bug——**實際上人眼在真瀏覽器看完全正常**。
+
+原因：虛擬時間不會照實推進 GSAP 的 ticker，截到的是第一格而不是最終態。
+
+正確做法：用 `--remote-debugging-port` + CDP，navigate 之後**真的 sleep 幾秒**，
+再 `Page.captureScreenshot` 與 `Runtime.evaluate`。
+
+> **看到「元素完全不見」先懷疑量測方法，不要急著改程式。**
+> 另一個更快的裁決：直接請使用者自己看一眼。
+
+Vite dev server 是 **HTTPS**（self-signed）：`curl` 要 `-k`，Chrome 要
+`--ignore-certificate-errors`，用 `http://` 連會直接失敗。
 
 ## 「手機才會壞」不等於「iOS 擋了什麼」
 
@@ -65,6 +82,7 @@ transform（見 `.claude/skills/gsap-animation-conventions`）。**只記其中�
 
 ## 相關
 
-- `.claude/skills/gsap-animation-conventions` — 動畫類的已知雷與 headless 驗證
+- `.claude/skills/vue-component-conventions` — 進場動畫的分工，以及 GSAP 在本專案踩過的三個雷
+- GSAP 的 **API 用法**：全域 plugin `gsap-skills`（本專案不留自己的 GSAP skill）
 - `.claude/skills/routing-and-auth` — 登入／SSO 的已知雷
 - `docs/adr/0001-google-sso-登入流程.md`
