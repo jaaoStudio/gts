@@ -66,6 +66,14 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh && current_slot /opt/traefik/dynami
 >
 > **三支要一起放**——少了 `lib-slot.sh`,另兩支會因 source 失敗而中止(刻意的:寧可不部署,也不要判不出 slot 就亂寫)。
 > `deploy-freshness.sh` 在 `.github/scripts/` 底下、跑在 runner 上,不需要同步到 VM。
+>
+> ✅ **忘記同步不會再靜默過去**(2026-09-11 起):`deploy.yml` 在切流量前會比對 repo 與 VM
+> 三支腳本的 md5,不一致就紅並印出兩邊的 hash。**紅在切流量之前**,所以正式站不受影響,
+> 只是那次沒部署成功——照訊息裡的 `scp` 同步完再重跑即可。
+>
+> 加這一關的原因是真的漏過:#25 改了三支腳本、PR 裡也寫了「merge 後要同步」,然後忘了做。
+> 而且**完全沒有症狀**——VM 上那組是自我一致的舊版,部署照樣全綠、藍綠也照樣交替,
+> 是後來手動跑 `active_tag` 才撞出來的。又一個「部署類失效都是靜默的」實例。
 
 ## 日常操作(在本機跑,`ssh hetzner` 進 VM)
 

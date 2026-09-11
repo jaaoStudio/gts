@@ -104,6 +104,10 @@ sudo cp traefik-dynamic/gts.yml /opt/traefik/dynamic/gts.yml
 > ```bash
 > scp deploy/{deploy.sh,rollback.sh,lib-slot.sh} <vm>:~/gts-web/
 > ```
+>
+> ✅ **忘記同步不會靜默過去**（2026-09-11 起）：`deploy.yml` 在切流量前會比對 repo 與
+> VM 三支腳本的 md5，不一致就紅並印出兩邊 hash。紅在**切流量之前**，正式站不受影響，
+> 照錯誤訊息裡的 `scp` 同步完重跑即可。
 
 ### 4. DNS
 Cloudflare 加 `gtxin.com.tw` / `core.gtxin.com.tw` A record 指向新 VM（DNS-01 憑證，橘雲/灰雲都可）。

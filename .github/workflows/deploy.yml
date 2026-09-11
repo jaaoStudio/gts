@@ -146,14 +146,49 @@ jobs:
             exit 1
           }
 
-      - name: Deploy (blue-green switch)
-        # 自己 ssh，不依賴第三方 action（私鑰只在本步驟指令內使用）
+      # 自己 ssh，不依賴第三方 action。私鑰的 secret 只注入這一步；
+      # 寫出來的檔案在同一個 job 的後續步驟可用（runner 用完即銷毀）。
+      - name: 設定部署用 SSH key
         env:
           SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+
+      # `deploy/**` 在 paths-ignore 內，腳本改動不會經 CI 更新到 VM，必須手動 scp。
+      # 2026-09-11 真的漏過一次：#25 改了三支腳本、PR 裡也寫了「merge 後要同步」，
+      # 然後 merge 後就忘了——而且**完全沒有症狀**，因為 VM 上那組是自我一致的舊版，
+      # 部署照樣全綠、藍綠也照樣交替。是後來手動跑 active_tag 才撞出來的。
+      #
+      # 所以這一關不靠人記得。不一致就紅，而且是在切流量**之前**紅：
+      # 正式站不受影響，只是這次沒部署成功。
+      #
+      # 註：VM 上少了某支檔案時，`md5sum … | sort` 的 pipeline 離開碼仍是 0
+      # （sort 成功），所以不會走下面的 ssh 失敗分支；但 md5sum 的錯誤訊息被
+      # `2>&1` 收進 REMOTE，比對照樣不等、照樣紅。兩條路都抓得到（已實測）。
+      - name: 確認 VM 上的腳本與 repo 一致
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          LOCAL=$(cd deploy && md5sum deploy.sh rollback.sh lib-slot.sh | sort)
+          REMOTE=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "$VM_USER@$VM_HOST" 'cd ~/gts-web && md5sum deploy.sh rollback.sh lib-slot.sh 2>&1 | sort') || {
+              echo "::error title=無法讀取 VM 上的腳本::ssh 或 md5sum 失敗，輸出：$REMOTE"
+              exit 1
+            }
+          if [ "$LOCAL" = "$REMOTE" ]; then
+            echo "✅ 三支腳本與 repo 一致"
+            exit 0
+          fi
+          echo "::error title=VM 上的部署腳本與 repo 不一致::請先同步再重跑：scp deploy/{deploy.sh,rollback.sh,lib-slot.sh} <vm>:~/gts-web/"
+          printf 'repo:\n%s\n\nVM:\n%s\n' "$LOCAL" "$REMOTE"
+          exit 1
+
+      - name: Deploy (blue-green switch)
+        env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
           GIT_SHA: ${{ github.sha }}
         run: |
-          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
             "$VM_USER@$VM_HOST" "~/gts-web/deploy.sh $GIT_SHA"
