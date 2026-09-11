@@ -48,7 +48,6 @@ createDirectus(apiUrl)
 | `/login` | Login | Lazy | title（元件是 `AdminLogin.vue`）|
 | `/admin/callback` | AdminCallback | Lazy | — |
 | `/account` | Account | Lazy | `requiresAuth` |
-| `/admin` | Admin | Lazy | `requiresAuth` + `requiresAdmin` |
 | `/order` | OrderForm | Lazy | title（**刻意不設 `requiresAuth`**，見下）|
 | `/order/done/:id` | OrderDone | Lazy | `requiresAuth` |
 | `/account/orders` | OrderHistory | Lazy | `requiresAuth` |
@@ -70,18 +69,22 @@ createDirectus(apiUrl)
 
 ```js
 router.beforeEach(async (to) => {
-    if (to.meta.requiresAuth || to.meta.requiresAdmin) {
+    if (to.meta.requiresAuth) {
         const { useAuthStore } = await import('../stores/auth')   // 動態 import 避免循環相依
         const authStore = useAuthStore()
 
         // ⚠️ 這一行不能拿掉,見下方「守衛競態」
-        if (!authStore.initialized) await authStore.init()
+        await authStore.init()
 
         if (!authStore.isAuthenticated) return '/login'
-        if (to.meta.requiresAdmin && !authStore.isAdmin) return '/account'
     }
 })
 ```
+
+**只有 `requiresAuth`，沒有 `requiresAdmin`。** 前台已經沒有管理員概念——
+`isAdmin` / `accountRoute` / `/admin` 路由都在 2026-09 移除，原因見下方
+〈Directus 11：role 已經沒有 `admin_access`〉：那個判斷恆為 false，
+所以 `/admin` 對所有人不可達，而沒人抱怨是因為那頁只有 placeholder。
 
 ### ⚠️ 守衛競態：受保護頁面「直接輸入網址」會被吞掉
 
@@ -143,7 +146,7 @@ Google 同意畫面 → Directus 換 token、寫 session、302 回 /admin/callba
 AdminCallback.vue → authStore.handleCallback()
      │  └─ fetchCurrentUser({ force: true })：抓得到 user 就代表 session 有效
      ▼  ※ 不需要、也不可以打 /auth/refresh 或 setToken
-導向 authStore.accountRoute（/admin 或 /account）
+導向 /account（前台已無管理員概念，見〈導航守衛〉）
 ```
 
 ### Gotchas
@@ -160,15 +163,57 @@ AdminCallback.vue → authStore.handleCallback()
 - **要優化先看 Worker log**：第二擊會 `console.log` 一筆 `sso_callback_upstream`
   （含 `ms`/`status`/`colo`/`ua`）。這是判斷還值不值得優化的唯一依據，不要憑感覺調。
 
+## 帳號登不進去：先查 `status` 與 `provider`，不要從程式碼找
+
+2026-09-07 為此繞了很多輪。這兩欄在 `directus_users`，**兩欄要一起看**，因為
+provider 的檢查排在 status 之前、會蓋掉 status 的錯誤訊息。
+
+> ⚠️ 查詢一律加 `-w '[HTTP %{http_code}]'`：壞 token 的 401 在 `curl -s` 下看起來像
+> 空回應，**極易誤判成「查無此人」**。
+> 該用哪把 token、它讀得到什麼，見 `.claude/skills/directus-schema-fetcher`（那支擁有 `.env`）。
+
+### `status` 必須是 `active`
+
+非 active（`invited` / `suspended` / `draft`）時：
+
+- 密碼正確也登不進去——Directus 在**驗密碼之前**就擋掉
+- 「忘記密碼」**靜默不寄信**，畫面卻照樣顯示已寄出（防 email 列舉）
+
+第二點是好用的診斷手法：**去 Resend 看有沒有寄出紀錄**。查無該收件人＝Directus
+根本沒發請求＝`status` 不對。
+
+### `provider` 綁定登入方式，email 不是鍵
+
+後台手動建的帳號是 `default`（只認密碼），SSO 建的是 `google`（只認 Google）。
+email 一樣也不通，zh-TW 訊息是「此使用者屬於其他服務」（`INVALID_PROVIDER`）。
+這是刻意的安全設計，避免有人拿 OAuth 授權接管同 email 的密碼帳號。
+
+前台 storefront 只有 Google 入口（`AdminLogin.vue` 無密碼表單），所以
+**`provider = 'default'` 的帳號前台一定進不去**，只能進後台。
+
+### 改成 Google 登入的正確做法（已實測）
+
+兩欄要同時設，缺一不可：
+
+```json
+{"provider": "google", "external_identifier": "<該帳號的 email>"}
+```
+
+**這座 Directus 用 email 當識別鍵，不是 Google 的 `sub`**——不必去撈 OAuth 回應裡的 sub，
+照抄一筆已知可登入的記錄即可。改完密碼登入會失效（provider 單選），
+退回就是 `{"provider":"default","external_identifier":null}`。
+
+> 驗證方式：先拿一個自己控制得到的 Google 帳號改改看、實際登入過，確認可行再套到目標帳號。
+
 ## 角色與導向
 
-| 角色 | `role.admin_access` | 登入後導向 | 可存取 |
-|---|---|---|---|
-| Admin | `true` | `/admin` | 全部 |
-| Member(customer) | `false` | `/account` | 除 `/admin` 外全部 |
-| 訪客 | — | `/login` | 公開頁 |
+| 角色 | 登入後導向 | 可存取 |
+|---|---|---|
+| 已登入（不分角色） | `/account` | 除公開頁外的 `requiresAuth` 頁面 |
+| 訪客 | `/login` | 公開頁 |
 
-Directus 端目前有 3 個 role：`Administrator` / `customer` / `AI_agnet`。
+**前台不區分管理員**——老闆用 Directus 後台處理訂單，不走這個站。
+⚠️ 不要重新加入基於 `role.admin_access` 的判斷，理由見下節。
 
 ## 新增路由步驟
 
@@ -177,3 +222,38 @@ Directus 端目前有 3 個 role：`Administrator` / `customer` / `AI_agnet`。
 3. 除核心店面頁外一律 lazy-load
 4. 給 `meta.title`（格式 `<頁名>｜金同心實業`）
 5. 需登入加 `meta: { requiresAuth: true }`；限管理員再加 `requiresAdmin: true`
+
+<!-- 自 docs/gotchas.md 移入（2026-09-10），該檔已解散 -->
+
+## Directus 11:role 已經沒有 `admin_access`,別再從 role 判斷管理員
+
+**症狀**:`user.role.admin_access` 恆為 `undefined`,任何 `=== true` 的判斷永遠是
+false。程式碼看起來完全合理,沒有錯誤訊息,只是那條路線對所有人都不通。
+
+前台曾有 `isAdmin` / `accountRoute` / `/admin` 路由靠這個欄位判斷,結果 `/admin`
+對所有人不可達(2026-09 發現)。沒人察覺是因為那頁只顯示「功能即將上線」——
+**權限判斷寫錯而沒有任何人抱怨,是因為錯誤的那一側剛好什麼都沒有**。
+
+**成因**:Directus 11 把 `admin_access` / `app_access` 從 `directus_roles` 搬到
+`directus_policies`,role 改以 `policies` 關聯過去。實際欄位:
+
+```
+directus_roles     children description icon id name parent policies users …
+directus_policies  admin_access app_access name permissions roles users …
+```
+
+`readMe({ fields: ['*', 'role.*'] })` 因此永遠拿不到 `admin_access`。
+
+**要在客戶端判斷的話**,可用的欄位路徑是(兩條都有效,使用者可直接掛 policy,
+也可經由 role 繼承):
+
+```
+policies.policy.admin_access
+role.policies.policy.admin_access
+```
+
+⚠️ **但不要把它加進 `readMe()` 的預設 fields**。`customer access` policy 對系統
+collection 只開放 `directus_files` / `directus_users` / `directus_roles`,**沒有
+`directus_policies`**;夾帶進去會讓整個 `readMe` 403,也就是**所有客戶都登不進去**
+(與 `settingsService.getSettings()` 的 403 陷阱同型)。真要做就另發一個請求、
+catch 掉失敗當作非管理員,並且只在需要的路由上呼叫。

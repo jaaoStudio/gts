@@ -16,6 +16,30 @@ description: Directus 商品分類的批次維運與重歸類手法。整批改�
 - 商品分類**只用 M2M** `categories`（junction `products_categories`：`id` / `products_id` / `categories_id`）。舊 M2O `category` 欄位全空、已棄用。
 - 每個商品掛剛好 **2 筆：`[父分類, 子分類]`**（父父分類頁與子分類頁都能出現）。
 - 前端主分類取「有 parent 的葉節點（子分類）」；breadcrumb 取最長路徑。
+- 目前約 **56 個分類**。2026-07 大整理：668 筆商品重歸類 328 筆。新增子分類（手工具下
+  `刀具/剪具/鋸具/板手類/起子類/套筒類`、電動配件下 `鑽尾類`(原鑽頭類改名, slug=drill-bits)
+  `/開孔器·自由錐`、電動工具下 `氣動工具`），刪掉九個空分類。
+- 「電動工具」大分類商品極少——此店本質是手工具／配件／耗材店。留在「雜項五金」的是真雜項
+  （密碼鎖／磁鐵／延長線／LED燈泡／電池）；`測試的哆拉a夢`、`補差額專用` 不是商品。
+
+### ⚠️ 統計一定要用 `countDistinct`，不能用 `count`
+
+**「每商品掛 [父,子] 兩筆」的隱藏後果**：任何「同時用父與子 id 篩選」的查詢，JOIN 後
+同一件商品會命中多列。Directus 的 `aggregate: { count: '*' }` 數的是 **JOIN 後的列數**，
+不是商品數。
+
+2026-08-13 實際踩到：十個根分類的商品總數**全被灌成剛好 2 倍**（工安防護 9→18、
+手工具 189→377），還連帶算出永遠空白的幽靈分頁。
+
+```js
+// ❌ 錯：數 JOIN 後的列
+aggregate: { count: '*' }
+// ✅ 對：回傳形狀是 [{ countDistinct: { id: "9" } }]
+aggregate: { countDistinct: 'id' }
+```
+
+葉節點分類與「不帶分類條件」的查詢只命中一列，本來就正確——**所以這個錯很久沒被發現**。
+日後在這個 M2M 上再加任何統計都要留意同一個坑。
 
 ### 批次建立商品前必讀（2026-08 起）
 
@@ -95,4 +119,5 @@ Directus 有三個非系統角色：`Administrator`、`customer`（前台註冊�
 - **Public 與 customer access 兩個 policy 都帶 `status=published` filter**，
   所以訪客與註冊會員都讀不到 draft 的商品與規格。
 
-相關記憶：`category-taxonomy`。
+相關：`.claude/skills/directus-schema-fetcher`（查欄位能不能改：permission 只是一半，
+另一半是 `meta.readonly`）。

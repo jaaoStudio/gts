@@ -51,10 +51,11 @@ src/
 │   ├── HeroProductRing.vue / HeroRingCard.vue   # 首頁商品轉盤
 │   ├── LineButton.vue    # LINE 聯絡鈕（有 floating prop，但 Footer/Contact 目前都用內嵌）
 │   └── OrderStatusChip.vue  # 訂購單狀態標籤，顏色與 Directus 後台對齊
-├── views/                # 17 個：Home / Products / ProductDetail / Contact / Faq /
+├── views/                # 16 個：Home / Products / ProductDetail / Contact / Faq /
 │                         # Shipping / Warranty / Privacy / Terms / AdminLogin(=/login) /
-│                         # AdminCallback / Account / Admin /
+│                         # AdminCallback / Account /
 │                         # OrderForm(=/order) / OrderDone / OrderHistory / OrderDetail
+│                         # （+ OrderDetail.test.js，唯一的元件測試）
 ├── stores/               # auth / product / category / settings / order
 ├── services/             # productService（+ productMapper）/ customerService /
 │                         # settingsService / orderService
@@ -86,7 +87,8 @@ npm run build     # → dist/
 npm run preview
 ```
 
-沒有測試框架與 lint 設定（現況如此，非遺漏待補的暗示）。
+測試用 **vitest**（`npm test`），lint 用 **ESLint**（`npm run lint`，帶 `--max-warnings 0`）。
+兩者都是 PR 的 required check，見 `.github/workflows/test.yml`；註解與文件的分工規則見 `CLAUDE.md`。
 
 ## 正典文件與 skill 索引
 
@@ -100,12 +102,22 @@ npm run preview
 | 商品分類批次維運 | skill `directus-catalog-categorization` |
 | 部署 / 回滾 / 線上除錯 | skill `deploy-ops` |
 | 訂購單（資料模型／權限／Flow／踩雷） | `docs/proposals/訂購單.md` |
+| **GSAP 動畫的雷與驗證** | skill `gsap-animation-conventions` |
+| **手機專屬 bug 除錯** | skill `mobile-debugging` |
+| **Vue SFC 慣例（含 await 前後讀 reactive 的坑）** | skill `vue-component-conventions` |
+| **專案定位與「哪些東西不在 repo」** | `docs/status.md` |
+| **寫 code 的通用慣例（註解該放哪）** | `CLAUDE.md` |
+
+> ⚠️ 新增任何 skill 或 `docs/` 文件時，**同一個 commit 要在這張表補一列**。
+> 沒進索引的文件沒人會讀到，也就沒人會發現它過時了——`docs/status.md` 的
+> 六條缺口清單就是這樣爛掉的（2026-09-10 逐條核對後全部不成立）。
 
 ## 現況已知缺口
 
-- `views/Admin.vue` 只有殼、無 CRUD；後台實務上直接用 Directus admin UI。
-  老闆處理訂購單也是在 Directus 後台（有「待處理訂購單」書籤）。
-  日後規劃改為獨立的後台網站（另一個網域），非本站的 `/admin` 路由。
+- **前台沒有管理員介面**（`views/Admin.vue` 與 `/admin` 路由已於 2026-09 移除，
+  原因見 skill `routing-and-auth` 的 Directus 11 `admin_access` 那節）。
+  老闆一律在 Directus 後台處理訂購單（有「待處理訂購單」書籤）。
+  日後若要做，規劃是獨立的後台網站（另一個網域），不是本站的路由。
 - `src/assets/` 有一張 5MB 的 jpg，未經最佳化。
 - 上線前 `site_settings` 必填：匯款銀行／帳號／戶名（缺一即視為未設定，
   客人會看到「請直接與我們聯絡」）、滿額免運門檻與預設運費（未填則一律不免運）、

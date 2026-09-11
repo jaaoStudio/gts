@@ -22,9 +22,6 @@ export const useCategoryStore = defineStore('category', {
             return state.categories.find(c => c.slug && String(c.slug).trim().toLowerCase() === target) || null;
         },
 
-        /**
-         * 複用底層 Getter 找名稱
-         */
         getCategoryNameBySlug() {
             return (slug) => {
                 const found = this.getCategoryBySlug(slug);
@@ -32,9 +29,6 @@ export const useCategoryStore = defineStore('category', {
             }
         },
 
-        /**
-         * 複用底層 Getter 找 ID
-         */
         getCategoryIdBySlug() {
             return (slug) => {
                 const found = this.getCategoryBySlug(slug);
@@ -42,9 +36,6 @@ export const useCategoryStore = defineStore('category', {
             }
         },
 
-        /**
-         * 根據 id 查找分類
-         */
         getCategoryById: (state) => (id) => {
             return state.categories.find(c => c.id === id)
         },

@@ -82,9 +82,6 @@ export const productService = {
         }
     },
 
-    /**
-     * 獲取精選產品
-     */
     async getFeatured(limit = 4) {
         // 3. 直接複用 getProducts，不重寫 API 呼叫
         const response = await this.getProducts({
@@ -96,9 +93,6 @@ export const productService = {
         return response.data;
     },
 
-    /**
-     * 根據分類獲取產品
-     */
     async getByCategory(categoryId, { page = 1, limit = 12 } = {}) {
         return await this.getProducts({
             page, limit,
@@ -106,9 +100,6 @@ export const productService = {
         });
     },
 
-    /**
-     * 搜尋產品
-     */
     async search(keyword, { page = 1, limit = 12 } = {}) {
         if (!keyword) return await this.getProducts({ page, limit });
 
@@ -188,9 +179,6 @@ export const productService = {
         }));
     },
 
-    /**
-     * 根據 slug 獲取單一商品詳情
-     */
     async getProductBySlug(slug) {
         // SDK 的 readItems 直接回傳陣列
         const items = await directus.request(readItems('products', {
@@ -209,7 +197,6 @@ export const productService = {
     },
 
     buildFilter({ categoryIds = [], keyword = '' } = {}) {
-        // ... (保持你原本的優秀邏輯) ...
         const filters = []
 
         if (categoryIds && categoryIds.length > 0) {
@@ -278,9 +265,6 @@ const safeExternalUrl = (url) => {
  * 產品資料轉換器
  */
 export const productMapper = {
-    /**
-     * 將單一產品資料轉換
-     */
     mapProduct(item) {
         // TODO(主標籤): 卡片小標目前取 tags[0]，而 tags 查詢未排序，
         // 顯示哪顆 Tag 取決於 Directus junction 順序、不可預測。
@@ -357,9 +341,6 @@ export const productMapper = {
         }
     },
 
-    /**
-     * 將多個產品資料轉換
-     */
     mapProducts(items) {
         if (!Array.isArray(items)) {
             console.error('mapProducts expected an array but got:', items);
