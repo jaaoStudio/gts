@@ -50,8 +50,14 @@ jobs:
   # build-and-deploy 整個 job 被 skip（顯示為 skipped，不是 failed），
   # 因為那不是壞掉，是這次部署已經沒有意義了。
   # 刻意不設 `needs: test`：這個檢查只做 git fetch + git diff，不吃 test 的任何產物。
-  # 掛上去等於白等（實測 test 15s + 一次 job 派工約 4s 都加進部署的關鍵路徑）。
-  # 由 build-and-deploy 的 `needs: [test, freshness]` 同時擋這兩件，兩者並行即可。
+  #
+  # 省下來的只有 freshness 自己那幾秒——`test` 的時間無論如何都在關鍵路徑上
+  # （build-and-deploy 仍 needs: test）。實測 build-and-deploy 的起始從 +26s 提前到
+  # +23s，約 3 秒。先前這裡寫「省 test 15s + 派工 4s」是把關鍵路徑模型搞錯了。
+  #
+  # ⚠️ 整條 pipeline 的總時間由 build-and-deploy 主導（45～62s），而它的擺動來自
+  # Docker layer cache 是否命中（動到 src/ 就會讓 COPY 層失效）。那個擺動比這裡
+  # 省下的 3 秒大一個量級，所以**不要用總時間來驗證這類改動有沒有效**，要看逐 job。
   freshness:
     runs-on: ubuntu-latest
     outputs:
@@ -97,9 +103,8 @@ jobs:
           fetch-depth: 0   # 下面那道最後檢查同樣要 diff 兩個 commit
 
       # ⚠️ 這裡原本有一步 `Set up QEMU`。amd64-only 的 build 跑在 x86_64 runner 上
-      # 不需要 binfmt 模擬，那一步只是去拉 tonistiigi/binfmt image（實測 4～15 秒，
-      # 佔部署總時間最多兩成）。若哪天把下面的 platforms 改成 linux/arm64，
-      # 要把它加回來。
+      # 不需要 binfmt 模擬，那一步只是去拉 tonistiigi/binfmt image（觀測到 4～15 秒）。
+      # 若哪天把下面的 platforms 改成 linux/arm64，要把它加回來。
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
