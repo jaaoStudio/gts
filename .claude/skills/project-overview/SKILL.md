@@ -97,12 +97,15 @@ npm run preview
 | 領域詞彙 | `CONTEXT.md` |
 | Google SSO / Worker double-tap | `docs/adr/0001` + skill `routing-and-auth` |
 | 設計系統決策 | `docs/adr/0002` + skill `tailwind-design-system` |
+| 運費為何是預估值、不進應付金額 | `docs/adr/0003` |
+| `payment_note` 的對帳規則（為何不做回報通知信、為何關掉 readonly） | `docs/adr/0004` |
 | Directus 資料結構 | skill `directus-schema-fetcher`（抓即時 schema，**碰資料層前先跑**）|
 | service / mapper 寫法 | skill `directus-service-layer` |
 | 商品分類批次維運 | skill `directus-catalog-categorization` |
 | 部署 / 回滾 / 線上除錯 | skill `deploy-ops` |
 | 訂購單（資料模型／權限／Flow／踩雷） | `docs/proposals/訂購單.md` |
-| **GSAP 動畫的雷與驗證** | skill `gsap-animation-conventions` |
+| GSAP：API 用法 | **全域 plugin `gsap-skills`**（本專案不留自己的 GSAP skill）|
+| GSAP：本專案踩過的雷（NaN 凍結、iOS hover、IO 多筆 entry）| skill `vue-component-conventions` |
 | **手機專屬 bug 除錯** | skill `mobile-debugging` |
 | **Vue SFC 慣例（含 await 前後讀 reactive 的坑）** | skill `vue-component-conventions` |
 | **專案定位與「哪些東西不在 repo」** | `docs/status.md` |
