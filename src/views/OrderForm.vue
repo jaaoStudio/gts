@@ -275,6 +275,7 @@ import { useSettingsStore } from '../stores/settings'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { SHIPPING, estimateShipping } from '../utils/orderTotals'
+import { trackGenerateLead } from '../utils/analytics'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 import { PhArrowRight, PhInfo, PhMinus, PhPlus } from '@phosphor-icons/vue'
 
@@ -373,9 +374,20 @@ const submit = async () => {
     return
   }
 
+  // submit() 成功後會 clear()，品項數必須在送出前抓，否則全部是 0
+  const leadMetrics = {
+    itemCount: orderStore.items.length,
+    totalQuantity: orderStore.count,
+    quoteItemCount: orderStore.quoteItemCount,
+  }
+
   const result = await orderStore.submit(payload)
 
   if (!result) return
+
+  // 放在這裡而不是完成頁：完成頁已被排除追蹤，而且輪詢逾時那條分支根本不會去完成頁，
+  // 但那時訂購單一樣已經建立
+  trackGenerateLead(leadMetrics)
 
   // 極少數情況輪詢逾時而拿不到 id（flow 慢），此時直接帶去訂單列表——
   // 訂單已經建立，讓客人看得到比停在購物車重要

@@ -129,6 +129,7 @@ jobs:
           build-args: |
             VITE_DIRECTUS_URL=/api
             VITE_DIRECTUS_PUBLIC_URL=${{ secrets.VITE_DIRECTUS_PUBLIC_URL }}
+            VITE_GA_ID=G-M1PCKEXVMT
           cache-from: type=registry,ref=${{ env.IMAGE }}:cache
           cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
 

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { getAssetUrl } from '../utils/directus'
+import { trackAddToCart } from '../utils/analytics'
 
 const STORAGE_KEY = 'gts_order_items'
 
@@ -105,6 +106,7 @@ export const useOrderStore = defineStore('order', {
             }
 
             this._persist()
+            trackAddToCart(product, variant, qty)
         },
 
         updateQuantity(variantId, quantity) {

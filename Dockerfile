@@ -17,8 +17,11 @@ COPY . .
 # Vite 於 build 時讀取 process env 的 VITE_* 並烘進 dist。
 ARG VITE_DIRECTUS_URL=/api
 ARG VITE_DIRECTUS_PUBLIC_URL
+ARG VITE_GA_ID
 ENV VITE_DIRECTUS_URL=$VITE_DIRECTUS_URL
 ENV VITE_DIRECTUS_PUBLIC_URL=$VITE_DIRECTUS_PUBLIC_URL
+# 沒傳這個 build arg 的話 GA 會整個不載入，而且不會有任何錯誤訊息（見 main.js）
+ENV VITE_GA_ID=$VITE_GA_ID
 
 # 構建應用 (Vue.js 項目通常使用 npm run build)
 RUN npm run build

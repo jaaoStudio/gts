@@ -225,6 +225,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
+import { trackViewItem } from '../utils/analytics'
 import { useRoute } from 'vue-router'
 import { productService } from '../services/productService'
 import { useCategoryStore } from '../stores/category'
@@ -331,6 +332,7 @@ const fetchProduct = async (slug) => {
       setMeta('og:description', data.short_description || '專業五金工具與耗材供應。', 'property')
       if (data.image) setMeta('og:image', data.image, 'property')
     }
+    if (data) trackViewItem(data)
     if (data?.image) activeImage.value = data.image
     if (publishedVariants.value.length > 0) selectedVariant.value = publishedVariants.value[0]
   } catch (err) {
