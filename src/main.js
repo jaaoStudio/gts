@@ -11,7 +11,13 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 import { reveal } from './directives/reveal'
-import { analyticsConfigured, consent, enableAnalytics } from './utils/analytics'
+import {
+    analyticsConfigured,
+    consent,
+    enableAnalytics,
+    isExcludedFromAnalytics,
+    routeToPageView,
+} from './utils/analytics'
 
 const pinia = createPinia()
 const app = createApp(App)
@@ -27,18 +33,11 @@ if (analyticsConfigured) {
             tagId: import.meta.env.VITE_GA_ID,
             // 同意之前一律不載入 gtag script，不是載入後再設 denied
             initMode: 'manual',
+            // 預設的 template 是 route.name，報表會變成一排 "ProductDetail"
             pageTracker: {
                 router,
-                exclude: (route) => route.matched.some((r) => r.meta?.noAnalytics),
-                // 預設的 template 是 route.name，報表會變成一排 "ProductDetail"。
-                // ⚠️ page_title 讀 meta 而非 document.title：後者要等 router 的 afterEach
-                //    先跑完才正確，而那只是註冊順序的巧合，沒有東西保證它。
-                // ⚠️ page_path 要用實際路徑，換成 route.matched 的 pattern 會讓所有商品併成一列。
-                template: (route) => ({
-                    page_title: route.meta?.title ?? document.title,
-                    page_path: route.path,
-                    page_location: window.location.href,
-                }),
+                exclude: isExcludedFromAnalytics,
+                template: routeToPageView,
             },
         })
     )
@@ -56,8 +55,12 @@ authStore.init().then(() => {
 
     // 擺在 mount 之後：addGtag() 會同步插入 script tag，放在前面等於把跨網域請求塞進
     // 畫面還沒繪製的那段。延後不會漏掉這一頁——addGtag 內部會先 await router.isReady()
-    // 再追蹤當前路由。
-    if (analyticsConfigured && consent.value === 'granted') {
-        ;(window.requestIdleCallback ?? setTimeout)(() => enableAnalytics())
+    // 再追蹤當前路由，而這段窗口內送出的事件由 analytics.js 排隊補送。
+    if (analyticsConfigured) {
+        // ⚠️ 必須在 callback 內再讀一次：使用者可能在這中間就從頁尾撤回了同意，
+        //    而 enableAnalytics() 的 optIn() 會把剛設好的停用旗標清掉。
+        ;(window.requestIdleCallback ?? setTimeout)(() => {
+            if (consent.value === 'granted') enableAnalytics()
+        })
     }
 })

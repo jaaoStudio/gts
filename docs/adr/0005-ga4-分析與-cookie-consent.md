@@ -31,7 +31,11 @@ Cookie consent 採 **opt-in**：同意之前完全不載入 gtag script。
 
 **狀態與副作用由 `setConsent()` 一起完成**，呼叫端只給值。分開寫的那版讓
 `reject()` 只更新了狀態、沒停用 tag，撤回同意變成空操作——把配對交給呼叫端記得，
-就會有人忘記。
+就會有人忘記。**`null`（重新詢問）也必須停用**：banner 跳出來時使用者尚未重新同意，
+那段期間繼續送 page_view 等於在「沒問過」的狀態下追蹤。
+
+**跨分頁同步**：監聽 `storage` 事件，一個分頁撤回時其他分頁跟著停用。否則使用者
+以為關掉了，另一個開著的分頁照樣在送。
 
 ## Context
 
@@ -100,9 +104,20 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
 
 - ⚠️ **GA4 後台「加強型評估」的「網頁瀏覽」必須關閉**。它會靠 History Change 自己抓 SPA
   換頁，與 `pageTracker` 疊起來每次換頁算兩次。那個開關不在本 repo 裡，CI 綠燈不構成證據。
-  （`vue-gtag` 那一側不必擔心：啟用 `pageTracker` 時它會自動把 config 設成
-  `send_page_view: false`，實測首頁的 dataLayer 只有一筆 `page_view`。雙重計算的風險
-  只剩後台那個開關。）
+  （`vue-gtag` 那一側不必擔心：它**無條件**把 config 設成 `send_page_view: false`，
+  所以 `pageTracker` 是唯一的 page_view 來源，實測首頁的 dataLayer 只有一筆。
+  雙重計算的風險只剩後台那個開關。）
+- **啟動延後的窗口內，事件必須排隊而不是直接送**。回訪者的 `consent` 在模組載入當下
+  就是 `granted`，但 `config` 要等 idle callback 跑 `addGtag()` 才進 dataLayer。事件若
+  排在 `config` 前面，gtag 依序重播時會判定它沒有目的地而**靜默丟棄**——深連結進商品頁
+  的那筆 `view_item`（最有價值的一筆）就這樣不見。
+  ⚠️ 這也讓 `track()` 的 consent 守衛變成測試盲區：守衛失守時事件不會被送出、而是堆進
+  佇列，等使用者按下接受再整批補送。測「未同意時不推 dataLayer」看不到這件事，要測的是
+  **「同意前的行為不得在事後被補送」**。
+- **404 會被算成首頁**。catch-all 路由 `redirect: '/'`，所以失效連結、打錯的網址與掃描
+  機器人都灌進 Home 的 page_view，而 404 本身在 GA 裡完全看不到；`page_location` 還會
+  保留原始 query 與 `page_path` 不一致。redirect 早於本次改動，只有資料後果是新的——
+  要修得先決定站上要不要有 404 頁，那是產品決策，不在本 ADR 範圍。
 - **撤回同意必須 `optOut()`，不能只清 cookie**。`pageTracker` 的 `afterEach` 由 vue-gtag
   自己註冊，不經過 `analytics.js` 的 consent 守衛——先接受、後從頁尾撤回時，它照樣會在
   下次換頁送出 page_view，gtag 也會立刻把 `_ga` 種回來，撤回等於沒發生。

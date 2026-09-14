@@ -91,6 +91,18 @@ describe('未同意時不得送出任何東西', () => {
 
         expect(trackingEvents()).toHaveLength(0)
     })
+
+    test('同意前的行為不得在事後被補送', async () => {
+        const a = await load()
+
+        a.trackViewItem(product)
+        a.setConsent('granted')
+        await new Promise((r) => setTimeout(r, 0))
+
+        // 啟動時會 flush 排隊中的事件。守衛若失守，未同意期間的瀏覽紀錄會在使用者
+        // 按下接受的瞬間整批送給 Google——「不推 dataLayer」那條斷言看不到這件事
+        expect(eventsNamed('view_item')).toHaveLength(0)
+    })
 })
 
 describe('事件 payload', () => {
@@ -154,6 +166,39 @@ describe('啟用與撤回', () => {
         expect(window[`ga-disable-${TAG_ID}`]).toBe(true)
     })
 
+    test('接受會真的啟動 GA', async () => {
+        const a = await load()
+        const before = window.dataLayer.length
+
+        a.setConsent('granted')
+        await new Promise((r) => setTimeout(r, 0))
+
+        // 沒有這條的話，「接受按了等於沒事發生、永遠收不到資料」不會被任何東西擋下
+        expect(window.dataLayer.length).toBeGreaterThan(before)
+    })
+
+    test('重新詢問（null）也必須停用——banner 顯示期間不得繼續追蹤', async () => {
+        const a = await load()
+        a.setConsent('granted')
+        await new Promise((r) => setTimeout(r, 0))
+
+        a.reopenConsent()
+
+        expect(window[`ga-disable-${TAG_ID}`]).toBe(true)
+    })
+
+    test('啟動前送出的事件會排隊補送，不會排在 config 前面被丟掉', async () => {
+        localStorage.setItem(CONSENT_KEY, 'granted')
+        const a = await load()
+
+        a.trackViewItem(product)
+        expect(eventsNamed('view_item')).toHaveLength(0)
+
+        await a.enableAnalytics()
+
+        expect(eventsNamed('view_item')).toHaveLength(1)
+    })
+
     test('enableAnalytics 重複呼叫只會真的啟動一次', async () => {
         const a = await load()
         const before = window.dataLayer.length
@@ -176,6 +221,19 @@ describe('啟用與撤回', () => {
 
         expect(window[`ga-disable-${TAG_ID}`]).toBe(true)
         expect(document.cookie).not.toContain('_ga')
+    })
+
+    test('其他分頁撤回時，這一頁也要跟著停用', async () => {
+        const a = await load()
+        a.setConsent('granted')
+        await new Promise((r) => setTimeout(r, 0))
+
+        window.dispatchEvent(
+            new StorageEvent('storage', { key: CONSENT_KEY, newValue: 'denied' })
+        )
+
+        expect(a.consent.value).toBe('denied')
+        expect(window[`ga-disable-${TAG_ID}`]).toBe(true)
     })
 
     test('撤回之後再次同意，會把停用旗標拿掉', async () => {
