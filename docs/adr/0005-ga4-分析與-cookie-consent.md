@@ -111,4 +111,10 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
 - **`VITE_GA_ID` 沒傳 build arg 就整個不載入，且不會有任何錯誤訊息**。它直接寫在
   `deploy.yml` 的 build-args 而非 GitHub secret：GA 評估 ID 本來就在前端明碼可見、不是機密，
   走 secret 只會多一個「忘了設 → 正式站靜默沒有 GA」的失敗點。
+  Dockerfile 在 `npm run build` 之後加了一道 grep：有傳這個 arg 就必須出現在 `dist/assets`，
+  否則 build 失敗。連帶擋住「有人把 `main.js` 的 `if (import.meta.env.VITE_GA_ID)` 改成恆假」。
+- **GA4 後台還有兩個 repo 外的設定會靜默影響資料**：
+  **資料保留期間**預設只有 2 個月（且調整不追溯，過期資料救不回來），已改為 14 個月；
+  **Google Signals 維持關閉**——開啟會讓資料流入 Google 的廣告個人化，而 `Privacy.vue`
+  第五節的揭露只涵蓋「分析網站流量」，要開就得先改那段。
 - **排除規則不可順手把 `/product/:slug` 也正規化**——商品熱度正是靠實際 slug 分辨的。
