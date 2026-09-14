@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createGtag, addGtag } from 'vue-gtag'
+import { createGtag } from 'vue-gtag'
 
 // Self-hosted variable fonts (no external <link>)
 import '@fontsource-variable/geist'
@@ -11,7 +11,7 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 import { reveal } from './directives/reveal'
-import { consent } from './utils/analytics'
+import { consent, enableAnalytics } from './utils/analytics'
 
 const pinia = createPinia()
 const app = createApp(App)
@@ -51,7 +51,7 @@ if (import.meta.env.VITE_GA_ID) {
         })
     )
 
-    if (consent.value === 'granted') addGtag()
+    if (consent.value === 'granted') enableAnalytics()
 }
 
 // 訂購單只讀 localStorage，同步且不會失敗，先還原好讓 Navbar 首次繪製就有正確數量

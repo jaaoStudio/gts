@@ -19,8 +19,9 @@ status: accepted
 
 Cookie consent 採 **opt-in**：同意之前完全不載入 gtag script。
 「使用者的選擇」由 `src/utils/analytics.js` 以 localStorage 存**三態**
-（`null` 沒問過 / `granted` / `denied`）；按鈕動作則借用 `vue-gtag` 的
-`acceptAll()` / `rejectAll()`。
+（`null` 沒問過 / `granted` / `denied`）。啟用走 `addGtag()`、撤回走 `optOut()`
+加自行清除 cookie；**完全不使用 `useConsent()` composable**（理由見下）。
+兩個動作都不重載頁面。
 
 ## Context
 
@@ -92,9 +93,19 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
   （`vue-gtag` 那一側不必擔心：啟用 `pageTracker` 時它會自動把 config 設成
   `send_page_view: false`，實測首頁的 dataLayer 只有一筆 `page_view`。雙重計算的風險
   只剩後台那個開關。）
-- **`acceptAll` / `rejectAll` 會 `window.location.reload()`**。使用者若一路忽略 banner 到
-  `/order` 才按掉，`OrderForm` 的 `form`（純 `reactive`，未持久化）會被清空；品項因為在
-  localStorage 所以還在。要根治得把 `form` 也持久化，目前未做。
+- **撤回同意必須 `optOut()`，不能只清 cookie**。`pageTracker` 的 `afterEach` 由 vue-gtag
+  自己註冊，不經過 `analytics.js` 的 consent 守衛——先接受、後從頁尾撤回時，它照樣會在
+  下次換頁送出 page_view，gtag 也會立刻把 `_ga` 種回來，撤回等於沒發生。
+- **`addGtag()` 每呼叫一次就多註冊一組 `router.afterEach`**，所以啟用必須是冪等的
+  （`analytics.js` 的 `started` 旗標）。否則「接受 → 拒絕 → 再接受」之後，每次換頁都會
+  送出兩筆 page_view。
+- **兩個按鈕都不重載頁面**。`addGtag()` 內部是 `await router.isReady()` →
+  `trackRoute(currentRoute)` → 註冊 `afterEach`，當前這頁它自己會追蹤，不必靠重載補。
+  重載反而會清空 `OrderForm` 那個沒有持久化的 `reactive` 表單。
+- **商品頁的 `page_title` 是通用的「商品｜金同心實業」**，不是商品名。`router/index.js`
+  的 `afterEach` 先套 `meta.title`，而 `ProductDetail.vue` 要等 API 回來才覆蓋成商品名，
+  那時 page_view 早已送出。`page_path` 仍能區分各商品，且 `view_item` 帶的 `item_name`
+  是正確商品名、商品報表不受影響——已知取捨，刻意不修。
 - **`generate_lead` 的品項數必須在 `orderStore.submit()` 之前抓**——`submit()` 成功後會
   `clear()`，之後再讀全是 0。
 - **`VITE_GA_ID` 沒傳 build arg 就整個不載入，且不會有任何錯誤訊息**。它直接寫在

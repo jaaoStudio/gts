@@ -86,6 +86,7 @@ export const useOrderStore = defineStore('order', {
             if (!product || !variant) return
 
             const qty = Math.max(1, Math.floor(Number(quantity) || 1))
+            const specName = normalizeSpecName(variant.spec_name)
             const existing = this.items.find((it) => it.variantId === variant.id)
 
             if (existing) {
@@ -96,7 +97,7 @@ export const useOrderStore = defineStore('order', {
                     productId: product.id,
                     productSlug: product.slug,
                     productName: product.name,
-                    specName: normalizeSpecName(variant.spec_name),
+                    specName,
                     sku: variant.sku || '',
                     // null 代表詢價；不要塞 0，那會被誤讀成免費
                     unitPrice: variant.price ?? null,
@@ -106,7 +107,7 @@ export const useOrderStore = defineStore('order', {
             }
 
             this._persist()
-            trackAddToCart(product, variant, qty)
+            trackAddToCart(product, variant, qty, specName)
         },
 
         updateQuantity(variantId, quantity) {

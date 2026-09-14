@@ -95,7 +95,10 @@ const routes = [
     {
         path: '/admin/callback',
         name: 'AdminCallback',
-        component: () => import('../views/AdminCallback.vue')
+        component: () => import('../views/AdminCallback.vue'),
+        // 沒有 title 的話 afterEach 不會動 document.title，GA 的 page_view 會沿用
+        // 前一頁的標題（多半是「會員登入」或某個商品名）
+        meta: { title: '登入中｜金同心實業' }
     },
     {
         path: '/account',

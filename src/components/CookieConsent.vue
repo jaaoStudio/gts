@@ -51,21 +51,19 @@
 <script setup>
 import { computed } from 'vue'
 import { PhCookie } from '@phosphor-icons/vue'
-import { consent, setConsent, clearGaCookies } from '../utils/analytics'
+import { consent, setConsent, enableAnalytics, disableAnalytics } from '../utils/analytics'
 
 const visible = computed(() => consent.value === null)
 
-// 重載是為了讓 main.js 走正常的啟動路徑：addGtag() 之後 gtag config 會送出
-// 當前這頁的 page_view。pageTracker 只監聽路由變更，不重載的話「同意後看的
-// 第一頁」會整筆漏掉。
+// 兩邊都不重載：使用者可能是在 /order 填到一半才按掉 banner，而 OrderForm 的
+// form 是純 reactive、沒有持久化，重載會把已填的聯絡資料清光。
 const accept = () => {
   setConsent('granted')
-  window.location.reload()
+  enableAnalytics()
 }
 
-// 拒絕不必重載——同意前本來就沒載入任何東西。清 cookie 是為了撤回先前的同意。
 const reject = () => {
   setConsent('denied')
-  clearGaCookies()
+  disableAnalytics()
 }
 </script>

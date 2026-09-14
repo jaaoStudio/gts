@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { event } from 'vue-gtag'
+import { addGtag, event, optIn, optOut } from 'vue-gtag'
 
 const CONSENT_KEY = 'gts_analytics_consent'
 
@@ -64,6 +64,32 @@ export function clearGaCookies() {
     })
 }
 
+let started = false
+
+/**
+ * 啟動追蹤。`addGtag()` 內部會 `await router.isReady()` 後先追蹤當前頁、再註冊
+ * `router.afterEach`，所以同意當下不必重載也不會漏掉這一頁。
+ *
+ * ⚠️ `started` 不可拿掉：`addGtag()` 每呼叫一次就多註冊一組 `afterEach`，
+ * 「接受→拒絕→再接受」會讓之後每次換頁送出兩筆 page_view。
+ */
+export async function enableAnalytics() {
+    optIn()
+    if (started) return
+    started = true
+    await addGtag()
+}
+
+/**
+ * 撤回同意。`optOut()` 是必要的，不能只清 cookie —— pageTracker 的 `afterEach`
+ * 由 vue-gtag 自己註冊，不經過下面的 `track()` 守衛，先接受後撤回時它仍會送
+ * page_view，gtag 也會把 `_ga` 立刻種回來。
+ */
+export function disableAnalytics() {
+    optOut()
+    clearGaCookies()
+}
+
 // 未同意時不送。vue-gtag 的 query() 會自己建 dataLayer 再 push，不呼叫也不會壞，
 // 但那些事件會一直堆在陣列裡沒人消化。
 function track(name, params) {
@@ -85,13 +111,17 @@ export function trackViewItem(product) {
     })
 }
 
-export function trackAddToCart(product, variant, quantity) {
+export function trackAddToCart(product, variant, quantity, specName) {
     track('add_to_cart', {
         items: [
             {
-                item_id: variant.sku || String(variant.id),
+                // ⚠️ 必須與 trackViewItem 用同一把 key。改成 SKU 會讓 GA4 把同一商品的
+                // 瀏覽與加入拆成兩列，view_item → add_to_cart 的漏斗永遠對不起來。
+                // 規格要保留就放 item_variant。
+                item_id: String(product.id),
                 item_name: product.name,
                 item_category: product.category?.name,
+                item_variant: specName || undefined,
                 quantity,
             },
         ],
