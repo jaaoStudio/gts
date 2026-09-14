@@ -44,6 +44,16 @@ installMemoryStorage()
 beforeEach(() => {
     // 換一個全新的實例而不是 clear()：順帶把上一個測試掛在它身上的 spy 一起丟掉
     installMemoryStorage()
+
+    // cookie 與 localStorage 同屬「每個測試都該重置的 ambient 狀態」。只有 jsdom 有
+    // document——node 環境的測試不需要，也沒有。
+    if (typeof document !== 'undefined') {
+        document.cookie.split(';').forEach((entry) => {
+            const name = entry.split('=')[0].trim()
+            if (name) document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+        })
+    }
+
     // store 的失敗路徑會 console.error，那是刻意的行為，不需要噴進測試輸出
     vi.spyOn(console, 'error').mockImplementation(() => {})
 })

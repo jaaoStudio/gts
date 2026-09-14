@@ -225,12 +225,12 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
-import { trackViewItem } from '../utils/analytics'
+import { trackAddToCart, trackViewItem } from '../utils/analytics'
 import { useRoute } from 'vue-router'
 import { productService } from '../services/productService'
 import { useCategoryStore } from '../stores/category'
 import { useSettingsStore } from '../stores/settings'
-import { useOrderStore } from '../stores/order'
+import { normalizeSpecName, useOrderStore } from '../stores/order'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple,
@@ -267,6 +267,11 @@ const addToOrder = () => {
   if (!product.value || !selectedVariant.value) return
 
   orderStore.add(product.value, selectedVariant.value, quantity.value)
+  trackAddToCart(
+    product.value,
+    quantity.value,
+    normalizeSpecName(selectedVariant.value.spec_name)
+  )
   quantity.value = 1
 
   // 短暫回饋，不用 toast 元件（全站目前沒有）
@@ -326,13 +331,13 @@ const fetchProduct = async (slug) => {
     const data = await productService.getProductBySlug(slug)
     product.value = data
     if (data?.name) {
+      trackViewItem(data)
       const title = `${data.name}｜金同心實業`
       document.title = title
       setMeta('og:title', title, 'property')
       setMeta('og:description', data.short_description || '專業五金工具與耗材供應。', 'property')
       if (data.image) setMeta('og:image', data.image, 'property')
     }
-    if (data) trackViewItem(data)
     if (data?.image) activeImage.value = data.image
     if (publishedVariants.value.length > 0) selectedVariant.value = publishedVariants.value[0]
   } catch (err) {

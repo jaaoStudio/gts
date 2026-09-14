@@ -2,13 +2,12 @@ import { defineStore } from 'pinia'
 import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { getAssetUrl } from '../utils/directus'
-import { trackAddToCart } from '../utils/analytics'
 
 const STORAGE_KEY = 'gts_order_items'
 
 // 1399 筆規格中有 374 筆的 spec_name 是匯入時留下的佔位字串 "Default"，
 // 不是真的規格名。顯示「規格：Default」對客人和老闆都是雜訊，一律視為未命名。
-const normalizeSpecName = (name) => {
+export const normalizeSpecName = (name) => {
     const s = (name || '').trim()
     return s.toLowerCase() === 'default' ? '' : s
 }
@@ -86,7 +85,6 @@ export const useOrderStore = defineStore('order', {
             if (!product || !variant) return
 
             const qty = Math.max(1, Math.floor(Number(quantity) || 1))
-            const specName = normalizeSpecName(variant.spec_name)
             const existing = this.items.find((it) => it.variantId === variant.id)
 
             if (existing) {
@@ -97,7 +95,7 @@ export const useOrderStore = defineStore('order', {
                     productId: product.id,
                     productSlug: product.slug,
                     productName: product.name,
-                    specName,
+                    specName: normalizeSpecName(variant.spec_name),
                     sku: variant.sku || '',
                     // null 代表詢價；不要塞 0，那會被誤讀成免費
                     unitPrice: variant.price ?? null,
@@ -107,7 +105,6 @@ export const useOrderStore = defineStore('order', {
             }
 
             this._persist()
-            trackAddToCart(product, variant, qty, specName)
         },
 
         updateQuantity(variantId, quantity) {

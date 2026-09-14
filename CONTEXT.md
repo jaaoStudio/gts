@@ -123,8 +123,7 @@ Customer actually sees change.
 In analytics, the moment an Order form is successfully created — **not** payment, and not
 the Admin's price confirmation. Those two happen in Directus with no browser present, so
 the storefront can never observe them. Reported to GA4 as `generate_lead`, deliberately
-carrying no monetary value: at submission only the Reference subtotal exists, and that is
-an estimate the Amount due will not match.
+carrying no monetary value (why: `docs/adr/0005`).
 _Avoid_: treating GA4's `purchase` event or any revenue figure as meaningful here — the
 real money is settled in Directus and never reaches the browser.
 

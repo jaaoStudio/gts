@@ -11,17 +11,27 @@ status: accepted
 | 事件 | 觸發點 |
 |---|---|
 | `view_item` | `ProductDetail.vue` 的 `fetchProduct()` 取得商品後 |
-| `add_to_cart` | order store 的 `add()` 末尾 |
+| `add_to_cart` | `ProductDetail.vue` 的 `addToOrder()` |
 | `generate_lead` | `OrderForm.vue` 的 `submit()`，`if (!result) return` 之後 |
 
-三個事件**一律不帶 `price` / `value` / `currency`**，`page_view` 排除 `/account/*`
-與 `/order/done/*`。
+三個事件**一律不帶 `price` / `value` / `currency`**。
+
+**埋點一律放在互動發生的元件，不放進 store 或 service**：store action 不知道自己
+為何被呼叫，把事件放進 `order.add()` 會讓未來任何呼叫端（重新下單、批次加入、還原）
+都被迫送出一個它沒打算送的使用者意圖事件。
+
+`page_view` 的排除靠路由自己的 `meta.noAnalytics` 宣告，不在 `main.js` 比對路徑字串
+——後者會在改路由時靜默失效，而且新增的私人路由預設會被追蹤（安全預設是反的）。
 
 Cookie consent 採 **opt-in**：同意之前完全不載入 gtag script。
 「使用者的選擇」由 `src/utils/analytics.js` 以 localStorage 存**三態**
 （`null` 沒問過 / `granted` / `denied`）。啟用走 `addGtag()`、撤回走 `optOut()`
 加自行清除 cookie；**完全不使用 `useConsent()` composable**（理由見下）。
 兩個動作都不重載頁面。
+
+**狀態與副作用由 `setConsent()` 一起完成**，呼叫端只給值。分開寫的那版讓
+`reject()` 只更新了狀態、沒停用 tag，撤回同意變成空操作——把配對交給呼叫端記得，
+就會有人忘記。
 
 ## Context
 
@@ -102,10 +112,14 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
 - **兩個按鈕都不重載頁面**。`addGtag()` 內部是 `await router.isReady()` →
   `trackRoute(currentRoute)` → 註冊 `afterEach`，當前這頁它自己會追蹤，不必靠重載補。
   重載反而會清空 `OrderForm` 那個沒有持久化的 `reactive` 表單。
-- **商品頁的 `page_title` 是通用的「商品｜金同心實業」**，不是商品名。`router/index.js`
-  的 `afterEach` 先套 `meta.title`，而 `ProductDetail.vue` 要等 API 回來才覆蓋成商品名，
-  那時 page_view 早已送出。`page_path` 仍能區分各商品，且 `view_item` 帶的 `item_name`
-  是正確商品名、商品報表不受影響——已知取捨，刻意不修。
+- **GA 的啟動掛在 `app.mount()` 之後**（`requestIdleCallback`）。`addGtag()` 會**同步**
+  插入 script tag，放在 mount 前等於把跨網域請求塞進畫面還沒繪製的那段。延後不會漏掉
+  當前頁——見上一條。
+- **商品頁的 `page_title` 是通用的「商品｜金同心實業」**，不是商品名。`page_title` 讀的是
+  `route.meta.title`（刻意不用 `document.title`：後者要等 `router` 的 `afterEach` 先跑完
+  才正確，而那只是註冊順序的巧合），而商品路由的 `meta.title` 本來就是通用值。
+  `page_path` 仍能區分各商品，且 `view_item` 帶的 `item_name` 是正確商品名、商品報表
+  不受影響——已知取捨，刻意不修。
 - **`generate_lead` 的品項數必須在 `orderStore.submit()` 之前抓**——`submit()` 成功後會
   `clear()`，之後再讀全是 0。
 - **`VITE_GA_ID` 沒傳 build arg 就整個不載入，且不會有任何錯誤訊息**。它直接寫在

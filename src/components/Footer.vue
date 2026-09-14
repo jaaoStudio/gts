@@ -83,9 +83,7 @@ import { useCategoryStore } from '../stores/category'
 import { PhPhoneCall } from '@phosphor-icons/vue'
 import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
 import LineButton from './LineButton.vue'
-import { reopenConsent } from '../utils/analytics'
-
-const analyticsConfigured = !!import.meta.env.VITE_GA_ID
+import { analyticsConfigured, reopenConsent } from '../utils/analytics'
 
 const categoryStore = useCategoryStore()
 const topCategories = computed(() => categoryStore.categoryTree.slice(0, 5))

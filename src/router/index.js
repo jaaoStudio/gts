@@ -36,19 +36,19 @@ const routes = [
         path: '/order/done/:id',
         name: 'OrderDone',
         component: () => import('../views/OrderDone.vue'),
-        meta: { title: '訂購單已送出｜金同心實業', requiresAuth: true }
+        meta: { title: '訂購單已送出｜金同心實業', requiresAuth: true, noAnalytics: true }
     },
     {
         path: '/account/orders',
         name: 'OrderHistory',
         component: () => import('../views/OrderHistory.vue'),
-        meta: { title: '我的訂購單｜金同心實業', requiresAuth: true }
+        meta: { title: '我的訂購單｜金同心實業', requiresAuth: true, noAnalytics: true }
     },
     {
         path: '/account/orders/:id',
         name: 'OrderDetail',
         component: () => import('../views/OrderDetail.vue'),
-        meta: { title: '訂購單明細｜金同心實業', requiresAuth: true }
+        meta: { title: '訂購單明細｜金同心實業', requiresAuth: true, noAnalytics: true }
     },
     {
         path: '/contact',
@@ -96,15 +96,13 @@ const routes = [
         path: '/admin/callback',
         name: 'AdminCallback',
         component: () => import('../views/AdminCallback.vue'),
-        // 沒有 title 的話 afterEach 不會動 document.title，GA 的 page_view 會沿用
-        // 前一頁的標題（多半是「會員登入」或某個商品名）
         meta: { title: '登入中｜金同心實業' }
     },
     {
         path: '/account',
         name: 'Account',
         component: () => import('../views/Account.vue'),
-        meta: { requiresAuth: true, title: '會員專區｜金同心實業' }
+        meta: { requiresAuth: true, title: '會員專區｜金同心實業', noAnalytics: true }
     }
 ]
 

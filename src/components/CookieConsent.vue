@@ -31,14 +31,14 @@
           <button
             type="button"
             class="flex-1 rounded-full bg-steel-100 px-6 py-3 font-display text-sm font-semibold text-steel-900 transition-colors duration-300 hover:bg-steel-200 lg:flex-none"
-            @click="reject"
+            @click="setConsent('denied')"
           >
             拒絕
           </button>
           <button
             type="button"
             class="flex-1 rounded-full bg-steel-900 px-6 py-3 font-display text-sm font-semibold text-white transition-colors duration-300 hover:bg-brand-500 lg:flex-none"
-            @click="accept"
+            @click="setConsent('granted')"
           >
             接受
           </button>
@@ -51,19 +51,7 @@
 <script setup>
 import { computed } from 'vue'
 import { PhCookie } from '@phosphor-icons/vue'
-import { consent, setConsent, enableAnalytics, disableAnalytics } from '../utils/analytics'
+import { consent, setConsent } from '../utils/analytics'
 
 const visible = computed(() => consent.value === null)
-
-// 兩邊都不重載：使用者可能是在 /order 填到一半才按掉 banner，而 OrderForm 的
-// form 是純 reactive、沒有持久化，重載會把已填的聯絡資料清光。
-const accept = () => {
-  setConsent('granted')
-  enableAnalytics()
-}
-
-const reject = () => {
-  setConsent('denied')
-  disableAnalytics()
-}
 </script>

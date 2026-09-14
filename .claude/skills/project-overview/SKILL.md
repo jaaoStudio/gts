@@ -70,6 +70,8 @@ src/
 │                         # ⚠ SPA runtime 設定，LINE/FB 爬蟲不執行 JS 故讀不到，
 │                         #   要精準社群卡需 SSR/預渲染
 └── router/index.js       # 路由 + 守衛 + afterEach 套 meta.title
+                          # meta.noAnalytics 決定該頁要不要進 GA（main.js 的 exclude 靠它）
+                          # + index.test.js：requiresAuth 的路由一律必須標 noAnalytics
 ```
 
 **分層規則**：元件**不直接**呼叫 Directus → 走 Pinia store → store 委派 service → service 用 SDK。

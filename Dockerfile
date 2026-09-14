@@ -20,16 +20,13 @@ ARG VITE_DIRECTUS_PUBLIC_URL
 ARG VITE_GA_ID
 ENV VITE_DIRECTUS_URL=$VITE_DIRECTUS_URL
 ENV VITE_DIRECTUS_PUBLIC_URL=$VITE_DIRECTUS_PUBLIC_URL
-# 沒傳這個 build arg 的話 GA 會整個不載入，而且不會有任何錯誤訊息（見 main.js）
 ENV VITE_GA_ID=$VITE_GA_ID
 
 # 構建應用 (Vue.js 項目通常使用 npm run build)
 RUN npm run build
 
-# 「GA 沒載入」是完全靜默的失敗：畫面正常、CI 全綠、只是永遠收不到資料。
-# 有傳 VITE_GA_ID 就代表要啟用，那它就必須出現在產物裡——擋得住 build arg 漏接、
-# env 沒被替換，以及有人把 main.js 那個 `if (import.meta.env.VITE_GA_ID)` 改成恆假。
-# 留空＝刻意停用，跳過檢查。
+# 留空＝刻意停用（本機/dev）。傳了就必須烘進產物，否則是完全靜默的失敗。
+# 它擋得住／擋不住哪些情況，見 .claude/skills/deploy-ops。
 RUN if [ -n "$VITE_GA_ID" ]; then \
       grep -rq "$VITE_GA_ID" dist/assets/ || { \
         echo "VITE_GA_ID 有傳入卻沒烘進 dist/assets，GA 不會載入" >&2; exit 1; }; \
