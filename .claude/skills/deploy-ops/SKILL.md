@@ -51,7 +51,7 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh && current_slot /opt/traefik/dynami
 **merge / push 到 `main`** → GitHub Actions(`.github/workflows/deploy.yml`):
 1. `test` job:`npm ci` → `npm run lint` → `npm test`。紅了就不會部署(擋直接 push 到 main 與 merge 後才浮現的問題)
 2. `freshness` job:跑 `.github/scripts/deploy-freshness.sh`,確認這個 commit 還值得部署;過期就把 build-and-deploy 整個 job **skip**(顯示 skipped 不是 failed)
-3. build 前端 image(build-args 烘 `VITE_DIRECTUS_URL=/api`、`VITE_DIRECTUS_PUBLIC_URL`)
+3. build 前端 image(build-args 烘 `VITE_DIRECTUS_URL=/api`、`VITE_DIRECTUS_PUBLIC_URL`、`VITE_GA_ID`)
 4. push `harbor.jaao.tw/gts/gts_web_store:{sha}` + `:latest`
 5. **切流量前再跑一次 freshness 檢查**(擋「Re-run failed jobs」繞過第 2 步的快取結果)
 6. SSH(部署 key)進 VM 跑 `~/gts-web/deploy.sh {sha}`:部署到**閒置** slot → 等 healthcheck healthy → 改 `gts.yml` 切流量(Traefik file provider 自動 reload,秒切)
@@ -228,8 +228,12 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
 把 `dist/` 複製到 `/usr/share/nginx/html`,`EXPOSE 80`。
 
 - **`VITE_*` 是 build-time 烘進靜態檔的**,不是 runtime 環境變數。Dockerfile 以
-  `ARG VITE_DIRECTUS_URL=/api` / `ARG VITE_DIRECTUS_PUBLIC_URL` 接,轉成 `ENV` 供 build 使用。
-  換後端網址**必須重 build image**,改容器環境變數沒有用。
+  `ARG VITE_DIRECTUS_URL=/api` / `ARG VITE_DIRECTUS_PUBLIC_URL` / `ARG VITE_GA_ID` 接,
+  轉成 `ENV` 供 build 使用。換後端網址**必須重 build image**,改容器環境變數沒有用。
+- **`npm run build` 之後有一道 GA 產物檢查**:傳了 `VITE_GA_ID` 就必須在 `dist/assets`
+  裡 grep 得到,否則 build 失敗。理由同「切流量前比對腳本 md5」——「GA 沒載入」是
+  完全靜默的失敗(畫面正常、CI 全綠、只是永遠收不到資料)。**留空則跳過檢查**,
+  代表刻意停用。它擋不住 GA ID 填錯或 consent 邏輯壞掉,那兩種產物檢查都是綠的。
 - `nginx/nginx.conf` 負責:靜態檔服務、SPA fallback(`try_files $uri $uri/ /index.html`)、
   `/api` 反代到 `directus_app:8055`。只 `listen 80`(無 IPv6)——healthcheck 用 `127.0.0.1`,見上方雷區 2。
 - **根目錄的 `docker-compose.yml` 不是正式部署路徑**:它仍指向舊的
@@ -243,6 +247,7 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh
 IMG=harbor.jaao.tw/gts/gts_web_store
 docker build --build-arg VITE_DIRECTUS_URL=/api \
   --build-arg VITE_DIRECTUS_PUBLIC_URL=https://core.gtxin.com.tw \
+  --build-arg VITE_GA_ID=G-M1PCKEXVMT \
   -t $IMG:<tag> -t $IMG:latest .
 docker push $IMG:<tag> && docker push $IMG:latest
 ```
@@ -252,6 +257,7 @@ docker push $IMG:<tag> && docker push $IMG:latest
 - **repo**:`deploy/`(compose + `deploy.sh` + `rollback.sh` + **`lib-slot.sh`** + README + traefik-dynamic/gts.yml)、`.github/workflows/deploy.yml`、**`.github/scripts/deploy-freshness.sh`**、`Dockerfile`、`nginx/nginx.conf`
 - **VM**:`/opt/traefik/`(Traefik)、`~/gts-web/`(藍綠 compose + **三支腳本** + .env;`.bak-*/` 是手動同步前的備份)
 - **GitHub Secrets**(`jaaoStudio/gts`):`HARBOR_URL/USER/PASSWORD`、`VM_HOST/USER/SSH_KEY`(部署 key `~/.ssh/gts-deploy`)、`VITE_DIRECTUS_PUBLIC_URL`
+  (`VITE_GA_ID` **不在這裡**,直接寫在 workflow 的 build-args——不是機密,且走 secret 會多一個靜默失敗點)
 - **SSH key 分工**:`~/.ssh/hetzner`=你自己登入;`~/.ssh/gts-deploy`=GitHub Actions 部署專用(要撤 CI 權限就從 VM authorized_keys 移掉這把)
 
 ## 專案要點(部署相關)

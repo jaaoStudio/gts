@@ -31,6 +31,7 @@ description: 專案的技術棧、目錄結構、環境變數與正典文件索�
 | 圖示 | `@phosphor-icons/vue` | ^2.2 |
 | 字體 | `@fontsource-variable/*`（自 host）| — |
 | 消毒 | DOMPurify（rich-text `v-html` 前必用）| ^3.4 |
+| 分析 | GA4（`vue-gtag`）+ 自管的 opt-in consent | ^3.7 |
 | Dev HTTPS | `vite-plugin-mkcert` | ^2.1 |
 | 部署 | Docker（node:24 → nginx）+ Traefik 藍綠 | — |
 
@@ -50,6 +51,7 @@ src/
 │   ├── ProductCard.vue
 │   ├── HeroProductRing.vue / HeroRingCard.vue   # 首頁商品轉盤
 │   ├── LineButton.vue    # LINE 聯絡鈕（有 floating prop，但 Footer/Contact 目前都用內嵌）
+│   ├── CookieConsent.vue # GA4 同意橫幅。拒絕鈕與接受同層同尺寸（EDPB 要求，ADR 0005）
 │   └── OrderStatusChip.vue  # 訂購單狀態標籤，顏色與 Directus 後台對齊
 ├── views/                # 16 個：Home / Products / ProductDetail / Contact / Faq /
 │                         # Shipping / Warranty / Privacy / Terms / AdminLogin(=/login) /
@@ -61,6 +63,8 @@ src/
 │                         # settingsService / orderService
 ├── directives/reveal.js  # v-reveal：IntersectionObserver + failsafe（勿改回 ScrollTrigger）
 ├── utils/
+│   ├── analytics.js      # GA4 事件 + consent 三態（null/granted/denied）。
+│   │                     # ⚠ 事件一律不帶金額；改這裡前先讀 ADR 0005（+ analytics.test.js）
 │   ├── directus.js       # SDK 單例（session 模式）+ getAssetUrl()
 │   └── seo.js            # setMeta()：runtime 改 <head> meta（目前僅 ProductDetail 用它設 og:*）
 │                         # ⚠ SPA runtime 設定，LINE/FB 爬蟲不執行 JS 故讀不到，
@@ -75,7 +79,8 @@ src/
 | 變數 | 用途 |
 |---|---|
 | `VITE_DIRECTUS_URL` | API base。正式站為相對路徑 `/api`（經 nginx 反代，與前端同源）|
-| `VITE_DIRECTUS_PUBLIC_URL` | 對外絕對網址，供 assets 與 SSO 導向用（`https://core.gtxin.com.tw`）|
+| `VITE_DIRECTUS_PUBLIC_URL` | 對外絕對網址，供 assets 與 SSO 導向用（`https://core.gtxin.com.tw`）。**必須是 `core.` 那個**——填成前台網域時圖片與 SSO 都會被 SPA fallback 吃掉、回 200 HTML 而非報錯 |
+| `VITE_GA_ID` | GA4 評估 ID。**留空＝完全不載入 GA**（本機 dev 即是此狀態）。正式值直接寫在 `deploy.yml` 的 build-args，刻意不走 secret：它本來就在前端明碼可見，走 secret 只會多一個「忘了設→靜默沒有 GA」的失敗點 |
 
 ⚠️ **`VITE_*` 是 build-time 烘進靜態檔的**，換後端網址必須重 build image，改容器環境變數無效。
 
@@ -99,6 +104,7 @@ npm run preview
 | 設計系統決策 | `docs/adr/0002` + skill `tailwind-design-system` |
 | 運費為何是預估值、不進應付金額 | `docs/adr/0003` |
 | `payment_note` 的對帳規則（為何不做回報通知信、為何關掉 readonly） | `docs/adr/0004` |
+| GA4 與 cookie consent（為何 GA 裡沒有金額、為何不用 `useConsent()`、後台要關哪些開關）| `docs/adr/0005` |
 | Directus 資料結構 | skill `directus-schema-fetcher`（抓即時 schema，**碰資料層前先跑**）|
 | service / mapper 寫法 | skill `directus-service-layer` |
 | 商品分類批次維運 | skill `directus-catalog-categorization` |
