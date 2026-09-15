@@ -28,6 +28,15 @@ describe('分析排除規則', () => {
         }
     })
 
+    test('404 必須被追蹤', () => {
+        const route = router.resolve('/totally-missing')
+
+        // 「哪些連結壞了」正是要從 GA 看出來的東西，排除掉就白做了。
+        // 也確認它真的走到 NotFound 而不是被 redirect 吞掉。
+        expect(route.name).toBe('NotFound')
+        expect(isExcludedFromAnalytics(route)).toBe(false)
+    })
+
     test('每個可導航的路由都必須有 meta.title', () => {
         // routeToPageView 直接讀 meta.title 且沒有 fallback：漏了就送出 undefined，
         // 而 fallback 到 document.title 會拿到「上一頁」的標題，錯得更隱晦

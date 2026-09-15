@@ -5,8 +5,13 @@ import ProductDetail from '../views/ProductDetail.vue'
 
 const routes = [
     {
+        // 這裡刻意不 redirect 到首頁：那會把失效連結、打錯的網址與下架商品的舊網址
+        // 全部靜默吞掉——使用者莫名其妙彈回首頁，而 GA 只看到「又一次首頁瀏覽」，
+        // 沒有人會發現哪些連結壞了。
         path: '/:pathMatch(.*)*',
-        redirect: '/'
+        name: 'NotFound',
+        component: () => import('../views/NotFound.vue'),
+        meta: { title: '找不到頁面｜金同心實業' }
     },
     {
         path: '/',

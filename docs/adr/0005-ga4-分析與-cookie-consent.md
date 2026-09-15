@@ -114,10 +114,10 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
   ⚠️ 這也讓 `track()` 的 consent 守衛變成測試盲區：守衛失守時事件不會被送出、而是堆進
   佇列，等使用者按下接受再整批補送。測「未同意時不推 dataLayer」看不到這件事，要測的是
   **「同意前的行為不得在事後被補送」**。
-- **404 會被算成首頁**。catch-all 路由 `redirect: '/'`，所以失效連結、打錯的網址與掃描
-  機器人都灌進 Home 的 page_view，而 404 本身在 GA 裡完全看不到；`page_location` 還會
-  保留原始 query 與 `page_path` 不一致。redirect 早於本次改動，只有資料後果是新的——
-  要修得先決定站上要不要有 404 頁，那是產品決策，不在本 ADR 範圍。
+- **404 現在是真的一頁**（`views/NotFound.vue`），catch-all 不再 `redirect: '/'`。
+  原本的 redirect 會把失效連結、打錯的網址與下架商品的舊網址全部靜默吞掉：使用者莫名
+  彈回首頁，而 GA 只看到「又一次首頁瀏覽」。現在 `page_path` 是實際的錯誤路徑，壞掉的
+  連結會自己出現在報表裡。⚠️ 它**不可**標 `noAnalytics`——那正是要看見的東西（有測試守著）。
 - **撤回同意必須 `optOut()`，不能只清 cookie**。`pageTracker` 的 `afterEach` 由 vue-gtag
   自己註冊，不經過 `analytics.js` 的 consent 守衛——先接受、後從頁尾撤回時，它照樣會在
   下次換頁送出 page_view，gtag 也會立刻把 `_ga` 種回來，撤回等於沒發生。

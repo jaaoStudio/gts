@@ -53,7 +53,8 @@ src/
 │   ├── LineButton.vue    # LINE 聯絡鈕（有 floating prop，但 Footer/Contact 目前都用內嵌）
 │   ├── CookieConsent.vue # GA4 同意橫幅。拒絕鈕與接受同層同尺寸（EDPB 要求，ADR 0005）
 │   └── OrderStatusChip.vue  # 訂購單狀態標籤，顏色與 Directus 後台對齊
-├── views/                # 16 個：Home / Products / ProductDetail / Contact / Faq /
+├── views/                # 17 個：Home / Products / ProductDetail / Contact / Faq /
+│                         # NotFound（catch-all，刻意不 redirect 到首頁）/
 │                         # Shipping / Warranty / Privacy / Terms / AdminLogin(=/login) /
 │                         # AdminCallback / Account /
 │                         # OrderForm(=/order) / OrderDone / OrderHistory / OrderDetail
