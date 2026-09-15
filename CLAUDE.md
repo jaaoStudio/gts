@@ -55,6 +55,13 @@ verbosity 報」，結果把自己的產出從唯一會抓到這件事的審查�
 
 改完跑 `npm run lint`（帶 `--max-warnings 0`）、`npm test`、`npm run build`。
 
+⚠️ **本機 `npm test` 綠不代表 CI 綠**：本機有 `.env`，CI 沒有（它不進版控）。任何會拉到
+`utils/directus` 的測試都要 `vi.mock('../utils/directus')`——**包括只是 `import router`**，
+因為 router 靜態 import 了 `ProductDetail.vue`，一路帶進 product store → productService。
+漏了的話 CI 會**載入失敗而非測試失敗**，而那個輸出很像全綠：
+`Test Files 1 failed` 配上 `Tests 84 passed`——那 15 條其實一次都沒跑。
+懷疑時把 `.env` 暫時移開跑一次（記得還原）。
+
 **動到測試本身就要重驗突變測試** —— 換了抓手或 mock 機制之後，測試可能仍然
 全綠卻已經抓不到東西。做法是把對應的 bug 種回去，確認它會紅，再還原。
 

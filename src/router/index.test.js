@@ -2,7 +2,15 @@
 //
 // 需要 DOM：createWebHistory() 讀 window.location。
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+
+// ⚠️ 少了這行，整個測試檔會在 CI「載入失敗」而不是「測試失敗」——vitest 回報
+// `Test Files 1 failed` 但 `Tests N passed`，看起來像全綠，實際上這裡一條都沒跑。
+// router 靜態 import 了 ProductDetail.vue，於是拉進 product store → productService
+// → utils/directus，而它在模組載入時就用 import.meta.env 建 SDK client。
+// 本機有 .env 所以不會炸，CI 沒有（.env 不進版控）。見 utils/__mocks__/directus.js。
+vi.mock('../utils/directus')
+
 import router from './index'
 import { isExcludedFromAnalytics } from '../utils/analytics'
 
