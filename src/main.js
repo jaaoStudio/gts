@@ -11,7 +11,7 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 import { reveal } from './directives/reveal'
-import { analyticsConfigured, isExcludedFromAnalytics, routeToPageView } from './utils/analytics'
+import { analyticsConfigured, gtagOptions, startAnalyticsWhenIdle } from './utils/analytics'
 
 const pinia = createPinia()
 const app = createApp(App)
@@ -22,19 +22,7 @@ app.directive('reveal', reveal)
 
 // ⚠️ 與 GA4 後台「加強型評估」的網頁瀏覽會雙重計算，那個開關必須關著（docs/status.md）
 if (analyticsConfigured) {
-    app.use(
-        createGtag({
-            tagId: import.meta.env.VITE_GA_ID,
-            // 同意之前一律不載入 gtag script，不是載入後再設 denied
-            initMode: 'manual',
-            // 預設的 template 是 route.name，報表會變成一排 "ProductDetail"
-            pageTracker: {
-                router,
-                exclude: isExcludedFromAnalytics,
-                template: routeToPageView,
-            },
-        })
-    )
+    app.use(createGtag(gtagOptions(router)))
 }
 
 // 訂購單只讀 localStorage，同步且不會失敗，先還原好讓 Navbar 首次繪製就有正確數量
@@ -52,14 +40,5 @@ const authStore = useAuthStore()
 authStore.init().then(() => {
     app.mount('#app')
 
-    // 擺在 mount 之後：addGtag() 會同步插入 script tag，放在前面等於把跨網域請求塞進
-    // 畫面還沒繪製的那段。延後不會漏掉這一頁——addGtag 內部會先 await router.isReady()
-    // 再追蹤當前路由，而這段窗口內送出的事件由 store 排隊補送。
-    if (analyticsConfigured) {
-        // ⚠️ 必須在 callback 內再讀一次：使用者可能在這中間就從頁尾撤回了同意，
-        //    而 enable() 的 optIn() 會把剛設好的停用旗標清掉。
-        ;(window.requestIdleCallback ?? setTimeout)(() => {
-            if (consentStore.value === 'granted') consentStore.enable()
-        })
-    }
+    if (analyticsConfigured) startAnalyticsWhenIdle(consentStore)
 })

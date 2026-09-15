@@ -6,7 +6,7 @@
       <header>
         <p class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">訂購單</p>
         <h1 class="mt-2 font-display text-3xl font-bold tracking-tight text-steel-900 sm:text-4xl">
-          我的訂購單
+          訂購單
         </h1>
         <p class="mt-3 max-w-xl leading-relaxed text-steel-500">
           送出後由專人與您確認價格與庫存，確認後才需付款。
@@ -374,20 +374,13 @@ const submit = async () => {
     return
   }
 
-  // submit() 成功後會 clear()，品項數必須在送出前抓，否則全部是 0
-  const leadMetrics = {
-    itemCount: orderStore.items.length,
-    totalQuantity: orderStore.count,
-    quoteItemCount: orderStore.quoteItemCount,
-  }
-
   const result = await orderStore.submit(payload)
 
   if (!result) return
 
   // 放在這裡而不是完成頁：完成頁已被排除追蹤，而且輪詢逾時那條分支根本不會去完成頁，
-  // 但那時訂購單一樣已經建立
-  trackGenerateLead(leadMetrics)
+  // 但那時訂購單一樣已經建立。品項數由 submit() 回傳（它成功後會 clear()）
+  trackGenerateLead(result.snapshot)
 
   // 極少數情況輪詢逾時而拿不到 id（flow 慢），此時直接帶去訂單列表——
   // 訂單已經建立，讓客人看得到比停在購物車重要

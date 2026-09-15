@@ -5,6 +5,14 @@ import ProductDetail from '../views/ProductDetail.vue'
 
 const routes = [
     {
+        // 私人網址打錯仍可能帶訂購單 ID，不能落入會送分析的公開 404。
+        path: '/account/:pathMatch(.*)*',
+        alias: '/order/done/:pathMatch(.*)*',
+        name: 'PrivateNotFound',
+        component: () => import('../views/NotFound.vue'),
+        meta: { title: '找不到頁面｜金同心實業', noAnalytics: true }
+    },
+    {
         // 這裡刻意不 redirect 到首頁：那會把失效連結、打錯的網址與下架商品的舊網址
         // 全部靜默吞掉——使用者莫名其妙彈回首頁，而 GA 只看到「又一次首頁瀏覽」，
         // 沒有人會發現哪些連結壞了。

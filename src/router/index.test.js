@@ -18,8 +18,8 @@ describe('分析排除規則', () => {
     })
 
     test('排除判斷本身要認得旗標', () => {
-        // 上一條只保證旗標在，這條保證消費端真的讀它——否則旗標可以完美無缺，
-        // 而 main.js 那邊被改成恆 false 也不會有人發現
+        // 上一條只保證旗標宣告在路由上，這條保證排除判斷讀得懂它。
+        // main.js 的接線另由 main.test.js 實際啟動後驗證。
         for (const path of ['/account', '/account/orders', '/account/orders/42', '/order/done/9']) {
             expect(isExcludedFromAnalytics(router.resolve(path)), path).toBe(true)
         }
@@ -28,7 +28,23 @@ describe('分析排除規則', () => {
         }
     })
 
-    test('404 必須被追蹤', () => {
+    test.each([
+        '/account/xxx', '/account/orders/42/x', '/account/orders/42/x?source=email#detail',
+        '/order/done', '/order/done/', '/order/done/42/x', '/ACCOUNT/unknown',
+    ])('私人 404 不追蹤：%s', (path) => {
+        const route = router.resolve(path)
+
+        expect(route.name).toBe('PrivateNotFound')
+        expect(route.meta.noAnalytics).toBe(true)
+        expect(isExcludedFromAnalytics(route)).toBe(true)
+        expect(route.matched.some((record) => record.redirect)).toBe(false)
+    })
+
+    test.each(['/order', '/accounting', '/order/done-other', '/totally-missing'])('公開路徑仍可追蹤：%s', (path) => {
+        expect(isExcludedFromAnalytics(router.resolve(path))).toBe(false)
+    })
+
+    test('公開 404 必須被追蹤', () => {
         const route = router.resolve('/totally-missing')
 
         // 「哪些連結壞了」正是要從 GA 看出來的東西，排除掉就白做了。

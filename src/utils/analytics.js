@@ -3,7 +3,6 @@ import { useConsentStore } from '../stores/consent'
 /** 沒設 `VITE_GA_ID` 就完全不載入 GA，banner 也沒有存在意義（本機 dev 即是此狀態）*/
 export const analyticsConfigured = !!import.meta.env.VITE_GA_ID
 
-/** ⚠️ 分開 export 才測得到：inline 在 `createGtag()` 的選項物件裡沒有任何入口 */
 export const isExcludedFromAnalytics = (route) =>
     route.matched.some((r) => r.meta?.noAnalytics)
 
@@ -15,6 +14,24 @@ export const routeToPageView = (route) => ({
     page_path: route.path,
     page_location: window.location.href,
 })
+
+export const gtagOptions = (router) => ({
+    tagId: import.meta.env.VITE_GA_ID,
+    // 同意前不載入 script；不能改用預設的 auto。
+    initMode: 'manual',
+    pageTracker: {
+        router,
+        exclude: isExcludedFromAnalytics,
+        template: routeToPageView,
+    },
+})
+
+// mount 後再排程，避免 GA 請求搶首次繪製；callback 內重查同意，避免撤回後又啟用。
+export const startAnalyticsWhenIdle = (consentStore) => {
+    ;(window.requestIdleCallback ?? setTimeout)(() => {
+        if (consentStore.value === 'granted') consentStore.enable()
+    })
+}
 
 // ⚠️ 事件一律不帶 price / value / currency——這站沒有真實成交價，理由見 ADR 0005
 export function trackViewItem(product) {

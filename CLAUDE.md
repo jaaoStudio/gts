@@ -58,5 +58,10 @@ verbosity 報」，結果把自己的產出從唯一會抓到這件事的審查�
 **動到測試本身就要重驗突變測試** —— 換了抓手或 mock 機制之後，測試可能仍然
 全綠卻已經抓不到東西。做法是把對應的 bug 種回去，確認它會紅，再還原。
 
+⚠️ **跑突變時小心兩個會讓結論反過來的陷阱**：`--reporter=basic` 在 vitest 5 不存在，
+它會在跑任何測試**之前**就 `Failed to load url basic` 並 exit 1 —— 拿離開碼判斷的話，
+每一個突變都會被誤判成「殺掉了」。`.vitest/json/output.json` 的 `numFailedTests`
+同樣不可信。用 `--reporter=verbose` 讀 `Tests N failed`，或自己解析 `assertionResults`。
+
 部署相關的改動見 `.claude/skills/deploy-ops`：那類失效幾乎都是靜默的，
 CI 綠燈不構成證據。

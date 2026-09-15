@@ -137,7 +137,7 @@ export const useOrderStore = defineStore('order', {
         },
 
         /**
-         * 送出訂購單。成功後清空購物車並回傳 { id, orderNumber }。
+         * 送出訂購單。成功後清空購物車並回傳 { id, orderNumber, snapshot }。
          * orderNumber 可能為 null（Flow 還沒補上），呼叫端要能只用 id 顯示。
          *
          * 失敗時**不清空購物車**，讓客人可以直接重試。
@@ -158,6 +158,14 @@ export const useOrderStore = defineStore('order', {
                     console.error('無法取得比對基準，將略過輪詢:', err)
                 }
 
+                // 與 createOrder 在同一段同步執行中取值，統計才與實際送出的品項一致。
+                // 成功後會 clear()，呼叫端必須使用回傳的 snapshot。
+                const snapshot = {
+                    itemCount: this.items.length,
+                    totalQuantity: this.count,
+                    quoteItemCount: this.quoteItemCount,
+                }
+
                 await orderService.createOrder({
                     contactName,
                     contactPhone,
@@ -175,7 +183,11 @@ export const useOrderStore = defineStore('order', {
                 // 訂單確實已建立；即使輪詢逾時也要清空購物車並帶去完成頁，
                 // 否則客人會重送而產生重複訂單
                 this.clear()
-                return { id: created?.id ?? null, orderNumber: created?.order_number ?? null }
+                return {
+                    id: created?.id ?? null,
+                    orderNumber: created?.order_number ?? null,
+                    snapshot,
+                }
             } catch (err) {
                 this.submitError = '訂購單送出失敗，請稍後再試或直接與我們聯絡。'
                 console.error('Error submitting order:', err)

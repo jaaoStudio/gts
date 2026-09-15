@@ -16,6 +16,7 @@ export const useConsentStore = defineStore('consent', {
         started: false,
         /** 啟動前送出的事件。直接送會排在 `config` 前面，被 gtag 靜默丟棄 */
         queued: [],
+        listening: false,
     }),
 
     getters: {
@@ -25,7 +26,10 @@ export const useConsentStore = defineStore('consent', {
     actions: {
         /** 在 `main.js` 呼叫一次（同 order store）：banner 顯不顯示要在首次繪製就定案 */
         init() {
+            // 重複初始化不能再掛監聽，也不能覆蓋儲存失敗後仍有效的記憶體選擇。
+            if (this.listening) return
             this.value = this._read()
+            this.listening = true
 
             // 其他分頁改了選擇就同步過來，否則在 A 分頁撤回、B 分頁照樣追蹤。
             // storage 事件只在「其他」分頁觸發，不會自迴圈。
@@ -45,7 +49,7 @@ export const useConsentStore = defineStore('consent', {
         },
 
         track(name, params) {
-            if (this.value !== 'granted') return
+            if (!import.meta.env.VITE_GA_ID || this.value !== 'granted') return
 
             if (!this.started) {
                 this.queued.push([name, params])
@@ -56,6 +60,7 @@ export const useConsentStore = defineStore('consent', {
         },
 
         async enable() {
+            if (!import.meta.env.VITE_GA_ID) return
             optIn()
             if (this.started) return
             this.started = true

@@ -5,13 +5,14 @@
 // 這裡的失效全是靜默的——撤回同意變成空操作、啟動被呼叫兩次而每次換頁送兩筆、
 // 同意前的瀏覽紀錄在按下接受時被整批補送。三種都不拋錯。
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { configure } from 'vue-gtag'
 import { useConsentStore } from './consent'
 
 const TAG_ID = 'G-TESTID'
 const STORAGE_KEY = 'gts_analytics_consent'
+let listeners
 
 // inject:false 不下載 gtag.js（測試不碰網路），但 dataLayer 照樣會被填，
 // 所以斷言拿到的是真實 payload 而不是 mock 的呼叫紀錄
@@ -21,9 +22,19 @@ const trackingEvents = () =>
     window.dataLayer.map((args) => Array.from(args)).filter((a) => a[0] === 'event')
 
 beforeEach(() => {
+    vi.stubEnv('VITE_GA_ID', TAG_ID)
+    listeners = vi.spyOn(window, 'addEventListener')
     setActivePinia(createPinia())
     window.dataLayer = []
     delete window[`ga-disable-${TAG_ID}`]
+})
+
+afterEach(() => {
+    for (const [type, listener, options] of listeners.mock.calls) {
+        if (type === 'storage') window.removeEventListener(type, listener, options)
+    }
+    vi.restoreAllMocks()
+    vi.unstubAllEnvs()
 })
 
 describe('三態', () => {
@@ -43,6 +54,31 @@ describe('三態', () => {
         // banner 的顯示條件是 isUndecided，所以 'denied' 必須與「沒問過」分得開
         expect(store.value).toBe('denied')
         expect(store.isUndecided).toBe(false)
+    })
+
+    test('init 可以重複呼叫而不會重複掛上 storage 監聽', () => {
+        const store = useConsentStore()
+
+        store.init()
+        store.init()
+
+        expect(listeners.mock.calls.filter(([type]) => type === 'storage')).toHaveLength(1)
+        const apply = vi.spyOn(store, '_apply')
+        window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: 'denied' }))
+        expect(apply).toHaveBeenCalledExactlyOnceWith('denied')
+    })
+
+    test('重複 init 不會用舊儲存值覆蓋尚未存成功的選擇', () => {
+        const store = useConsentStore()
+        store.init()
+        vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+            throw new Error('QuotaExceededError')
+        })
+        store.set('denied')
+
+        store.init()
+
+        expect(store.value).toBe('denied')
     })
 
     test('set 與 reopen 會同步 state 與 localStorage', () => {

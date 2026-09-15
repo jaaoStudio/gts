@@ -23,13 +23,18 @@ status: accepted
 `page_view` 的排除靠路由自己的 `meta.noAnalytics` 宣告，不在 `main.js` 比對路徑字串
 ——後者會在改路由時靜默失效，而且新增的私人路由預設會被追蹤（安全預設是反的）。
 
+**私人路徑的 404 也排除**：`/account`、`/order/done` 及其子路徑都不送分析，
+由帶 `noAnalytics` 的私人 catch-all 路由承接。打錯的訂購單網址仍可能含有訂購單 ID；
+寧可少收這些壞連結，也不把私人識別資料送到 Google。一般公開頁的 404 照常追蹤，
+未送出的 `/order` 仍是公開頁。
+
 Cookie consent 採 **opt-in**：同意之前完全不載入 gtag script。
 「使用者的選擇」由 `src/stores/consent.js` 以 localStorage 存**三態**
 （`null` 沒問過 / `granted` / `denied`）。啟用走 `addGtag()`、撤回走 `optOut()`
 加自行清除 cookie；**完全不使用 `useConsent()` composable**（理由見下）。
 兩個動作都不重載頁面。
 
-**狀態與副作用由 `setConsent()` 一起完成**，呼叫端只給值。分開寫的那版讓
+**狀態與副作用由 store 的 `set()` 一起完成**，呼叫端只給值。分開寫的那版讓
 `reject()` 只更新了狀態、沒停用 tag，撤回同意變成空操作——把配對交給呼叫端記得，
 就會有人忘記。**`null`（重新詢問）也必須停用**：banner 跳出來時使用者尚未重新同意，
 那段期間繼續送 page_view 等於在「沒問過」的狀態下追蹤。
@@ -75,7 +80,7 @@ localhost 上其他專案留下的 `_ga` 就讓 GA 在 banner 還顯示著的當
 （例如先前同意過、後來想撤回）。
 
 所以整個 composable 都不碰，改為直接呼叫 `addGtag()`，撤回同意時清 cookie 的部分
-自己實作（`clearGaCookies()`）。
+自己實作（store 的 `_clearGaCookies()`）。
 
 ### 為什麼照歐盟標準做
 
@@ -116,13 +121,14 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
   **「同意前的行為不得在事後被補送」**。
 - **404 現在是真的一頁**（`views/NotFound.vue`），catch-all 不再 `redirect: '/'`。
   原本的 redirect 會把失效連結、打錯的網址與下架商品的舊網址全部靜默吞掉：使用者莫名
-  彈回首頁，而 GA 只看到「又一次首頁瀏覽」。現在 `page_path` 是實際的錯誤路徑，壞掉的
-  連結會自己出現在報表裡。⚠️ 它**不可**標 `noAnalytics`——那正是要看見的東西（有測試守著）。
+  彈回首頁，而 GA 只看到「又一次首頁瀏覽」。現在公開壞連結的實際路徑會出現在報表裡。
+  公開 catch-all 不標 `noAnalytics`；私人 catch-all 則必須
+  標記排除，避免打錯的訂購單網址洩漏 ID。
 - **撤回同意必須 `optOut()`，不能只清 cookie**。`pageTracker` 的 `afterEach` 由 vue-gtag
-  自己註冊，不經過 `analytics.js` 的 consent 守衛——先接受、後從頁尾撤回時，它照樣會在
+  自己註冊，不經過 store 的 `track()` 守衛——先接受、後從頁尾撤回時，它照樣會在
   下次換頁送出 page_view，gtag 也會立刻把 `_ga` 種回來，撤回等於沒發生。
 - **`addGtag()` 每呼叫一次就多註冊一組 `router.afterEach`**，所以啟用必須是冪等的
-  （`analytics.js` 的 `started` 旗標）。否則「接受 → 拒絕 → 再接受」之後，每次換頁都會
+  （store 的 `started` 旗標）。否則「接受 → 拒絕 → 再接受」之後，每次換頁都會
   送出兩筆 page_view。
 - **兩個按鈕都不重載頁面**。`addGtag()` 內部是 `await router.isReady()` →
   `trackRoute(currentRoute)` → 註冊 `afterEach`，當前這頁它自己會追蹤，不必靠重載補。
@@ -135,8 +141,9 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
   才正確，而那只是註冊順序的巧合），而商品路由的 `meta.title` 本來就是通用值。
   `page_path` 仍能區分各商品，且 `view_item` 帶的 `item_name` 是正確商品名、商品報表
   不受影響——已知取捨，刻意不修。
-- **`generate_lead` 的品項數必須在 `orderStore.submit()` 之前抓**——`submit()` 成功後會
-  `clear()`，之後再讀全是 0。
+- **`generate_lead` 的品項數由 `orderStore.submit()` 回傳**（`result.snapshot`）。
+  `submit()` 成功後會 `clear()`，呼叫端若自己在事後讀 `items` 一律拿到 0——而且不會報錯，
+  轉換報表會變成一整排「0 件」。元件測試驗證清空後仍送出正確數量，包含輪詢逾時的分支。
 - **`VITE_GA_ID` 沒傳 build arg 就整個不載入，且不會有任何錯誤訊息**。它直接寫在
   `deploy.yml` 的 build-args 而非 GitHub secret：GA 評估 ID 本來就在前端明碼可見、不是機密，
   走 secret 只會多一個「忘了設 → 正式站靜默沒有 GA」的失敗點。
@@ -145,5 +152,5 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
 - **GA4 後台還有兩個 repo 外的設定會靜默影響資料**：
   **資料保留期間**預設只有 2 個月（且調整不追溯，過期資料救不回來），已改為 14 個月；
   **Google Signals 維持關閉**——開啟會讓資料流入 Google 的廣告個人化，而 `Privacy.vue`
-  第五節的揭露只涵蓋「分析網站流量」，要開就得先改那段。
+  第五節揭露的範圍是流量、商品互動與送單數量統計，不含廣告用途，要開就得先改那段。
 - **排除規則不可順手把 `/product/:slug` 也正規化**——商品熱度正是靠實際 slug 分辨的。

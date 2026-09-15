@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 //
-// consent 狀態機本身的測試在 src/stores/consent.test.js；這裡只管事件的 payload
-// 與兩個 pageTracker predicate。
+// 啟動接線由 main.test.js 驗證；這裡驗事件 payload 與頁面欄位。
 
-import { beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { configure } from 'vue-gtag'
 import { useConsentStore } from '../stores/consent'
-import { routeToPageView, trackAddToCart, trackGenerateLead, trackViewItem } from './analytics'
+import {
+    routeToPageView,
+    trackAddToCart,
+    trackGenerateLead,
+    trackViewItem,
+} from './analytics'
 
 const TAG_ID = 'G-TESTID'
 
@@ -23,14 +27,18 @@ const firstItem = (name) => eventsNamed(name)[0][2].items[0]
 const product = { id: 'prod-1', name: '專利水泥攪拌器轉接頭組', category: { name: '接桿/轉接頭' } }
 
 beforeEach(async () => {
+    vi.stubEnv('VITE_GA_ID', TAG_ID)
     setActivePinia(createPinia())
     window.dataLayer = []
     delete window[`ga-disable-${TAG_ID}`]
 
     const store = useConsentStore()
-    store.init()
     store.set('granted')
     await new Promise((r) => setTimeout(r, 0))
+})
+
+afterEach(() => {
+    vi.unstubAllEnvs()
 })
 
 describe('事件 payload', () => {
