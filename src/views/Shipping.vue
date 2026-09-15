@@ -2,12 +2,15 @@
   <PageShell
     title="運送與退貨"
     eyebrow="Shipping & Returns"
-    updated="2026-07-21"
+    updated="2026-09-15"
     lead="關於出貨、運費與退換貨的說明。實際細節以雙方確認為準。"
   >
     <div class="doc">
       <h2>出貨時間</h2>
-      <p>現貨商品於<strong>確認訂單後盡速安排出貨</strong>；大量或特殊規格品項的交期會於詢價時另行告知。</p>
+      <p>
+        現貨商品於<strong>款項確認後盡速安排出貨</strong>；大量或特殊規格品項的交期，
+        會在我們確認金額時一併告知。
+      </p>
 
       <h2>運費</h2>
       <ul>
