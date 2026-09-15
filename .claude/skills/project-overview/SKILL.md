@@ -58,12 +58,13 @@ src/
 │                         # AdminCallback / Account /
 │                         # OrderForm(=/order) / OrderDone / OrderHistory / OrderDetail
 │                         # （+ OrderDetail.test.js，唯一的元件測試）
-├── stores/               # auth / product / category / settings / order
+├── stores/               # auth / product / category / settings / order / consent
+│                         # consent：GA 同意三態 + 副作用，main.js 呼叫 init()（+ 測試）
 ├── services/             # productService（+ productMapper）/ customerService /
 │                         # settingsService / orderService
 ├── directives/reveal.js  # v-reveal：IntersectionObserver + failsafe（勿改回 ScrollTrigger）
 ├── utils/
-│   ├── analytics.js      # GA4 事件 + consent 三態（null/granted/denied）。
+│   ├── analytics.js      # GA4 事件與 pageTracker predicate（狀態在 stores/consent.js）。
 │   │                     # ⚠ 事件一律不帶金額；改這裡前先讀 ADR 0005（+ analytics.test.js）
 │   ├── directus.js       # SDK 單例（session 模式）+ getAssetUrl()
 │   └── seo.js            # setMeta()：runtime 改 <head> meta（目前僅 ProductDetail 用它設 og:*）

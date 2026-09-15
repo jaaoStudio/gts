@@ -60,7 +60,7 @@
             </li>
             <!-- 撤回同意的入口。GDPR 要求撤回和給予一樣容易，而 banner 按過就不再出現 -->
             <li v-if="analyticsConfigured">
-              <button type="button" class="text-sm text-steel-400 transition-colors hover:text-white" @click="reopenConsent">
+              <button type="button" class="text-sm text-steel-400 transition-colors hover:text-white" @click="consentStore.reopen()">
                 Cookie 設定
               </button>
             </li>
@@ -83,7 +83,10 @@ import { useCategoryStore } from '../stores/category'
 import { PhPhoneCall } from '@phosphor-icons/vue'
 import horizontal from '@/assets/gts-lockup-horizontal-dark.svg'
 import LineButton from './LineButton.vue'
-import { analyticsConfigured, reopenConsent } from '../utils/analytics'
+import { analyticsConfigured } from '../utils/analytics'
+import { useConsentStore } from '../stores/consent'
+
+const consentStore = useConsentStore()
 
 const categoryStore = useCategoryStore()
 const topCategories = computed(() => categoryStore.categoryTree.slice(0, 5))

@@ -11,13 +11,7 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 import { reveal } from './directives/reveal'
-import {
-    analyticsConfigured,
-    consent,
-    enableAnalytics,
-    isExcludedFromAnalytics,
-    routeToPageView,
-} from './utils/analytics'
+import { analyticsConfigured, isExcludedFromAnalytics, routeToPageView } from './utils/analytics'
 
 const pinia = createPinia()
 const app = createApp(App)
@@ -47,6 +41,11 @@ if (analyticsConfigured) {
 import { useOrderStore } from './stores/order'
 useOrderStore().init()
 
+// 同理：banner 顯不顯示要在首次繪製就定案，不能等 GA 啟動
+import { useConsentStore } from './stores/consent'
+const consentStore = useConsentStore()
+consentStore.init()
+
 // 在 mount 前初始化認證狀態（只執行一次）
 import { useAuthStore } from './stores/auth'
 const authStore = useAuthStore()
@@ -55,12 +54,12 @@ authStore.init().then(() => {
 
     // 擺在 mount 之後：addGtag() 會同步插入 script tag，放在前面等於把跨網域請求塞進
     // 畫面還沒繪製的那段。延後不會漏掉這一頁——addGtag 內部會先 await router.isReady()
-    // 再追蹤當前路由，而這段窗口內送出的事件由 analytics.js 排隊補送。
+    // 再追蹤當前路由，而這段窗口內送出的事件由 store 排隊補送。
     if (analyticsConfigured) {
         // ⚠️ 必須在 callback 內再讀一次：使用者可能在這中間就從頁尾撤回了同意，
-        //    而 enableAnalytics() 的 optIn() 會把剛設好的停用旗標清掉。
+        //    而 enable() 的 optIn() 會把剛設好的停用旗標清掉。
         ;(window.requestIdleCallback ?? setTimeout)(() => {
-            if (consent.value === 'granted') enableAnalytics()
+            if (consentStore.value === 'granted') consentStore.enable()
         })
     }
 })

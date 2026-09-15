@@ -24,7 +24,7 @@ status: accepted
 ——後者會在改路由時靜默失效，而且新增的私人路由預設會被追蹤（安全預設是反的）。
 
 Cookie consent 採 **opt-in**：同意之前完全不載入 gtag script。
-「使用者的選擇」由 `src/utils/analytics.js` 以 localStorage 存**三態**
+「使用者的選擇」由 `src/stores/consent.js` 以 localStorage 存**三態**
 （`null` 沒問過 / `granted` / `denied`）。啟用走 `addGtag()`、撤回走 `optOut()`
 加自行清除 cookie；**完全不使用 `useConsent()` composable**（理由見下）。
 兩個動作都不重載頁面。

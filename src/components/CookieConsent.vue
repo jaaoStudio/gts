@@ -6,7 +6,7 @@
     leave-to-class="translate-y-full opacity-0"
   >
     <div
-      v-if="visible"
+      v-if="consentStore.isUndecided"
       class="fixed inset-x-0 bottom-0 z-50 border-t border-steel-200 bg-white shadow-2xl"
       role="dialog"
       aria-live="polite"
@@ -31,14 +31,14 @@
           <button
             type="button"
             class="flex-1 rounded-full bg-steel-100 px-6 py-3 font-display text-sm font-semibold text-steel-900 transition-colors duration-300 hover:bg-steel-200 lg:flex-none"
-            @click="setConsent('denied')"
+            @click="consentStore.set('denied')"
           >
             拒絕
           </button>
           <button
             type="button"
             class="flex-1 rounded-full bg-steel-900 px-6 py-3 font-display text-sm font-semibold text-white transition-colors duration-300 hover:bg-brand-500 lg:flex-none"
-            @click="setConsent('granted')"
+            @click="consentStore.set('granted')"
           >
             接受
           </button>
@@ -49,9 +49,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { PhCookie } from '@phosphor-icons/vue'
-import { consent, setConsent } from '../utils/analytics'
+import { useConsentStore } from '../stores/consent'
 
-const visible = computed(() => consent.value === null)
+const consentStore = useConsentStore()
 </script>
