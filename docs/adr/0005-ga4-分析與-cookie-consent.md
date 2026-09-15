@@ -109,7 +109,8 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
 
 - ⚠️ **GA4 後台「加強型評估」的「網頁瀏覽」必須關閉**。它會靠 History Change 自己抓 SPA
   換頁，與 `pageTracker` 疊起來每次換頁算兩次。那個開關不在本 repo 裡，CI 綠燈不構成證據。
-  （`vue-gtag` 那一側不必擔心：它**無條件**把 config 設成 `send_page_view: false`，
+  （`vue-gtag` 那一側不必擔心：它的 config 預設帶 `send_page_view: false`（本專案沒傳
+  `config`，所以不會被覆蓋——它是 `{send_page_view:false, ...使用者的 config}`），
   所以 `pageTracker` 是唯一的 page_view 來源，實測首頁的 dataLayer 只有一筆。
   雙重計算的風險只剩後台那個開關。）
 - **啟動延後的窗口內，事件必須排隊而不是直接送**。回訪者的 `consent` 在模組載入當下
@@ -148,7 +149,10 @@ EDPB 的 Cookie Banner Taskforce 報告要求：只要任一層有「接受」�
   `deploy.yml` 的 build-args 而非 GitHub secret：GA 評估 ID 本來就在前端明碼可見、不是機密，
   走 secret 只會多一個「忘了設 → 正式站靜默沒有 GA」的失敗點。
   Dockerfile 在 `npm run build` 之後加了一道 grep：有傳這個 arg 就必須出現在 `dist/assets`，
-  否則 build 失敗。連帶擋住「有人把 `main.js` 的 `if (import.meta.env.VITE_GA_ID)` 改成恆假」。
+  否則 build 失敗。⚠️ 它能證明的**只有「build-arg 有傳進 bundler」**——擋不住 GA ID 填錯，
+  也擋不住初始化路徑失效：把 `analyticsConfigured` 改成恆假之後 grep 照樣命中，因為那個
+  字面值還來自 `stores/consent.js` 的 env 守衛（Vite 替換後落在別的 chunk）。
+  「初始化路徑失效」是由 `src/main.test.js` 守住的，不是這道 grep。
 - **GA4 後台還有兩個 repo 外的設定會靜默影響資料**：
   **資料保留期間**預設只有 2 個月（且調整不追溯，過期資料救不回來），已改為 14 個月；
   **Google Signals 維持關閉**——開啟會讓資料流入 Google 的廣告個人化，而 `Privacy.vue`

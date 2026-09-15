@@ -230,4 +230,22 @@ describe('啟用與撤回', () => {
         expect(store.value).toBe('denied')
         expect(window[`ga-disable-${TAG_ID}`]).toBe(true)
     })
+
+    test('其他 key 的 storage 事件不可被當成 consent', async () => {
+        const store = useConsentStore()
+        store.init()
+        store.set('granted')
+        await new Promise((r) => setTimeout(r, 0))
+
+        // 購物車也寫 localStorage。少了 key 比對，A 分頁按「加入訂購單」會讓 B 分頁把
+        // consent 設成那串 JSON——不等於 'granted' 所以 GA 被關掉，isUndecided 同時
+        // 變 false，banner 永遠不再出現，使用者無從修正。全程靜默。
+        window.dispatchEvent(
+            new StorageEvent('storage', { key: 'gts_order_items', newValue: '[{"variantId":1}]' })
+        )
+
+        expect(store.value).toBe('granted')
+        expect(store.isUndecided).toBe(false)
+        expect(window[`ga-disable-${TAG_ID}`]).toBeUndefined()
+    })
 })

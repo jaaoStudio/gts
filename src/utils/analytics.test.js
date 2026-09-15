@@ -90,5 +90,8 @@ describe('routeToPageView', () => {
         expect(view.page_title).toBe('某商品｜金同心實業')
         // 換成 route.matched 的 pattern 會讓所有商品併成一列
         expect(view.page_path).toBe('/product/abc')
+        // page_location 要是完整網址。填成相對路徑的話 GA4 的 hostname 與到達網頁
+        // 報表會靜默失真——而且 vue-gtag 只在它是 undefined 時才補，給錯值不會被糾正
+        expect(view.page_location).toBe(window.location.href)
     })
 })
