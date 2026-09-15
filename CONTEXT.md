@@ -119,6 +119,14 @@ label from the Customer's (該付錢了). Same state, two viewpoints — grep fo
 _Avoid_: inventing intermediate states — each one must correspond to something the
 Customer actually sees change.
 
+**Conversion** (轉換):
+In analytics, the moment an Order form is successfully created — **not** payment, and not
+the Admin's price confirmation. Those two happen in Directus with no browser present, so
+the storefront can never observe them. Reported to GA4 as `generate_lead`, deliberately
+carrying no monetary value (why: `docs/adr/0005`).
+_Avoid_: treating GA4's `purchase` event or any revenue figure as meaningful here — the
+real money is settled in Directus and never reaches the browser.
+
 **External channel** (外部通路):
 iOPEN Mall / 蝦皮 links stored on a Product. A Product may offer both an external channel
 and the Order form; the shopper chooses. Those platforms provide no order-creation API, so

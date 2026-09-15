@@ -2,7 +2,7 @@
   <PageShell
     title="聯絡我們"
     eyebrow="Contact"
-    lead="有任何商品、規格或報價需求，歡迎透過以下方式與我們聯繫，我們會盡快回覆。"
+    lead="商品、規格或報價的問題，歡迎用以下方式聯繫。"
   >
     <div class="grid gap-4 sm:grid-cols-2">
       <!-- 電話 -->

@@ -124,11 +124,12 @@
           </transition>
         </div>
 
-        <!-- Order form -->
+        <!-- Order form。不叫「我的訂購單」：那是 /account/orders（已送出的歷史單）
+             的名字，這裡是還沒送出的那張，同名會讓人點錯 -->
         <router-link
           to="/order"
           class="relative flex h-10 w-10 items-center justify-center rounded-full text-steel-600 transition-colors hover:bg-steel-100 hover:text-steel-900"
-          aria-label="我的訂購單"
+          aria-label="訂購單"
         >
           <PhShoppingCartSimple :size="20" weight="regular" />
           <span

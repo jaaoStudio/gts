@@ -116,7 +116,7 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
         // 這是 C1 的核心：讀取失敗曾被吞成 0，導致任何舊單都滿足 id > 0，
         // 輪詢第一圈就命中舊單，客人拿到別張單的單號去填匯款備註
         expect(orderService.waitForNewOrder).not.toHaveBeenCalled()
-        expect(result).toEqual({ id: null, orderNumber: null })
+        expect(result).toMatchObject({ id: null, orderNumber: null })
         // 訂單確實已建立，購物車要清空——連重整之後都不能復活，否則客人會重送
         expect(s.items).toEqual([])
         expect(itemsAfterReload()).toEqual([])
@@ -134,7 +134,7 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
         const result = await s.submit(payload)
 
         expect(orderService.waitForNewOrder).toHaveBeenCalledWith(0)
-        expect(result).toEqual({ id: 1, orderNumber: 'GTS-260908-0001' })
+        expect(result).toMatchObject({ id: 1, orderNumber: 'GTS-260908-0001' })
     })
 
     test('given_輪詢逾時_will_仍清空購物車且重整後不會復活', async () => {
@@ -153,7 +153,7 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
 
         const result = await s2.submit(payload)
 
-        expect(result).toEqual({ id: null, orderNumber: null })
+        expect(result).toMatchObject({ id: null, orderNumber: null })
         expect(s2.items).toEqual([])
         expect(itemsAfterReload()).toEqual([])
     })
@@ -173,6 +173,42 @@ describe('submit — 辨識新訂單的基準（C1）', () => {
         expect(s.submitting).toBe(false)
         // 失敗要能直接重試——重整後品項必須還在
         expect(itemsAfterReload()).toHaveLength(1)
+    })
+
+    test('given_送出成功_will_回傳送出當下的組成而不是清空後的', async () => {
+        const s = useOrderStore()
+        s.add(product(), addableVariant(), 2)
+        s.add(product({ id: 11 }), addableVariant({ id: 2, price: null }), 3)
+
+        orderService.getLatestOrderId.mockResolvedValue(100)
+        orderService.createOrder.mockResolvedValue({ id: null })
+        orderService.waitForNewOrder.mockResolvedValue({ id: 101, order_number: 'GTS-260908-0101' })
+
+        const result = await s.submit(payload)
+
+        // submit() 成功後會 clear()。呼叫端若自己在事後讀 items 會全部拿到 0，
+        // 而且完全不會報錯——轉換報表會變成一整排「0 件」。
+        expect(s.items).toEqual([])
+        expect(result.snapshot).toEqual({ itemCount: 2, totalQuantity: 5, quoteItemCount: 1 })
+    })
+
+    test('given_等待基準時品項變動_will_統計與實際建立的訂購單一致', async () => {
+        const s = useOrderStore()
+        s.add(product(), addableVariant(), 2)
+        const baseline = Promise.withResolvers()
+        orderService.getLatestOrderId.mockReturnValue(baseline.promise)
+        orderService.createOrder.mockResolvedValue(null)
+        orderService.waitForNewOrder.mockResolvedValue(null)
+
+        const pending = s.submit(payload)
+        s.add(product({ id: 11 }), addableVariant({ id: 2, price: null }), 3)
+        baseline.resolve(100)
+        const result = await pending
+
+        expect(orderService.createOrder.mock.calls[0][0].items).toMatchObject([
+            { variantId: 1, quantity: 2 }, { variantId: 2, quantity: 3 },
+        ])
+        expect(result.snapshot).toEqual({ itemCount: 2, totalQuantity: 5, quoteItemCount: 1 })
     })
 
     test('given_訂購單是空的_will_不送出', async () => {

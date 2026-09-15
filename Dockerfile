@@ -17,11 +17,20 @@ COPY . .
 # Vite 於 build 時讀取 process env 的 VITE_* 並烘進 dist。
 ARG VITE_DIRECTUS_URL=/api
 ARG VITE_DIRECTUS_PUBLIC_URL
+ARG VITE_GA_ID
 ENV VITE_DIRECTUS_URL=$VITE_DIRECTUS_URL
 ENV VITE_DIRECTUS_PUBLIC_URL=$VITE_DIRECTUS_PUBLIC_URL
+ENV VITE_GA_ID=$VITE_GA_ID
 
 # 構建應用 (Vue.js 項目通常使用 npm run build)
 RUN npm run build
+
+# 留空＝刻意停用（本機/dev）。傳了就必須烘進產物，否則是完全靜默的失敗。
+# 它擋得住／擋不住哪些情況，見 .claude/skills/deploy-ops。
+RUN if [ -n "$VITE_GA_ID" ]; then \
+      grep -rq "$VITE_GA_ID" dist/assets/ || { \
+        echo "VITE_GA_ID 有傳入卻沒烘進 dist/assets，GA 不會載入" >&2; exit 1; }; \
+    fi
 
 # Production stage
 FROM nginx:alpine

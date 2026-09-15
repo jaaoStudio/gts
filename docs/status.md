@@ -25,6 +25,7 @@
 | **Cloudflare Worker**（SSO callback double-tap） | CF 帳號 | `worker/auth-callback-worker.js` 是原始碼，部署在 CF；見 `docs/adr/0001` |
 | **VM 上的部署腳本** | `~/gts-web/`，需手動 `scp` | `.claude/skills/deploy-ops` |
 | **PayUni 金流文件**（111 頁轉錄） | 全域 skill，不在本 repo | `~/.claude/skills/payuni-api/` |
+| **GA4 後台設定**（加強型評估／資料保留／Google Signals） | Google Analytics 介面 | 三個開關都會**靜默**影響資料正確性，CI 驗不到；清單與理由見 `docs/adr/0005` |
 
 ## 下一步
 

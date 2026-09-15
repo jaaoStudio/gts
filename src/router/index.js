@@ -5,8 +5,21 @@ import ProductDetail from '../views/ProductDetail.vue'
 
 const routes = [
     {
+        // 私人網址打錯仍可能帶訂購單 ID，不能落入會送分析的公開 404。
+        path: '/account/:pathMatch(.*)*',
+        alias: '/order/done/:pathMatch(.*)*',
+        name: 'PrivateNotFound',
+        component: () => import('../views/NotFound.vue'),
+        meta: { title: '找不到頁面｜金同心實業', noAnalytics: true }
+    },
+    {
+        // 這裡刻意不 redirect 到首頁：那會把失效連結、打錯的網址與下架商品的舊網址
+        // 全部靜默吞掉——使用者莫名其妙彈回首頁，而 GA 只看到「又一次首頁瀏覽」，
+        // 沒有人會發現哪些連結壞了。
         path: '/:pathMatch(.*)*',
-        redirect: '/'
+        name: 'NotFound',
+        component: () => import('../views/NotFound.vue'),
+        meta: { title: '找不到頁面｜金同心實業' }
     },
     {
         path: '/',
@@ -36,19 +49,19 @@ const routes = [
         path: '/order/done/:id',
         name: 'OrderDone',
         component: () => import('../views/OrderDone.vue'),
-        meta: { title: '訂購單已送出｜金同心實業', requiresAuth: true }
+        meta: { title: '訂購單已送出｜金同心實業', requiresAuth: true, noAnalytics: true }
     },
     {
         path: '/account/orders',
         name: 'OrderHistory',
         component: () => import('../views/OrderHistory.vue'),
-        meta: { title: '我的訂購單｜金同心實業', requiresAuth: true }
+        meta: { title: '我的訂購單｜金同心實業', requiresAuth: true, noAnalytics: true }
     },
     {
         path: '/account/orders/:id',
         name: 'OrderDetail',
         component: () => import('../views/OrderDetail.vue'),
-        meta: { title: '訂購單明細｜金同心實業', requiresAuth: true }
+        meta: { title: '訂購單明細｜金同心實業', requiresAuth: true, noAnalytics: true }
     },
     {
         path: '/contact',
@@ -95,13 +108,14 @@ const routes = [
     {
         path: '/admin/callback',
         name: 'AdminCallback',
-        component: () => import('../views/AdminCallback.vue')
+        component: () => import('../views/AdminCallback.vue'),
+        meta: { title: '登入中｜金同心實業' }
     },
     {
         path: '/account',
         name: 'Account',
         component: () => import('../views/Account.vue'),
-        meta: { requiresAuth: true, title: '會員專區｜金同心實業' }
+        meta: { requiresAuth: true, title: '會員專區｜金同心實業', noAnalytics: true }
     }
 ]
 
