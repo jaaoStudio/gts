@@ -61,7 +61,18 @@
 
       <!-- 品項 + 小計 -->
       <div v-else class="mt-10 grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-start">
-        <div class="space-y-4">
+        <!--
+          送出期間把整區鎖住。這是 vue-component-conventions「送出流程」對策的第 2 件，
+          與 submit() 內的快照是**一組的，少一件都不夠**：快照擋的是「送出去的值不一致」，
+          fieldset 擋的是「使用者以為還改得動」。
+
+          ⚠️ 數量按鈕特別重要：沒有它，客人能在 await 期間把 2,500×1 加成 ×2，而交貨
+          方式早就快照成超商了——送出去的是一張代收 5,100、超過 7-11 上限的單。store
+          內對品項的重驗是安全網，這裡才是根治（why: docs/adr/0006）。
+
+          `border-0 p-0 min-w-0`：fieldset 的預設樣式會弄壞 grid 版面。
+        -->
+        <fieldset :disabled="orderStore.submitting" class="min-w-0 space-y-4 border-0 p-0">
         <ul class="space-y-4">
           <li
             v-for="item in orderStore.items"
@@ -254,7 +265,7 @@
             />
           </label>
         </section>
-        </div>
+        </fieldset>
 
         <!-- 小計 -->
         <aside class="rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6 lg:sticky lg:top-28">
@@ -346,7 +357,7 @@ import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
-import { CVS, CVS_BLOCK, SHIPPING, cvsBlockReason, estimateShipping } from '../utils/orderTotals'
+import { CVS_IBON, CVS_BLOCK, SHIPPING, cvsBlockReason, estimateShipping } from '../utils/orderTotals'
 import { DELIVERY, DELIVERY_LABEL } from '../services/orderService'
 import { trackGenerateLead } from '../utils/analytics'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
@@ -380,11 +391,14 @@ const cvsBlock = computed(() =>
 
 const cvsBlockText = computed(() => {
   if (cvsBlock.value === CVS_BLOCK.oversize) {
-    const { longestCm, totalCm, weightKg } = CVS.size
-    return `本單含超過超商尺寸限制的品項（最長邊 ${longestCm} 公分、長寬高合計 ${totalCm} 公分、${weightKg} 公斤以內），只能走宅配。`
+    // ⚠️ 不要把原因寫死成「尺寸」。can_ship_cvs 是老闆憑經驗勾的判斷，不是量出來的
+    // （why: docs/adr/0006 第 5 條），而且不能寄的理由未必是尺寸——耗材與化工整批
+    // 設 false 是因為**超商禁寄危險物品**，那跟尺寸無關。講死一個理由會在那一類商品
+    // 上直接說錯話。尺寸只當成「最常見的原因」提一句。
+    return '本單含不適合超商寄送的品項（常見原因是超過尺寸限制，或屬於超商禁寄的品類），只能走宅配。'
   }
   if (cvsBlock.value === CVS_BLOCK.overLimit) {
-    return `超商取貨付款的代收上限是 NT$${CVS.maxCollectable.toLocaleString()}，本單已超過，請改用宅配。`
+    return `超商取貨付款的代收上限是 NT$${CVS_IBON.maxCollectable.toLocaleString()}，本單已超過，請改用宅配。`
   }
   return null
 })

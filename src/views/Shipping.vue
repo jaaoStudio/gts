@@ -27,7 +27,7 @@
         <li>大宗訂購或自取可另行洽談。</li>
       </ul>
 
-      <!-- 數字一律從 utils/orderTotals 的 CVS 讀，不在文案裡重打——同 useShippingCopy -->
+      <!-- 數字一律從 utils/orderTotals 的 CVS_IBON 讀，不在文案裡重打——同 useShippingCopy -->
       <h2>7-11 超商取貨付款</h2>
       <ul>
         <li>

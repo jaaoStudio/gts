@@ -37,9 +37,13 @@
         </header>
 
         <!-- 超商取貨付款：金額已確認，但客人不用做任何事，只要等簡訊。這一區取代
-             匯款資訊——對他顯示銀行帳號與「我已匯款」是錯的指示。 -->
+             匯款資訊——對他顯示銀行帳號與「我已匯款」是錯的指示。
+
+             ⚠️ `shipped` 也要顯示。客人真正需要知道「要帶多少錢去」的時刻是包裹到店，
+             那時單子早就不在 quoted 了；只在 quoted 渲染等於在他最需要的時候把金額
+             收起來，只剩出貨信在承擔。 -->
         <section
-          v-if="isCvs && order.status === 'quoted' && order.confirmed_total != null"
+          v-if="isCvs && ['quoted', 'shipped'].includes(order.status) && order.confirmed_total != null"
           class="mt-8 rounded-[1.5rem] border-2 border-steel-900 bg-white p-6"
         >
           <h2 class="font-display text-lg font-semibold text-steel-900">取貨時應付</h2>
@@ -49,11 +53,12 @@
             </p>
             <p class="mt-1 text-sm text-steel-500">含運費，到門市取貨時付給店員。</p>
           </div>
-          <!-- 「我們會盡快為您寄出」由上方的 statusHint 負責（orderService 的 CVS_STATUS），
-               這裡只補它沒講的取貨期限，同一句不要寫兩次 -->
-          <p class="mt-4 text-sm leading-relaxed text-steel-600">
+          <!-- 「我們會盡快為您寄出」「到店會以簡訊通知」由上方的 statusHint 負責
+               （orderService 的 CVS_STATUS），這裡只補它沒講的取貨期限。
+               出貨後 statusHint 自己就帶了期限，這一句才不必再講一次。 -->
+          <p v-if="order.status === 'quoted'" class="mt-4 text-sm leading-relaxed text-steel-600">
             包裹到店後會以簡訊通知，
-            <span class="font-semibold text-steel-900">請於 {{ CVS.holdDays }} 天內取貨</span>，逾期會被退回。
+            <span class="font-semibold text-steel-900">請於 {{ CVS_IBON.holdDays }} 天內取貨</span>，逾期會被退回。
           </p>
         </section>
 
@@ -287,7 +292,7 @@ import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import OrderStatusChip from '../components/OrderStatusChip.vue'
 import { PhCaretLeft } from '@phosphor-icons/vue'
-import { CVS, lineTotal, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
+import { CVS_IBON, lineTotal, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
 
 const route = useRoute()
 const settingsStore = useSettingsStore()

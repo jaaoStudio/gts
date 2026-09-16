@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
     CVS_BLOCK,
-    CVS,
+    CVS_IBON,
     SHIPPING,
     confirmedSubtotal,
     cvsBlockReason,
@@ -203,7 +203,7 @@ describe('cvsBlockReason', () => {
         // 上限管的是店員實際收的數字，運費是它的一部分。拿小計去比會讓
         // 小計 5,000（代收 5,100）過關，等到老闆建單才被 7-11 擋下來。
         test('given_小計恰好等於上限_will_因為加上運費而被擋', () => {
-            expect(reason({ subtotal: CVS.maxCollectable })).toBe(CVS_BLOCK.overLimit)
+            expect(reason({ subtotal: CVS_IBON.maxCollectable })).toBe(CVS_BLOCK.overLimit)
         })
 
         test('given_小計4900_will_不擋因為含運剛好等於上限', () => {
@@ -242,11 +242,22 @@ describe('estimateShipping（超商）', () => {
             .toMatchObject({ state: SHIPPING.charged, amount: 60 })
     })
 
-    test('given_含詢價品項_will_仍然給數字', () => {
-        // 宅配未達門檻遇詢價會退成 quote（怕免運判斷被推翻）；超商沒有門檻要判斷，
-        // 級距只看標價部分，詢價報價後只會往上跳一階，不需要閉嘴
+    test('given_含詢價品項_will_不給數字', () => {
+        // 級距查的是代收金額，而詢價品項報價後會把它整個墊高——一項報 4,000 的就跳
+        // 三階，先講的數字必然被推翻。同 ADR 0003 第 4 條：只在答案確定時才給數字。
         expect(estimateShipping({ isCvs: true, subtotal: 500, hasQuoteItems: true, rule: null }).state)
-            .toBe(SHIPPING.charged)
+            .toBe(SHIPPING.quote)
+    })
+
+    test('given_含詢價品項_will_不給數字但仍可選超商', () => {
+        // 這兩件事刻意不同調：cvsBlockReason 問「會不會超過上限」，詢價只會讓它更
+        // 超標，所以敢判；estimateShipping 問「收多少」，詢價讓答案未定，所以不敢講。
+        // 誤把兩邊統一的話，會變成「有詢價品項就不給選超商」——那不是規格要的。
+        //
+        // hasQuoteItems 刻意傳進去：cvsBlockReason 不收這個參數，這條就是在釘住
+        // 「它應該繼續不收」——有人日後把詢價判斷加進去，這裡會紅。
+        expect(cvsBlockReason({ subtotal: 500, allItemsShippable: true, hasQuoteItems: true }))
+            .toBeNull()
     })
 })
 

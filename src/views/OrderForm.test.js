@@ -244,6 +244,24 @@ describe('交貨方式', () => {
         expect(wrapper.text()).toContain('請填寫取貨門市')
     })
 
+    test('given_送出中_will_整區輸入鎖住', async () => {
+        // vue-component-conventions「送出流程」的對策是兩件事：快照 + fieldset 鎖住，
+        // 少一件都不夠。快照擋的是送出去的值不一致，fieldset 擋的是使用者以為還改得動
+        // ——尤其數量按鈕，它是下一條測試那個競態的來源。
+        let release
+        orderService.getLatestOrderId.mockReturnValue(new Promise((r) => { release = r }))
+
+        expect(wrapper.find('fieldset').attributes('disabled')).toBeUndefined()
+
+        submitButton().trigger('click')
+        await flushPromises()
+
+        expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
+
+        release(100)
+        await flushPromises()
+    })
+
     test('given_送出期間把品項加到超過代收上限_will_不建單', async () => {
         // 交貨方式在點下按鈕那一刻就定住，品項卻要等 await 之後才讀。數量按鈕全程可按，
         // 所以這個縫隙真的送得出一張「超商、代收超過 5,000」的單。

@@ -38,15 +38,13 @@ export const SHIPPING = {
 }
 
 /**
- * 7-11 交貨便的公告費率與限制。**改通路（例如改走綠界）時這裡是唯一要動的地方**
- * ——說明頁與訂購單頁的數字都從這裡讀，不要在文案裡重打一次（`Shipping.vue` 曾經
- * 因為文案與行為分家出過事，見 `composables/useShippingCopy.js`）。
+ * 自己拿去 7-11 門市寄交貨便的公告費率與限制。
  *
- * ⚠️ 寫死是刻意的，不要搬進 `site_settings`：這是貨運公司費率而非本站定價
- * （why: `docs/adr/0006` 第 2 條）。
- * 來源 https://www.7-11.com.tw/service/accept.aspx，查證於 2026-09-16。
+ * ⚠️ 名字帶 `IBON` 是刻意的：這組數字**整組綁在寄件管道上**，改走綠界要換掉整個
+ * 常數而不是調個別欄位。說明頁的數字也一律從這裡讀，不在文案裡重打。
+ * 來源 https://www.7-11.com.tw/service/accept.aspx（2026-09-16）· why: `docs/adr/0006`
  */
-export const CVS = {
+export const CVS_IBON = {
     // 依代收金額分階
     tiers: [
         { max: 1000, fee: 60 },
@@ -60,17 +58,13 @@ export const CVS = {
     size: { longestCm: 45, totalCm: 105, weightKg: 10 },
 }
 
-const tierFee = (amount) => (CVS.tiers.find((t) => amount <= t.max) ?? CVS.tiers.at(-1)).fee
+const tierFee = (amount) => (CVS_IBON.tiers.find((t) => amount <= t.max) ?? CVS_IBON.tiers.at(-1)).fee
 
 /**
  * 交貨便運費。
  *
- * ⚠️ 級距查的是**含運的代收金額**，不是小計——運費是代收金額的一部分。小計 950
- * 查表得 60，但代收其實 1,010 已經跨階，7-11 收 70。少了外層那次查表，前台會顯示
- * 60 而老闆建單打 70，客人在取貨櫃台當場發現。
- *
- * 兩次查表就夠：加運費最多讓金額跳一階（階寬 1,000 遠大於最高運費 100），
- * 第二次的結果必然是不動點。`orderTotals.test.js` 有一條性質測試在守這件事。
+ * ⚠️ 級距查的是**含運的代收金額**，不是小計，所以要查兩次——外層那次不可省。
+ * 兩次就夠：加運費最多跳一階（階寬 1,000 遠大於最高運費 100）。
  */
 export const cvsShippingFee = (subtotal) => tierFee(subtotal + tierFee(subtotal))
 
@@ -92,9 +86,8 @@ export const CVS_BLOCK = {
 export const cvsBlockReason = ({ subtotal, allItemsShippable }) => {
     if (!allItemsShippable) return CVS_BLOCK.oversize
 
-    // ⚠️ 比的是含運的代收金額，不是小計。拿小計比，小計 5,000 會過關而代收其實 5,100，
-    // 等到老闆建單才被 7-11 擋下來——那時包裹已經包好了。
-    if (subtotal + cvsShippingFee(subtotal) > CVS.maxCollectable) return CVS_BLOCK.overLimit
+    // ⚠️ 比的是含運的代收金額，不是小計——運費算在上限裡面。
+    if (subtotal + cvsShippingFee(subtotal) > CVS_IBON.maxCollectable) return CVS_BLOCK.overLimit
 
     return null
 }
@@ -118,10 +111,12 @@ export const cvsBlockReason = ({ subtotal, allItemsShippable }) => {
  *        getter 單獨認定**，這裡不重複判斷 null 欄位——兩邊各判一次，規則遲早會分歧。
  */
 export const estimateShipping = ({ isCvs, subtotal, hasQuoteItems, rule }) => {
-    // 超商是另一套規則：級距由 7-11 定，不吃 site_settings，也**不適用免運門檻**
-    // ——那是老闆對宅配運費的補貼，而交貨便的運費是 7-11 從代收款直接扣走的。
-    // 因此它永遠是 charged，沒有 unavailable / free / quote 三種狀態。
+    // 超商不吃 site_settings，也**不適用免運門檻**（why: `docs/adr/0006` 第 1 條）
     if (isCvs) {
+        // ⚠️ 與 cvsBlockReason 刻意不同調，不要順手統一：那邊問「會不會超過上限」，
+        // 詢價只會更超標所以敢判；這邊問「收多少」，詢價讓答案未定所以不敢講。
+        if (hasQuoteItems) return { state: SHIPPING.quote }
+
         return {
             state: SHIPPING.charged,
             amount: cvsShippingFee(subtotal),
