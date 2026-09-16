@@ -1,5 +1,6 @@
 import { createItem, readItems, readItem, updateItem } from '@directus/sdk'
 import directus from '../utils/directus'
+import { CVS } from '../utils/orderTotals'
 
 /**
  * 交貨方式。**同時決定配送與付款**——組合是鎖死的，所以是一個選擇而不是兩個欄位
@@ -170,7 +171,7 @@ const CVS_STATUS = {
     quoted: { label: '已確認', hint: '金額已確認，我們會盡快為您寄出，取貨時再付款。' },
     shipped: {
         label: '已出貨',
-        hint: '包裹已寄出，到店後會以簡訊通知。請於 7 天內到指定門市取貨並付款，逾期會退回。',
+        hint: `包裹已寄出，到店後會以簡訊通知。請於 ${CVS.holdDays} 天內到指定門市取貨並付款，逾期會退回。`,
     },
 }
 

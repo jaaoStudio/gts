@@ -27,7 +27,8 @@ export const confirmedSubtotal = (items) =>
  * - `unavailable` — Directus 的運費設定不完整，運費列整行不渲染（退回加運費之前的行為）
  * - `free` — 已達免運門檻
  * - `quote` — 含詢價品項且尚未達門檻，算不出可信的數字
- * - `charged` — 收費，附 `amount` 與距離免運還差多少的 `gap`
+ * - `charged` — 收費，附 `amount`；宅配另附距離免運還差多少的 `gap`，超商則改附
+ *   說明該級距怎麼來的 `note`（它沒有免運可湊，給 gap 會是騙人的）
  */
 export const SHIPPING = {
     unavailable: 'unavailable',
@@ -37,62 +38,41 @@ export const SHIPPING = {
 }
 
 /**
- * 訂購單頁顯示給客人看的**預估**運費。
+ * 7-11 交貨便的公告費率與限制。**改通路（例如改走綠界）時這裡是唯一要動的地方**
+ * ——說明頁與訂購單頁的數字都從這裡讀，不要在文案裡重打一次（`Shipping.vue` 曾經
+ * 因為文案與行為分家出過事，見 `composables/useShippingCopy.js`）。
  *
- * 這是預估而不是實價：老闆會逐單看內容物決定要幾箱，再填 `orders.shipping_fee`，
- * 那個值才進入應付金額。前台沒有重量與材積資料，算不出箱數（`product_variants`
- * 沒有這些欄位），所以一律以一箱計。
- *
- * @param {object}      p
- * @param {number}      p.subtotal       只含標價品項的小計
- * @param {boolean}     p.hasQuoteItems  是否含尚未報價的詢價品項
- * @param {{fee: number, threshold: number}|null} p.rule
- *        運費規則，來自 settings store 的 shippingRule。**設定是否完整由那個 getter
- *        單獨認定**，這裡不重複判斷 null 欄位——兩邊各判一次，規則遲早會分歧。
- */
-/**
- * 7-11 交貨便的運費級距，依**代收金額**分階。
- *
- * ⚠️ 寫死是刻意的，不要搬進 `site_settings`：這是 7-11 的公告費率而非本站定價，
- * 老闆改不動它——後台給他一個能改的欄位，只會製造與 ibon 對不上的機會。與
- * `Shipping.vue` 裡「長寬高總和」那句同性質（why: `docs/adr/0003` 的 Consequences）。
+ * ⚠️ 寫死是刻意的，不要搬進 `site_settings`：這是貨運公司費率而非本站定價
+ * （why: `docs/adr/0006` 第 2 條）。
  * 來源 https://www.7-11.com.tw/service/accept.aspx，查證於 2026-09-16。
  */
-const CVS_FEE_TIERS = [
-    { max: 1000, fee: 60 },
-    { max: 2000, fee: 70 },
-    { max: 3000, fee: 80 },
-    { max: 4000, fee: 90 },
-    { max: 5000, fee: 100 },
-]
+export const CVS = {
+    // 依代收金額分階
+    tiers: [
+        { max: 1000, fee: 60 },
+        { max: 2000, fee: 70 },
+        { max: 3000, fee: 80 },
+        { max: 4000, fee: 90 },
+        { max: 5000, fee: 100 },
+    ],
+    maxCollectable: 5000,
+    holdDays: 7,
+    size: { longestCm: 45, totalCm: 105, weightKg: 10 },
+}
 
-/** 交貨便的代收貨款上限。7-11 的硬限制，不是本站政策。 */
-export const CVS_MAX_COLLECTABLE = 5000
-
-const tierFee = (amount) =>
-    (CVS_FEE_TIERS.find((t) => amount <= t.max) ?? CVS_FEE_TIERS.at(-1)).fee
+const tierFee = (amount) => (CVS.tiers.find((t) => amount <= t.max) ?? CVS.tiers.at(-1)).fee
 
 /**
  * 交貨便運費。
  *
- * 級距查的是**代收金額**，而代收金額含運費本身：小計 980 查到 60，但實際代收
- * 1,040 已經跳進下一階，7-11 收的是 70。直接拿小計查表會讓前台顯示 60、老闆建單
- * 打 70——而客人是在取貨櫃台當場發現的。因此要把運費加回去再查一次。
+ * ⚠️ 級距查的是**含運的代收金額**，不是小計——運費是代收金額的一部分。小計 950
+ * 查表得 60，但代收其實 1,010 已經跨階，7-11 收 70。少了外層那次查表，前台會顯示
+ * 60 而老闆建單打 70，客人在取貨櫃台當場發現。
  *
- * ⚠️ 迴圈會停，理由是單調性：`tierFee` 對金額單調不減，加運費只會讓金額變大，
- * 所以 fee 單調不減且有上限。實務上**最多跑兩圈**——階寬 1,000 遠大於最高運費 100，
- * 不可能連跳兩階。上限取階數只是保險，真跑到底留下的是偏高的值，方向與「寧可高估」
- * 一致。
+ * 兩次查表就夠：加運費最多讓金額跳一階（階寬 1,000 遠大於最高運費 100），
+ * 第二次的結果必然是不動點。`orderTotals.test.js` 有一條性質測試在守這件事。
  */
-export const cvsShippingFee = (subtotal) => {
-    let fee = tierFee(subtotal)
-    for (let i = 0; i < CVS_FEE_TIERS.length; i++) {
-        const next = tierFee(subtotal + fee)
-        if (next === fee) break
-        fee = next
-    }
-    return fee
-}
+export const cvsShippingFee = (subtotal) => tierFee(subtotal + tierFee(subtotal))
 
 /** 不能走超商取貨付款的原因。`null` 代表可以。 */
 export const CVS_BLOCK = {
@@ -103,8 +83,7 @@ export const CVS_BLOCK = {
 /**
  * 這張訂購單能不能走超商取貨付款。
  *
- * 只擋確定的兩件事，其餘交給老闆逐單判斷——前台沒有重量與材積資料，猜就是騙人
- * （why: `docs/adr/0006` 第 4、5 條）。
+ * 只擋確定的兩件事，其餘交給老闆逐單判斷（why: `docs/adr/0006` 第 4、5 條）。
  *
  * @param {object}  p
  * @param {number}  p.subtotal            只含標價品項的小計
@@ -113,18 +92,43 @@ export const CVS_BLOCK = {
 export const cvsBlockReason = ({ subtotal, allItemsShippable }) => {
     if (!allItemsShippable) return CVS_BLOCK.oversize
 
-    // ⚠️ 比的是**含運的代收金額**，不是小計：上限管的是店員實際收的那個數字，而運費
-    // 是它的一部分。拿小計去比，小計 5,000 會過關，但代收其實是 5,100——建單當下才
-    // 被 7-11 擋下來，那時包裹已經包好了。
-    //
-    // 詢價品項刻意不納入判斷：它們只會讓代收金額**更多**，不可能把超標的單拉回上限
-    // 以內。這與 estimateShipping 把門檻判斷排在詢價判斷之前是同一個推理方向。
-    if (subtotal + cvsShippingFee(subtotal) > CVS_MAX_COLLECTABLE) return CVS_BLOCK.overLimit
+    // ⚠️ 比的是含運的代收金額，不是小計。拿小計比，小計 5,000 會過關而代收其實 5,100，
+    // 等到老闆建單才被 7-11 擋下來——那時包裹已經包好了。
+    if (subtotal + cvsShippingFee(subtotal) > CVS.maxCollectable) return CVS_BLOCK.overLimit
 
     return null
 }
 
-export const estimateShipping = ({ subtotal, hasQuoteItems, rule }) => {
+/**
+ * 訂購單頁顯示給客人看的**預估**運費。
+ *
+ * 這是預估而不是實價：老闆會逐單看內容物決定要幾箱，再填 `orders.shipping_fee`，
+ * 那個值才進入應付金額。前台沒有重量與材積資料，算不出箱數（`product_variants`
+ * 沒有這些欄位），所以宅配一律以一箱計。
+ *
+ * 兩種交貨方式走同一個出口是刻意的：呼叫端只有一個 computed、畫面只有一個區塊，
+ * 加第三種方式時也不必再長出一條 `v-else-if`。
+ *
+ * @param {object}      p
+ * @param {boolean}     p.isCvs          是否走超商取貨付款（不傳＝宅配，維持原行為）
+ * @param {number}      p.subtotal       只含標價品項的小計
+ * @param {boolean}     p.hasQuoteItems  是否含尚未報價的詢價品項
+ * @param {{fee: number, threshold: number}|null} p.rule
+ *        宅配的運費規則，來自 settings store 的 shippingRule。**設定是否完整由那個
+ *        getter 單獨認定**，這裡不重複判斷 null 欄位——兩邊各判一次，規則遲早會分歧。
+ */
+export const estimateShipping = ({ isCvs, subtotal, hasQuoteItems, rule }) => {
+    // 超商是另一套規則：級距由 7-11 定，不吃 site_settings，也**不適用免運門檻**
+    // ——那是老闆對宅配運費的補貼，而交貨便的運費是 7-11 從代收款直接扣走的。
+    // 因此它永遠是 charged，沒有 unavailable / free / quote 三種狀態。
+    if (isCvs) {
+        return {
+            state: SHIPPING.charged,
+            amount: cvsShippingFee(subtotal),
+            note: '7-11 交貨便依代收金額分級，超商取貨不適用免運門檻。',
+        }
+    }
+
     // 設定不完整。寧可整行不顯示，也不要拿寫死的預設值假裝——那會讓「後台把值
     // 清空」看起來像正常運作，設定頁因此變成騙人的。與 settings 的 bankInfo 同慣例。
     if (!rule) return { state: SHIPPING.unavailable }

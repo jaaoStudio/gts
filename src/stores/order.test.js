@@ -4,7 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 // 替身在 src/utils/__mocks__/directus.js（多個測試檔共用，理由見那支檔案）
 vi.mock('../utils/directus')
 
-vi.mock('../services/orderService', () => ({
+// ⚠️ 只替換 orderService 本身，其餘 export（DELIVERY…）走真品。手寫整份替身會在
+// service 每次多一個 export 時，以「No X export is defined on the mock」或——更難查的
+// ——`undefined.someKey` 的 TypeError 被 store 的 try/catch 吞掉、整批測試變成
+// 「submit 回傳 null」而炸掉，而那與被測的行為無關。真品只相依 ../utils/directus，
+// 那支已在上面換成替身。
+vi.mock('../services/orderService', async (importOriginal) => ({
+    ...(await importOriginal()),
     orderService: {
         getLatestOrderId: vi.fn(),
         createOrder: vi.fn(),

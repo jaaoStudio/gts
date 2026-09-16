@@ -8,13 +8,15 @@ import { configure } from 'vue-gtag'
 vi.mock('../utils/directus')
 vi.mock('../components/Navbar.vue', () => ({ default: { template: '<nav />' } }))
 vi.mock('../components/Footer.vue', () => ({ default: { template: '<footer />' } }))
-vi.mock('../stores/auth', () => ({
-    useAuthStore: () => ({
-        isAuthenticated: true,
-        customerStatus: 'ready',
-        customer: { id: 1, user_name: '王', phone: '0900000000' },
-    }),
+// 可變的替身：有一條測試要讓 submit() 真的走進「重抓會員資料」那段 await，
+// 才碰得到它之後對快照的重驗。固定物件做不到這件事。
+const auth = vi.hoisted(() => ({
+    isAuthenticated: true,
+    customerStatus: 'ready',
+    customer: { id: 1, user_name: '王', phone: '0900000000' },
+    refreshCustomerProfile: vi.fn(),
 }))
+vi.mock('../stores/auth', () => ({ useAuthStore: () => auth }))
 vi.mock('../stores/settings', () => ({
     useSettingsStore: () => ({ shippingRule: null, fetchSettings: async () => {} }),
 }))
@@ -45,6 +47,11 @@ let wrapper
 
 beforeEach(async () => {
     vi.clearAllMocks()
+    Object.assign(auth, {
+        isAuthenticated: true,
+        customerStatus: 'ready',
+        customer: { id: 1, user_name: '王', phone: '0900000000' },
+    })
     vi.stubEnv('VITE_GA_ID', TAG_ID)
     setActivePinia(createPinia())
     configure({ tagId: TAG_ID, initMode: 'manual', resource: { inject: false } })
@@ -73,10 +80,14 @@ afterEach(() => {
     vi.unstubAllEnvs()
 })
 
-const submit = async () => {
+const submitButton = () => {
     const button = wrapper.findAll('button').find((button) => button.text() === '送出訂購單')
     expect(button).toBeDefined()
-    await button.trigger('click')
+    return button
+}
+
+const submit = async () => {
+    await submitButton().trigger('click')
     await flushPromises()
 }
 
@@ -179,18 +190,14 @@ describe('交貨方式', () => {
         })
     })
 
-    test('given_超商單填市話_will_擋住不送', async () => {
+    test('given_超商單填市話_will_按鈕不可送出', async () => {
         // 7-11 到店只發簡訊，市話收不到；收不到就是棄件，而退回的運費老闆自己吃。
-        // 宅配那條刻意不驗格式（見 canSubmit 的註解），兩條不一致是有理由的。
+        // 宅配那條刻意不驗格式（見 checkOrderInput 的註解），兩條不一致是有理由的。
         await cvsRadio().setValue()
         await setInput('取貨人手機', '0287654321')
         await setInput('取貨門市', '916712 中山門市')
 
-        const button = wrapper.findAll('button').find((b) => b.text() === '送出訂購單')
-        await button.trigger('click')
-        await flushPromises()
-
-        expect(orderService.createOrder).not.toHaveBeenCalled()
+        expect(submitButton().attributes('disabled')).toBeDefined()
     })
 
     test('given_宅配單填市話_will_照送', async () => {
@@ -204,14 +211,62 @@ describe('交貨方式', () => {
         })
     })
 
-    test('given_超商單沒填門市_will_擋住不送', async () => {
+    test('given_超商單沒填門市_will_按鈕不可送出', async () => {
         await cvsRadio().setValue()
         await setInput('取貨人手機', '0912345678')
 
-        const button = wrapper.findAll('button').find((b) => b.text() === '送出訂購單')
-        await button.trigger('click')
+        expect(submitButton().attributes('disabled')).toBeDefined()
+    })
+
+    test('given_重抓會員資料期間清掉門市_will_擋在送出前而不是送出空門市', async () => {
+        // canSubmit 只在點下去的那一刻成立，但 submit() 內隔著一段 await（重抓會員
+        // 資料）。客人在那段期間清掉門市，payload 是 await 之後才取的快照——沒有這道
+        // 重驗，送到 Directus 的就是 cvs_store: null，老闆收到一張寄不出去的單。
+        auth.customerStatus = 'error'
+        auth.customer = null
+        let release
+        auth.refreshCustomerProfile.mockReturnValue(new Promise((r) => { release = r }))
+
+        await cvsRadio().setValue()
+        await setInput('取貨人手機', '0912345678')
+        await setInput('取貨門市', '916712 中山門市')
+        expect(submitButton().attributes('disabled')).toBeUndefined()
+
+        submitButton().trigger('click')
+        await flushPromises()
+
+        await setInput('取貨門市', '')     // 等待期間反悔清空
+        auth.customer = { id: 1 }          // 重抓成功，流程繼續往下
+        release()
         await flushPromises()
 
         expect(orderService.createOrder).not.toHaveBeenCalled()
+        expect(wrapper.text()).toContain('請填寫取貨門市')
+    })
+
+    test('given_送出期間把品項加到超過代收上限_will_不建單', async () => {
+        // 交貨方式在點下按鈕那一刻就定住，品項卻要等 await 之後才讀。數量按鈕全程可按，
+        // 所以這個縫隙真的送得出一張「超商、代收超過 5,000」的單。
+        const store = useOrderStore()
+        store.items = [{ ...store.items[0], unitPrice: 2500, quantity: 1, canShipCvs: true }]
+        await flushPromises()
+
+        await cvsRadio().setValue()
+        await setInput('取貨人手機', '0912345678')
+        await setInput('取貨門市', '916712 中山門市')
+
+        // 讓基準查詢停住，模擬客人在等待期間按「＋」
+        let release
+        orderService.getLatestOrderId.mockReturnValue(new Promise((r) => { release = r }))
+        submitButton().trigger('click')
+        await flushPromises()
+
+        store.items[0].quantity = 2      // 小計變 5,000、含運 5,100
+        release(100)
+        await flushPromises()
+
+        expect(orderService.createOrder).not.toHaveBeenCalled()
+        expect(store.submitError).toContain('超商取貨付款')
+        expect(store.items).toHaveLength(1)   // 失敗不清空，客人可以改完再送
     })
 })

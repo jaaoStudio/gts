@@ -49,9 +49,11 @@
             </p>
             <p class="mt-1 text-sm text-steel-500">含運費，到門市取貨時付給店員。</p>
           </div>
+          <!-- 「我們會盡快為您寄出」由上方的 statusHint 負責（orderService 的 CVS_STATUS），
+               這裡只補它沒講的取貨期限，同一句不要寫兩次 -->
           <p class="mt-4 text-sm leading-relaxed text-steel-600">
-            我們會盡快為您寄出，包裹到店後會以簡訊通知。
-            <span class="font-semibold text-steel-900">請於 7 天內取貨</span>，逾期會被退回。
+            包裹到店後會以簡訊通知，
+            <span class="font-semibold text-steel-900">請於 {{ CVS.holdDays }} 天內取貨</span>，逾期會被退回。
           </p>
         </section>
 
@@ -285,7 +287,7 @@ import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import OrderStatusChip from '../components/OrderStatusChip.vue'
 import { PhCaretLeft } from '@phosphor-icons/vue'
-import { lineTotal, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
+import { CVS, lineTotal, confirmedSubtotal as calcConfirmedSubtotal } from '../utils/orderTotals'
 
 const route = useRoute()
 const settingsStore = useSettingsStore()

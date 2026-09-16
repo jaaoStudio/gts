@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { productService } from '../services/productService'
-import { orderService } from '../services/orderService'
+import { DELIVERY, orderService } from '../services/orderService'
+import { cvsBlockReason } from '../utils/orderTotals'
 import { getAssetUrl } from '../utils/directus'
 
 const STORAGE_KEY = 'gts_order_items'
@@ -166,6 +167,21 @@ export const useOrderStore = defineStore('order', {
                     beforeId = await orderService.getLatestOrderId()
                 } catch (err) {
                     console.error('無法取得比對基準，將略過輪詢:', err)
+                }
+
+                // ⚠️ 交貨方式是呼叫端在**點下按鈕那一刻**定住的，品項卻要到這裡才讀。
+                // 中間隔著上面那個 await，而數量按鈕全程可按：客人在等待期間把
+                // 2,500 × 1 加成 × 2，送出去的就是一張「超商、代收 5,100」的單——
+                // 超過 7-11 的上限，要到老闆建單時才被擋下來。畫面上的 watcher 會把
+                // 選項切回宅配，但它改不動已經送出的那份快照，所以得在這裡對**實際
+                // 要送的品項**再驗一次。
+                if (deliveryMethod === DELIVERY.cvsCod
+                    && cvsBlockReason({
+                        subtotal: this.subtotal,
+                        allItemsShippable: this.allItemsShippable,
+                    })) {
+                    this.submitError = '訂購單內容在送出期間變動，已不符合超商取貨付款的條件，請改用宅配或調整品項。'
+                    return null
                 }
 
                 // 與 createOrder 在同一段同步執行中取值，統計才與實際送出的品項一致。

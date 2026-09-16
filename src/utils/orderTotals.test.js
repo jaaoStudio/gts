@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
     CVS_BLOCK,
-    CVS_MAX_COLLECTABLE,
+    CVS,
     SHIPPING,
     confirmedSubtotal,
     cvsBlockReason,
@@ -203,7 +203,7 @@ describe('cvsBlockReason', () => {
         // 上限管的是店員實際收的數字，運費是它的一部分。拿小計去比會讓
         // 小計 5,000（代收 5,100）過關，等到老闆建單才被 7-11 擋下來。
         test('given_小計恰好等於上限_will_因為加上運費而被擋', () => {
-            expect(reason({ subtotal: CVS_MAX_COLLECTABLE })).toBe(CVS_BLOCK.overLimit)
+            expect(reason({ subtotal: CVS.maxCollectable })).toBe(CVS_BLOCK.overLimit)
         })
 
         test('given_小計4900_will_不擋因為含運剛好等於上限', () => {
@@ -217,7 +217,40 @@ describe('cvsBlockReason', () => {
     })
 })
 
-describe('estimateShipping', () => {
+describe('estimateShipping（超商）', () => {
+    // 超商走同一個出口，但它是另一套規則：永遠 charged，沒有免運可湊。
+    const cvs = (subtotal) =>
+        estimateShipping({ isCvs: true, subtotal, hasQuoteItems: false, rule: { fee: 140, threshold: 2000 } })
+
+    test('given_已達宅配免運門檻_will_仍然收費', () => {
+        // 免運門檻是老闆對宅配運費的補貼，而交貨便的運費是 7-11 從代收款直接扣走的。
+        // 套用門檻等於老闆每單自吃 60–100。
+        expect(cvs(4000).state).toBe(SHIPPING.charged)
+        expect(cvs(4000).amount).toBe(cvsShippingFee(4000))
+    })
+
+    test('given_超商_will_不給gap只給說明', () => {
+        // 有 gap 等於在暗示「再買一點就免運」，而超商根本沒有免運
+        const result = cvs(500)
+        expect(result.gap).toBeUndefined()
+        expect(result.note).toContain('不適用免運門檻')
+    })
+
+    test('given_宅配設定不完整_will_超商仍算得出運費', () => {
+        // 超商不吃 site_settings，宅配那邊沒設定不該連累它
+        expect(estimateShipping({ isCvs: true, subtotal: 500, hasQuoteItems: false, rule: null }))
+            .toMatchObject({ state: SHIPPING.charged, amount: 60 })
+    })
+
+    test('given_含詢價品項_will_仍然給數字', () => {
+        // 宅配未達門檻遇詢價會退成 quote（怕免運判斷被推翻）；超商沒有門檻要判斷，
+        // 級距只看標價部分，詢價報價後只會往上跳一階，不需要閉嘴
+        expect(estimateShipping({ isCvs: true, subtotal: 500, hasQuoteItems: true, rule: null }).state)
+            .toBe(SHIPPING.charged)
+    })
+})
+
+describe('estimateShipping（宅配）', () => {
     // 正式站的設定：一箱 140、滿 2000 免運
     const rule = { fee: 140, threshold: 2000 }
     const est = ({ subtotal = 0, hasQuoteItems = false, ...over } = {}) =>

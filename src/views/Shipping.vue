@@ -27,21 +27,22 @@
         <li>大宗訂購或自取可另行洽談。</li>
       </ul>
 
+      <!-- 數字一律從 utils/orderTotals 的 CVS 讀，不在文案裡重打——同 useShippingCopy -->
       <h2>7-11 超商取貨付款</h2>
       <ul>
         <li>
-          運費 <strong class="font-mono">60–100</strong> 元，依代收金額分級，
+          運費 <strong class="font-mono">{{ cvs.feeRange }}</strong> 元，依代收金額分級，
           <strong>不適用免運門檻</strong>。
         </li>
         <li>
-          尺寸限制比宅配嚴格：最長邊 <span class="font-mono">45</span> 公分、
-          長寬高合計 <span class="font-mono">105</span> 公分、<span class="font-mono">10</span> 公斤以內。
-          超過的品項只能走宅配。
+          尺寸限制比宅配嚴格：最長邊 <span class="font-mono">{{ cvs.size.longestCm }}</span> 公分、
+          長寬高合計 <span class="font-mono">{{ cvs.size.totalCm }}</span> 公分、
+          <span class="font-mono">{{ cvs.size.weightKg }}</span> 公斤以內。超過的品項只能走宅配。
         </li>
-        <li>代收金額上限 <span class="font-mono">NT$5,000</span>，超過請改用宅配。</li>
+        <li>代收金額上限 <span class="font-mono">{{ cvs.maxCollectableText }}</span>，超過請改用宅配。</li>
         <li>
           包裹到門市會以簡訊通知，請務必填<strong>手機</strong>。
-          <strong>7 天內未取貨會退回</strong>，該筆運費仍會產生。
+          <strong>{{ cvs.holdDays }} 天內未取貨會退回</strong>，該筆運費仍會產生。
         </li>
       </ul>
 
@@ -68,7 +69,7 @@ import PageShell from '../components/PageShell.vue'
 import { useShippingCopy } from '../composables/useShippingCopy'
 
 const settingsStore = useSettingsStore()
-const { rule, feeText, thresholdText } = useShippingCopy()
+const { rule, feeText, thresholdText, cvs } = useShippingCopy()
 
 onMounted(() => settingsStore.fetchSettings())
 </script>
