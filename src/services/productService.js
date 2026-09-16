@@ -18,6 +18,8 @@ const DETAIL_FIELDS = [
     'categories.categories_id.id', 'categories.categories_id.name', 'categories.categories_id.slug',
     'tags.tags_id.id',
     'variants.id', 'variants.spec_name', 'variants.price', 'variants.stock', 'variants.sku', 'variants.status', 'variants.variant_image',
+    // 加入訂購單時要一起存進 store，訂購單頁才知道這張單能不能選超商取貨付款
+    'variants.can_ship_cvs',
     'gallery.directus_files_id',
     // 外部通路導流：只有詳情頁用得到，不放進 LIST_FIELDS 以免列表 payload 變大
     'iopen_url', 'shopee_url'
@@ -241,7 +243,7 @@ export const productService = {
         return directus.request(readItems('product_variants', {
             filter: { id: { _in: ids } },
             fields: [
-                'id', 'spec_name', 'sku', 'price', 'stock', 'status', 'variant_image',
+                'id', 'spec_name', 'sku', 'price', 'stock', 'status', 'variant_image', 'can_ship_cvs',
                 'product_id.id', 'product_id.name', 'product_id.slug',
                 'product_id.status', 'product_id.image',
             ],

@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { useSettingsStore } from '../stores/settings'
+import { CVS_IBON } from '../utils/orderTotals'
 
 /**
  * 說明頁的運費文案。
@@ -23,5 +24,14 @@ export const useShippingCopy = () => {
         rule.value ? `NT$${rule.value.threshold.toLocaleString()}` : null
     )
 
-    return { rule, feeText, thresholdText }
+    // 超商的數字不從 Directus 來（是 7-11 的公告費率，見 utils/orderTotals 的 CVS_IBON），
+    // 但同一條「說明頁不自己重打數字」的規則照樣適用——改通路時只要動 CVS_IBON 一處。
+    const cvs = computed(() => ({
+        feeRange: `${CVS_IBON.tiers[0].fee}–${CVS_IBON.tiers.at(-1).fee}`,
+        maxCollectableText: `NT$${CVS_IBON.maxCollectable.toLocaleString()}`,
+        holdDays: CVS_IBON.holdDays,
+        size: CVS_IBON.size,
+    }))
+
+    return { rule, feeText, thresholdText, cvs }
 }

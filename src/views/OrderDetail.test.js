@@ -22,11 +22,13 @@ vi.mock('../components/Footer.vue', () => ({ default: { template: '<footer />' }
 vi.mock('../components/OrderStatusChip.vue', () => ({ default: { template: '<span />' } }))
 vi.mock('@phosphor-icons/vue', () => ({ PhCaretLeft: { template: '<i />' } }))
 
-vi.mock('../services/orderService', () => ({
+// ⚠️ 只替換 orderService 本身，其餘 export 一律走真品（importOriginal）。
+// 手寫整份替身看似乾淨，但每次 orderService 多一個 export，這裡就會以
+// 「No X export is defined on the mock」炸掉——而那與被測的金額邏輯毫無關係。
+// 真品安全：它只相依 ../utils/directus，那支已經在上面被換成替身了。
+vi.mock('../services/orderService', async (importOriginal) => ({
+    ...(await importOriginal()),
     orderService: { getOrder: vi.fn(), reportPayment: vi.fn() },
-    ORDER_STATUS: {
-        paid: { label: '已付款', hint: '款項已確認，正在為您準備出貨。' },
-    },
 }))
 
 const OrderDetail = (await import('./OrderDetail.vue')).default

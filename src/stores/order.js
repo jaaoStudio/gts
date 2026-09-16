@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { productService } from '../services/productService'
-import { orderService } from '../services/orderService'
+import { DELIVERY, orderService } from '../services/orderService'
+import { cvsBlockReason } from '../utils/orderTotals'
 import { getAssetUrl } from '../utils/directus'
 
 const STORAGE_KEY = 'gts_order_items'
@@ -50,6 +51,15 @@ export const useOrderStore = defineStore('order', {
 
         /** 詢價品項數，用於「另有 N 項待報價」文案 */
         quoteItemCount: (state) => state.items.filter((it) => it.unitPrice == null).length,
+
+        /**
+         * 是否每一項都能走超商寄送。
+         *
+         * ⚠️ 用 `!== true` 而非 `=== false`：localStorage 裡的舊品項沒有這個欄位，
+         * 讀回來是 `undefined`。那要算成「不能寄」——失敗方向是少一個選項，而不是
+         * 讓客人選了卻寄不出去（why: `docs/adr/0006` 第 5 條）。
+         */
+        allItemsShippable: (state) => state.items.every((it) => it.canShipCvs === true),
     },
 
     actions: {
@@ -101,6 +111,7 @@ export const useOrderStore = defineStore('order', {
                     unitPrice: variant.price ?? null,
                     quantity: qty,
                     image: variant.image || product.image || null,
+                    canShipCvs: variant.can_ship_cvs === true,
                 })
             }
 
@@ -142,7 +153,7 @@ export const useOrderStore = defineStore('order', {
          *
          * 失敗時**不清空購物車**，讓客人可以直接重試。
          */
-        async submit({ contactName, contactPhone, contactAddress, note }) {
+        async submit({ contactName, contactPhone, contactAddress, note, deliveryMethod, cvsStore }) {
             if (this.isEmpty || this.submitting) return null
 
             this.submitting = true
@@ -158,6 +169,21 @@ export const useOrderStore = defineStore('order', {
                     console.error('無法取得比對基準，將略過輪詢:', err)
                 }
 
+                // ⚠️ 交貨方式是呼叫端在**點下按鈕那一刻**定住的，品項卻要到這裡才讀。
+                // 中間隔著上面那個 await，而數量按鈕全程可按：客人在等待期間把
+                // 2,500 × 1 加成 × 2，送出去的就是一張「超商、代收 5,100」的單——
+                // 超過 7-11 的上限，要到老闆建單時才被擋下來。畫面上的 watcher 會把
+                // 選項切回宅配，但它改不動已經送出的那份快照，所以得在這裡對**實際
+                // 要送的品項**再驗一次。
+                if (deliveryMethod === DELIVERY.cvsCod
+                    && cvsBlockReason({
+                        subtotal: this.subtotal,
+                        allItemsShippable: this.allItemsShippable,
+                    })) {
+                    this.submitError = '訂購單內容在送出期間變動，已不符合超商取貨付款的條件，請改用宅配或調整品項。'
+                    return null
+                }
+
                 // 與 createOrder 在同一段同步執行中取值，統計才與實際送出的品項一致。
                 // 成功後會 clear()，呼叫端必須使用回傳的 snapshot。
                 const snapshot = {
@@ -171,6 +197,8 @@ export const useOrderStore = defineStore('order', {
                     contactPhone,
                     contactAddress,
                     note,
+                    deliveryMethod,
+                    cvsStore,
                     items: this.items,
                 })
 
@@ -250,6 +278,8 @@ export const useOrderStore = defineStore('order', {
                         sku: v.sku || '',
                         unitPrice: freshPrice,
                         stock: v.stock ?? null,
+                        // 老闆可能在客人加入購物車之後才勾選，以後端為準
+                        canShipCvs: v.can_ship_cvs === true,
                         image: v.variant_image
                             ? getAssetUrl(v.variant_image)
                             : (product.image ? getAssetUrl(product.image) : item.image),

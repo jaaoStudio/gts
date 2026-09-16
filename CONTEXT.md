@@ -4,7 +4,8 @@ The customer-facing storefront for GTS Hardware (五金/工具電商). A Vue 3 S
 
 > **型錄 + 訂購單，仍然不是線上結帳站。**
 > 客人可以把品項送成一張 **Order form**（訂購單），但**站上不收款**：老闆確認金額後，
-> 客人依信中的匯款資訊轉帳。沒有線上刷卡、沒有即時庫存扣減、沒有物流串接。
+> 客人依信中的匯款資訊轉帳，或在超商取貨時付給店員（見 **Delivery method**）。
+> 沒有線上刷卡、沒有即時庫存扣減、沒有物流串接。
 > 部分商品另有外部通路連結（iOPEN Mall / 蝦皮），那是導流出去、不在本站成交。
 
 ## Language
@@ -40,8 +41,15 @@ A catalogue item (Directus `products`). A Product is the thing shoppers browse a
 _Avoid_: 產品, item, 貨品.
 
 **Variant** (規格):
-A purchasable specification under a Product (Directus `variants`), where price and stock actually live. A Product has one or more Variants.
+A purchasable specification under a Product (Directus `product_variants`), where price and stock actually live. A Product has one or more Variants.
 _Avoid_: SKU (a field on a Variant, not its name), 款式.
+
+**CVS-shippable** (超商可寄, `product_variants.can_ship_cvs`):
+Whether a Variant is judged to fit 7-11's parcel limits. A judgement the Admin makes from
+experience, **not a measurement** — the catalogue records no weight or dimensions, and the
+real check happens at the counter anyway. Defaults to `false`, so an unreviewed Variant
+costs the shopper an option rather than a returned parcel.
+_Avoid_: implying the flag is derived from stored dimensions; 材積 (nothing records it).
 
 **Display price** (顯示價):
 The price shown for a Product, defined as the lowest price among its Variants (the "起" / from-price). A Product with no priced Variant is shown as 詢價 instead of a number.
@@ -77,6 +85,30 @@ The customer-facing identifier, format `GTS-YYMMDD-####`, derived from the row's
 auto-increment id. Short enough to read aloud on the phone.
 _Avoid_: order id (that is the internal integer).
 
+**Delivery method** (交貨方式):
+How an Order form gets to the Customer **and how it gets paid for** — one choice, not
+two (`orders.delivery_method`: `cvs_cod` / `home_delivery` / `pickup`). The pairings are
+locked: 超商取貨付款 is always cash-at-the-counter, 宅配 is always 匯款, 自取 is always
+cash in the shop. Naming the two halves separately would invent
+combinations the shop does not offer, and each one would have to be blocked again in the
+form, the emails, and the status copy (why: `docs/adr/0006`).
+_Avoid_: 配送方式 / 付款方式 as separate concepts; shipping method (the old field of that
+name is gone).
+
+**代收金額** (Amount collected):
+What the 7-11 counter takes from the Customer on a 超商取貨付款 order — the same figure
+as the **Amount due**, seen from the courier's side. It is what the 交貨便 fee tier is
+keyed on, and because the fee is itself part of it, the tier has to be resolved by
+iteration rather than read straight off the subtotal.
+_Avoid_: 貨款, 總價; treating it as a separate amount from 應付金額.
+
+**棄件** (Unclaimed):
+A 超商取貨付款 parcel the Customer never collects within the hold period, sent back to
+the shop's own store. Not a cancellation the Customer makes — nothing is clicked, the
+order simply stops. The outbound freight is still charged and the invoice still has to be
+voided or credited, so it costs the shop money and time even though no sale happened.
+_Avoid_: 退貨 (that is a Customer returning goods they already took), 取消.
+
 **Confirmed price** (確認單價):
 The per-item price the Admin sets after checking stock and current cost. Takes precedence
 over the snapshot the Customer saw.
@@ -107,8 +139,12 @@ box**, because nothing in the catalogue records weight or volume. It is a foreca
 after looking at what actually has to be packed. Withheld entirely when the priced items
 alone cannot settle the question: below the threshold with 詢價 items present, the
 subtotal is not the order's real value, so no number is shown.
+Everything above describes the 宅配 rule only. 超商取貨付款 has its own — a tier read off
+7-11's published table, with **no free-shipping threshold at all**, because that threshold
+is the shop subsidising its own courier bill and 7-11's fee is deducted from the 代收金額
+before the shop ever sees it (why: `docs/adr/0006`).
 _Avoid_: 運費 unqualified on the cart side (it reads as a commitment); presenting it as
-the amount the shopper will pay.
+the amount the shopper will pay; speaking of "the" shipping rule as though there were one.
 
 **Order status** (狀態):
 One of 待確認 → 待付款 → 已付款 → 已出貨, plus 已取消. 已出貨 is the normal terminal
@@ -116,6 +152,11 @@ state; there is deliberately no 已完成 because nothing confirms receipt.
 The stored keys are `pending` / `quoted` / `paid` / `shipped` / `cancelled`. Note that
 `quoted` is the 待付款 state: the key names it from the Admin's side (已報價), the UI
 label from the Customer's (該付錢了). Same state, two viewpoints — grep for both.
+超商取貨付款 orders run `pending → quoted → shipped` and **never reach `paid`**: the money
+waits for the Customer to collect and then for the courier's weekly payout, so nothing has
+arrived at the moment of shipping. `quoted` therefore carries a third viewpoint — 已確認、
+等出貨 — on the same stored key, with only the UI copy branching on **Delivery method**
+(why: `docs/adr/0006`).
 _Avoid_: inventing intermediate states — each one must correspond to something the
 Customer actually sees change.
 

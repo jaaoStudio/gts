@@ -1,5 +1,22 @@
 import { createItem, readItems, readItem, updateItem } from '@directus/sdk'
 import directus from '../utils/directus'
+import { CVS_IBON } from '../utils/orderTotals'
+
+/**
+ * 交貨方式。**同時決定配送與付款**——組合是鎖死的，所以是一個選擇而不是兩個欄位
+ * （why: `docs/adr/0006`）。`pickup` 目前只在 Directus 供老闆選，前台不提供。
+ */
+export const DELIVERY = {
+    homeDelivery: 'home_delivery',
+    cvsCod: 'cvs_cod',
+    pickup: 'pickup',
+}
+
+export const DELIVERY_LABEL = {
+    [DELIVERY.homeDelivery]: '宅配（新竹貨運）',
+    [DELIVERY.cvsCod]: '7-11 超商取貨付款',
+    [DELIVERY.pickup]: '來店自取',
+}
 
 // 明細與列表共用。confirmed_* 是老闆確認後的值，客人要看得到才知道實際應付多少。
 const ORDER_FIELDS = [
@@ -8,7 +25,7 @@ const ORDER_FIELDS = [
     'subtotal', 'has_quote_items',
     'shipping_fee', 'discount', 'confirmed_total',
     'payment_note', 'paid_at',
-    'shipping_method', 'tracking_number', 'shipped_at',
+    'delivery_method', 'cvs_store', 'tracking_number', 'shipped_at',
     'items.id', 'items.product_name', 'items.spec_name', 'items.sku',
     'items.quantity', 'items.unit_price', 'items.confirmed_price',
 ]
@@ -30,11 +47,15 @@ export const orderService = {
      * ⚠️ 回傳的物件**不會有 order_number**，也可能因 `customer` 尚未補上而
      * 讀不回內容（HTTP 204）。單號請改用 waitForNewOrder()。
      */
-    async createOrder({ contactName, contactPhone, contactAddress, note, items }) {
+    async createOrder({ contactName, contactPhone, contactAddress, note, deliveryMethod, cvsStore, items }) {
         return directus.request(createItem('orders', {
             contact_name: contactName || null,
             contact_phone: contactPhone || null,
-            contact_address: contactAddress || null,
+            // 不適用的那一欄一律送 null，不讓上一次選擇的殘留值留在單上：老闆讀哪一欄
+            // 是由 delivery_method 決定的，另一欄有值只會讓他多讀一次才發現讀錯地方。
+            contact_address: deliveryMethod === DELIVERY.cvsCod ? null : (contactAddress || null),
+            cvs_store: deliveryMethod === DELIVERY.cvsCod ? (cvsStore || null) : null,
+            delivery_method: deliveryMethod,
             note: note || null,
             items: items.map((it) => ({
                 variant: it.variantId,
@@ -134,3 +155,32 @@ export const ORDER_STATUS = {
     shipped: { label: '已出貨', hint: '商品已寄出，可用下方單號查詢。' },
     cancelled: { label: '已取消', hint: '此訂購單已取消。' },
 }
+
+/**
+ * 超商取貨付款單的文案差異。只覆寫真的不一樣的那兩個狀態：
+ *
+ * - `quoted` 的鍵名本來就是老闆視角的「已報價」，對超商單它是「已確認、等出貨」——
+ *   客人這時什麼都不用做。`ORDER_STATUS` 的「請依下方資訊完成匯款」對他是錯的指示。
+ * - `shipped` 要帶取貨期限。超商保留期滿就退回，而退回的運費是老闆自己吃——
+ *   這句話是唯一一個能壓低棄件率的零成本槓桿。
+ *
+ * `paid` 刻意沒有對應文案：超商單走 `pending → quoted → shipped`，錢在取貨時才收、
+ * 隔週才入帳，這個狀態永遠不會出現（why: `docs/adr/0006` 第 6 條）。
+ */
+const CVS_STATUS = {
+    quoted: { label: '已確認', hint: '金額已確認，我們會盡快為您寄出，取貨時再付款。' },
+    shipped: {
+        label: '已出貨',
+        hint: `包裹已寄出，到店後會以簡訊通知。請於 ${CVS_IBON.holdDays} 天內到指定門市取貨並付款，逾期會退回。`,
+    },
+}
+
+/**
+ * 這張單在這個狀態下該顯示的標籤與說明。
+ *
+ * ⚠️ 不要退回直接讀 `ORDER_STATUS[status]`：那對超商單會叫客人去匯款。
+ */
+export const orderStatusCopy = (status, deliveryMethod) =>
+    (deliveryMethod === DELIVERY.cvsCod ? CVS_STATUS[status] : null)
+    ?? ORDER_STATUS[status]
+    ?? null
