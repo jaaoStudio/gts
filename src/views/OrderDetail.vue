@@ -28,7 +28,7 @@
             <h1 class="font-mono text-2xl font-bold tracking-tight text-steel-900 sm:text-3xl">
               {{ order.order_number || `#${order.id}` }}
             </h1>
-            <OrderStatusChip :status="order.status" />
+            <OrderStatusChip :status="order.status" :delivery-method="order.delivery_method" />
           </div>
           <p class="mt-3 leading-relaxed text-steel-600">{{ statusHint }}</p>
           <p class="mt-1 font-mono text-xs text-steel-400">
@@ -36,9 +36,28 @@
           </p>
         </header>
 
+        <!-- 超商取貨付款：金額已確認，但客人不用做任何事，只要等簡訊。這一區取代
+             匯款資訊——對他顯示銀行帳號與「我已匯款」是錯的指示。 -->
+        <section
+          v-if="isCvs && order.status === 'quoted' && order.confirmed_total != null"
+          class="mt-8 rounded-[1.5rem] border-2 border-steel-900 bg-white p-6"
+        >
+          <h2 class="font-display text-lg font-semibold text-steel-900">取貨時應付</h2>
+          <div class="mt-4 rounded-2xl bg-steel-50 px-5 py-4">
+            <p class="font-mono text-3xl font-bold tracking-tight text-steel-900">
+              NT${{ order.confirmed_total.toLocaleString() }}
+            </p>
+            <p class="mt-1 text-sm text-steel-500">含運費，到門市取貨時付給店員。</p>
+          </div>
+          <p class="mt-4 text-sm leading-relaxed text-steel-600">
+            我們會盡快為您寄出，包裹到店後會以簡訊通知。
+            <span class="font-semibold text-steel-900">請於 7 天內取貨</span>，逾期會被退回。
+          </p>
+        </section>
+
         <!-- 待付款：匯款資訊。刻意只在這個狀態顯示，不放在任何公開頁面 -->
         <section
-          v-if="order.status === 'quoted'"
+          v-if="!isCvs && order.status === 'quoted'"
           class="mt-8 rounded-[1.5rem] border-2 border-steel-900 bg-white p-6"
         >
           <h2 class="font-display text-lg font-semibold text-steel-900">匯款資訊</h2>
@@ -131,7 +150,9 @@
           <h2 class="font-display text-lg font-semibold text-steel-900">出貨資訊</h2>
           <div class="mt-4 space-y-2.5 text-sm">
             <div class="flex gap-3">
-              <span class="w-20 shrink-0 text-steel-500">貨運單號</span>
+              <span class="w-20 shrink-0 text-steel-500">
+                {{ isCvs ? '物流單號' : '貨運單號' }}
+              </span>
               <span class="font-mono font-bold text-steel-900">{{ order.tracking_number }}</span>
             </div>
             <div v-if="order.shipped_at" class="flex gap-3">
@@ -221,6 +242,10 @@
         <section class="mt-8 rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6">
           <h2 class="font-display text-lg font-semibold text-steel-900">聯絡與送貨資訊</h2>
           <dl class="mt-4 space-y-2.5 text-sm">
+            <div v-if="deliveryLabel" class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">交貨方式</dt>
+              <dd class="text-steel-900">{{ deliveryLabel }}</dd>
+            </div>
             <div v-if="order.contact_name" class="flex gap-3">
               <dt class="w-20 shrink-0 text-steel-500">聯絡人</dt>
               <dd class="text-steel-900">{{ order.contact_name }}</dd>
@@ -228,6 +253,11 @@
             <div v-if="order.contact_phone" class="flex gap-3">
               <dt class="w-20 shrink-0 text-steel-500">電話</dt>
               <dd class="font-mono text-steel-900">{{ order.contact_phone }}</dd>
+            </div>
+            <!-- 兩者互斥：送出時不適用的那一欄會被寫成 null，不會同時有值 -->
+            <div v-if="order.cvs_store" class="flex gap-3">
+              <dt class="w-20 shrink-0 text-steel-500">取貨門市</dt>
+              <dd class="text-steel-900">{{ order.cvs_store }}</dd>
             </div>
             <div v-if="order.contact_address" class="flex gap-3">
               <dt class="w-20 shrink-0 text-steel-500">送貨地址</dt>
@@ -250,7 +280,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '../stores/settings'
-import { orderService, ORDER_STATUS } from '../services/orderService'
+import { orderService, DELIVERY, DELIVERY_LABEL, orderStatusCopy } from '../services/orderService'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import OrderStatusChip from '../components/OrderStatusChip.vue'
@@ -280,7 +310,15 @@ const isConfirmed = computed(() => order.value?.confirmed_total != null)
 // 逐行金額加起來才保證等於這個小計。
 const confirmedSubtotal = computed(() => calcConfirmedSubtotal(order.value?.items))
 
-const statusHint = computed(() => ORDER_STATUS[order.value?.status]?.hint || '')
+// 超商取貨付款單永遠不會走到 paid（錢在取貨時才收），而 quoted 對它是「已確認、
+// 等出貨」而不是「該匯款了」——文案分岔見 orderService 的 CVS_STATUS。
+const isCvs = computed(() => order.value?.delivery_method === DELIVERY.cvsCod)
+
+const statusHint = computed(
+  () => orderStatusCopy(order.value?.status, order.value?.delivery_method)?.hint || ''
+)
+
+const deliveryLabel = computed(() => DELIVERY_LABEL[order.value?.delivery_method] || null)
 const bankInfo = computed(() => settingsStore.bankInfo)
 
 const formatDateTime = (iso) =>
@@ -329,8 +367,9 @@ onMounted(async () => {
     // 少了這行，loading/error/order 三個渲染分支會同時不成立而整頁空白。
     if (!order.value) error.value = '找不到這張訂購單。'
 
-    // 匯款資訊只有登入客戶讀得到，且只有「待付款」才會顯示——沒必要每次都拉
-    if (order.value?.status === 'quoted') await settingsStore.fetchPaymentInfo()
+    // 匯款資訊只有登入客戶讀得到，且只有「待付款」才會顯示——沒必要每次都拉。
+    // 超商取貨付款單根本不匯款，那一區整個不渲染，更沒有理由去拉。
+    if (order.value?.status === 'quoted' && !isCvs.value) await settingsStore.fetchPaymentInfo()
   } catch (err) {
     // 權限過濾讓別人的單直接查不到，這裡的錯誤同時涵蓋「不存在」與「不是你的」
     error.value = '找不到這張訂購單。'

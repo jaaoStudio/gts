@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import { SHIPPING, confirmedSubtotal, effectivePrice, estimateShipping, lineTotal } from './orderTotals'
+import {
+    CVS_BLOCK,
+    CVS_MAX_COLLECTABLE,
+    SHIPPING,
+    confirmedSubtotal,
+    cvsBlockReason,
+    cvsShippingFee,
+    effectivePrice,
+    estimateShipping,
+    lineTotal,
+} from './orderTotals'
 
 // 明細頁的品項欄位用 Directus 的原始命名（snake_case），與 store 裡的 camelCase 不同
 const item = (over = {}) => ({ unit_price: 100, confirmed_price: null, quantity: 1, ...over })
@@ -112,6 +122,98 @@ describe('逐行金額與小計的一致性', () => {
 
         expect(byLine).toBe(confirmedSubtotal(items))
         expect(byLine).toBe(1850)
+    })
+})
+
+describe('cvsShippingFee', () => {
+    // 7-11 公告費率：代收 1~1000 收 60，之後每千元跳一階到 5000 的 100。
+    test.each([
+        [0, 60],
+        [500, 60],
+        [2500, 80],
+        [3500, 90],
+    ])('given_小計%i_will_運費%i', (subtotal, fee) => {
+        expect(cvsShippingFee(subtotal)).toBe(fee)
+    })
+
+    describe('級距查的是含運的代收金額，不是小計', () => {
+        // 這一組是整個函式存在的理由。少了疊代，前台顯示 60 而老闆在後台建單打 70——
+        // 客人是在取貨櫃台當場發現差額的。
+        test('given_小計950_will_收70而不是查表直接得到的60', () => {
+            // 950 查表得 60，但代收其實是 950+60=1010，已經跨進 1001–2000 階
+            expect(cvsShippingFee(950)).toBe(70)
+        })
+
+        test('given_剛好停在階界上的940_will_維持60不多跳一階', () => {
+            // 940+60=1000 仍在第一階（含 1000 本身），不該被推到 70
+            expect(cvsShippingFee(940)).toBe(60)
+        })
+
+        test('given_下一階的界線1930_will_維持70', () => {
+            expect(cvsShippingFee(1930)).toBe(70)
+        })
+
+        test('given_1940_will_跳到80', () => {
+            expect(cvsShippingFee(1940)).toBe(80)
+        })
+    })
+
+    test('given_任何小計_will_運費與它自己造成的代收金額一致', () => {
+        // 這條是整個疊代的規格：算出的運費，必須正好是 7-11 對「含這筆運費的代收
+        // 金額」所收的那一階。刻意在這裡重述一次官方級距而不是引用實作的那張表——
+        // 共用同一份資料的話，表改錯了兩邊會一起錯，這條就白守了。
+        const published = (collected) =>
+            collected <= 1000 ? 60
+                : collected <= 2000 ? 70
+                    : collected <= 3000 ? 80
+                        : collected <= 4000 ? 90
+                            : 100
+
+        for (const subtotal of [0, 940, 950, 1930, 1940, 2999, 4000, 4900]) {
+            const fee = cvsShippingFee(subtotal)
+            expect(published(subtotal + fee)).toBe(fee)
+        }
+    })
+
+    test('given_已超過代收上限_will_回最高階而不是undefined', () => {
+        // 這種單會先被 cvsBlockReason 擋掉，但函式本身不能因為找不到級距就炸
+        expect(cvsShippingFee(9000)).toBe(100)
+    })
+})
+
+describe('cvsBlockReason', () => {
+    const reason = ({ subtotal = 0, allItemsShippable = true } = {}) =>
+        cvsBlockReason({ subtotal, allItemsShippable })
+
+    test('given_全部可寄且金額在上限內_will_不擋', () => {
+        expect(reason({ subtotal: 1200 })).toBeNull()
+    })
+
+    test('given_任一品項不可超商寄送_will_回oversize', () => {
+        expect(reason({ subtotal: 100, allItemsShippable: false })).toBe(CVS_BLOCK.oversize)
+    })
+
+    test('given_同時超尺寸與超金額_will_先報尺寸', () => {
+        // 兩個原因都成立時文案只能挑一個。尺寸是客人改不動的（得換商品），
+        // 金額他還能自己減量，所以先講死結那個。
+        expect(reason({ subtotal: 99999, allItemsShippable: false })).toBe(CVS_BLOCK.oversize)
+    })
+
+    describe('代收上限比的是含運金額', () => {
+        // 上限管的是店員實際收的數字，運費是它的一部分。拿小計去比會讓
+        // 小計 5,000（代收 5,100）過關，等到老闆建單才被 7-11 擋下來。
+        test('given_小計恰好等於上限_will_因為加上運費而被擋', () => {
+            expect(reason({ subtotal: CVS_MAX_COLLECTABLE })).toBe(CVS_BLOCK.overLimit)
+        })
+
+        test('given_小計4900_will_不擋因為含運剛好等於上限', () => {
+            // 4900 + 100 = 5000，等於上限本身仍可收
+            expect(reason({ subtotal: 4900 })).toBeNull()
+        })
+
+        test('given_小計4901_will_被擋', () => {
+            expect(reason({ subtotal: 4901 })).toBe(CVS_BLOCK.overLimit)
+        })
     })
 })
 

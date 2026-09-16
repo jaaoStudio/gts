@@ -139,9 +139,53 @@
           v-if="authStore.isAuthenticated"
           class="rounded-[1.5rem] border border-steel-900/[0.06] bg-white p-6"
         >
-          <h2 class="font-display text-lg font-semibold text-steel-900">聯絡與送貨資訊</h2>
+          <h2 class="font-display text-lg font-semibold text-steel-900">交貨與付款方式</h2>
           <p class="mt-1 text-sm text-steel-500">
-            已帶入您的會員資料，這次要送到別處可直接修改。標示 <span class="text-red-500">*</span> 為必填。
+            選擇後下方欄位會跟著調整。標示 <span class="text-red-500">*</span> 為必填。
+          </p>
+
+          <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <label
+              v-for="option in deliveryOptions"
+              :key="option.value"
+              class="flex cursor-pointer gap-3 rounded-2xl border p-4 transition-colors"
+              :class="[
+                form.deliveryMethod === option.value
+                  ? 'border-steel-900 bg-steel-50'
+                  : 'border-steel-200 hover:border-steel-400',
+                option.disabled && 'cursor-not-allowed opacity-50 hover:border-steel-200',
+              ]"
+            >
+              <input
+                v-model="form.deliveryMethod"
+                type="radio"
+                name="delivery-method"
+                :value="option.value"
+                :disabled="option.disabled"
+                class="mt-1 h-4 w-4 shrink-0 accent-steel-900"
+              />
+              <span class="min-w-0">
+                <span class="block font-display text-sm font-semibold text-steel-900">
+                  {{ option.label }}
+                </span>
+                <span class="mt-1 block text-xs leading-relaxed text-steel-500">
+                  {{ option.hint }}
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <!-- 選項被停用時必須說明原因：一個灰掉又沒有解釋的選項，客人只會以為壞了 -->
+          <p
+            v-if="cvsBlockText"
+            class="mt-3 rounded-xl bg-steel-50 px-4 py-3 text-xs leading-relaxed text-steel-600"
+          >
+            {{ cvsBlockText }}
+          </p>
+
+          <h2 class="mt-8 font-display text-lg font-semibold text-steel-900">聯絡資訊</h2>
+          <p class="mt-1 text-sm text-steel-500">
+            已帶入您的會員資料，這次要送到別處可直接修改。
           </p>
 
           <div class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -155,7 +199,7 @@
             </label>
             <label class="block">
               <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
-                聯絡電話 <span class="text-red-500">*</span>
+                {{ isCvs ? '取貨人手機' : '聯絡電話' }} <span class="text-red-500">*</span>
               </span>
               <input
                 v-model.trim="form.contactPhone"
@@ -164,10 +208,34 @@
                 inputmode="tel"
                 class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 text-steel-900 outline-none transition-colors focus:border-steel-900"
               />
+              <span v-if="isCvs" class="mt-1.5 block text-xs leading-relaxed text-steel-500">
+                包裹到店會發簡訊通知，請填手機（09 開頭 10 碼）。
+              </span>
             </label>
           </div>
 
-          <label class="mt-4 block">
+          <label v-if="isCvs" class="mt-4 block">
+            <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">
+              取貨門市 <span class="text-red-500">*</span>
+            </span>
+            <input
+              v-model.trim="form.cvsStore"
+              type="text"
+              placeholder="門市店號，或店名＋地址"
+              class="mt-2 w-full rounded-xl border border-steel-200 px-4 py-3 text-steel-900 outline-none transition-colors placeholder:text-steel-400 focus:border-steel-900"
+            />
+            <span class="mt-1.5 block text-xs leading-relaxed text-steel-500">
+              全台有多家同名門市，請盡量附上店號或地址。
+              <a
+                href="https://emap.pcsc.com.tw/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-semibold text-brand-600 underline underline-offset-2"
+              >查門市</a>
+            </span>
+          </label>
+
+          <label v-else class="mt-4 block">
             <span class="font-mono text-xs uppercase tracking-[0.16em] text-steel-500">送貨地址</span>
             <input
               v-model.trim="form.contactAddress"
@@ -199,9 +267,21 @@
             另有 {{ orderStore.quoteItemCount }} 項待報價，未計入小計。
           </p>
 
-          <!-- 運費：設定不完整時整行不顯示，不猜、也不用寫死的預設值頂替 -->
+          <!-- 超商：運費依代收金額級距，與宅配完全是兩套規則。免運門檻刻意不適用——
+               那是老闆對宅配的補貼，交貨便的運費是 7-11 從代收款直接扣走的。 -->
+          <div v-if="isCvs" class="mt-4 border-t border-steel-200 pt-4">
+            <div class="flex items-baseline justify-between text-sm">
+              <span class="text-steel-500">運費<span class="text-steel-400">（預估）</span></span>
+              <span class="font-mono text-steel-700">NT${{ cvsFee.toLocaleString() }}</span>
+            </div>
+            <p class="mt-1.5 text-xs text-steel-400">
+              7-11 交貨便依代收金額分級，超商取貨不適用免運門檻。
+            </p>
+          </div>
+
+          <!-- 宅配：設定不完整時整行不顯示，不猜、也不用寫死的預設值頂替 -->
           <div
-            v-if="shipping.state !== SHIPPING.unavailable"
+            v-else-if="shipping.state !== SHIPPING.unavailable"
             class="mt-4 border-t border-steel-200 pt-4"
           >
             <div class="flex items-baseline justify-between text-sm">
@@ -219,7 +299,11 @@
             </p>
           </div>
 
-          <p class="mt-4 text-sm leading-relaxed text-steel-500">
+          <p v-if="isCvs" class="mt-4 text-sm leading-relaxed text-steel-500">
+            取貨時再付款。包裹若超過超商尺寸限制，我們會與您改約宅配，且
+            <span class="font-semibold text-steel-700">價格與庫存以專人確認為準</span>。
+          </p>
+          <p v-else class="mt-4 text-sm leading-relaxed text-steel-500">
             運費為預估，重物與大材積商品可能另行報價，且
             <span class="font-semibold text-steel-700">價格與庫存以專人確認為準</span>。
           </p>
@@ -274,7 +358,15 @@ import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
-import { SHIPPING, estimateShipping } from '../utils/orderTotals'
+import {
+  CVS_BLOCK,
+  CVS_MAX_COLLECTABLE,
+  SHIPPING,
+  cvsBlockReason,
+  cvsShippingFee,
+  estimateShipping,
+} from '../utils/orderTotals'
+import { DELIVERY, DELIVERY_LABEL } from '../services/orderService'
 import { trackGenerateLead } from '../utils/analytics'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 import { PhArrowRight, PhInfo, PhMinus, PhPlus } from '@phosphor-icons/vue'
@@ -295,11 +387,58 @@ const shipping = computed(() =>
 )
 
 const form = reactive({
+  // 宅配是既有的唯一路徑，維持為預設——超商要客人主動選，因為它附帶取貨期限與
+  // 尺寸限制，不該由我們替他決定
+  deliveryMethod: DELIVERY.homeDelivery,
   contactName: '',
   contactPhone: '',
   contactAddress: '',
+  cvsStore: '',
   note: '',
 })
+
+const isCvs = computed(() => form.deliveryMethod === DELIVERY.cvsCod)
+
+// 只擋確定的兩件事；尺寸與重量交給老闆逐單判斷（why: docs/adr/0006 第 4、5 條）
+const cvsBlock = computed(() =>
+  cvsBlockReason({
+    subtotal: orderStore.subtotal,
+    allItemsShippable: orderStore.allItemsShippable,
+  })
+)
+
+const cvsBlockText = computed(() => {
+  if (cvsBlock.value === CVS_BLOCK.oversize) {
+    return '本單含超過超商尺寸限制的品項（最長邊 45 公分、長寬高合計 105 公分、10 公斤以內），只能走宅配。'
+  }
+  if (cvsBlock.value === CVS_BLOCK.overLimit) {
+    return `超商取貨付款的代收上限是 NT$${CVS_MAX_COLLECTABLE.toLocaleString()}，本單已超過，請改用宅配。`
+  }
+  return null
+})
+
+const deliveryOptions = computed(() => [
+  {
+    value: DELIVERY.homeDelivery,
+    label: DELIVERY_LABEL[DELIVERY.homeDelivery],
+    hint: '確認金額後匯款，款項確認後出貨。',
+    disabled: false,
+  },
+  {
+    value: DELIVERY.cvsCod,
+    label: DELIVERY_LABEL[DELIVERY.cvsCod],
+    hint: '到門市取貨時付現，不必先匯款。',
+    disabled: !!cvsBlock.value,
+  },
+])
+
+// 改數量或移除品項都可能讓已選的超商失效。留著一個選不到卻仍生效的選項，送出的會是
+// 前台自己判定不可行的組合——直接退回宅配，原因由上方那段說明承擔。
+watch(cvsBlock, (reason) => {
+  if (reason && isCvs.value) form.deliveryMethod = DELIVERY.homeDelivery
+})
+
+const cvsFee = computed(() => cvsShippingFee(orderStore.subtotal))
 
 // 送出的下一步就是「由專人與您確認價格與庫存」——也就是要打電話。三欄全空的單
 // 到後台只能回頭翻會員資料，而會員資料的電話也可能沒填，所以電話是唯一的硬門檻。
@@ -311,7 +450,22 @@ const form = reactive({
 //
 // trim 過再判斷：輸入框有 v-model.trim，但 prefillFromCustomer 是直接指派
 // `c.phone || ''`，會員資料裡若是一串空白就會原樣進來並讓這個閘門成立。
-const canSubmit = computed(() => !!form.contactPhone.trim() && !orderStore.submitting)
+//
+// ⚠️ 超商單**才**驗手機格式，兩條分支不一致是刻意的，不要順手統一：上面那段說
+// 「擋掉真客人的代價高於擋掉爛資料」，但走超商時這個比較反過來——7-11 包裹到店
+// 只發簡訊，市話收不到；收不到就是棄件，而退回的運費是老闆自己吃。手機在那條路上
+// 是物流的硬需求，不是偏好（why: docs/adr/0006 第 7 條）。
+const MOBILE_NUMBER = /^09\d{8}$/
+const phoneOk = computed(() => {
+  const phone = form.contactPhone.trim()
+  if (!phone) return false
+  return isCvs.value ? MOBILE_NUMBER.test(phone) : true
+})
+
+// 老闆在物流商後台建單時要填取件門市，沒有它這張單寄不出去
+const cvsStoreOk = computed(() => !isCvs.value || !!form.cvsStore.trim())
+
+const canSubmit = computed(() => phoneOk.value && cvsStoreOk.value && !orderStore.submitting)
 
 // 詢價品項沒有單價，不能算小計也不該顯示 NT$0
 const lineTotal = (item) =>
@@ -358,19 +512,35 @@ const submit = async () => {
     }
   }
 
-  // 四欄一次定住，之後只用這份快照。canSubmit 只在「點下去的那一刻」成立，而上面的
+  // 整份表單一次定住，之後只用這份快照。canSubmit 只在「點下去的那一刻」成立，而上面的
   // 重抓中間隔著一段 await——客人在等待期間清掉電話，直接讀 form 就會把空字串一路送到
   // service 轉成 contact_phone: null。輸入框不在原生提交的 form 裡，required 也攔不到。
-  // 其餘三欄本身沒有閘門，但一起快照才讀得出「送出的是同一個時間點的資料」。
+  // 沒有閘門的欄位也一起快照，才讀得出「送出的是同一個時間點的資料」。
   const payload = {
+    deliveryMethod: form.deliveryMethod,
     contactName: form.contactName,
     contactPhone: form.contactPhone.trim(),
     contactAddress: form.contactAddress,
+    cvsStore: form.cvsStore.trim(),
     note: form.note,
   }
 
+  const isCvsOrder = payload.deliveryMethod === DELIVERY.cvsCod
+
   if (!payload.contactPhone) {
     orderStore.submitError = '請填寫聯絡電話，我們需要它才能與您確認價格與庫存。'
+    return
+  }
+
+  // 這兩條與 canSubmit 重複，但重複是必要的：上面那段 await 之後，表單可能已經不是
+  // 按下按鈕時的樣子了，而檢查必須針對真正要送出去的那份快照。
+  if (isCvsOrder && !MOBILE_NUMBER.test(payload.contactPhone)) {
+    orderStore.submitError = '超商取貨需要手機號碼（09 開頭 10 碼）才能收到到店通知簡訊。'
+    return
+  }
+
+  if (isCvsOrder && !payload.cvsStore) {
+    orderStore.submitError = '請填寫取貨門市，我們需要它才能寄出包裹。'
     return
   }
 

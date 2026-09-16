@@ -58,7 +58,7 @@
               </p>
             </div>
 
-            <OrderStatusChip :status="order.status" />
+            <OrderStatusChip :status="order.status" :delivery-method="order.delivery_method" />
 
             <div class="text-right">
               <p class="font-mono text-lg font-bold text-steel-900">{{ amountLabel(order) }}</p>

@@ -10,10 +10,12 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ORDER_STATUS } from '../services/orderService'
+import { orderStatusCopy } from '../services/orderService'
 
 const props = defineProps({
   status: { type: String, required: true },
+  // 超商取貨付款單的 quoted 是「已確認」而不是「待付款」——客人不必匯款
+  deliveryMethod: { type: String, default: null },
 })
 
 // 與 Directus 後台的狀態顏色對齊，讓客人和老闆看到的是同一套語意
@@ -25,6 +27,8 @@ const TONES = {
   cancelled: { wrapper: 'bg-steel-100 text-steel-400', dot: 'bg-steel-300' },
 }
 
-const label = computed(() => ORDER_STATUS[props.status]?.label || props.status)
+const label = computed(
+  () => orderStatusCopy(props.status, props.deliveryMethod)?.label || props.status
+)
 const tone = computed(() => TONES[props.status] || TONES.pending)
 </script>

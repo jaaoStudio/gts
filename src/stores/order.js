@@ -50,6 +50,15 @@ export const useOrderStore = defineStore('order', {
 
         /** 詢價品項數，用於「另有 N 項待報價」文案 */
         quoteItemCount: (state) => state.items.filter((it) => it.unitPrice == null).length,
+
+        /**
+         * 是否每一項都能走超商寄送。
+         *
+         * ⚠️ 用 `!== true` 而非 `=== false`：localStorage 裡的舊品項沒有這個欄位，
+         * 讀回來是 `undefined`。那要算成「不能寄」——失敗方向是少一個選項，而不是
+         * 讓客人選了卻寄不出去（why: `docs/adr/0006` 第 5 條）。
+         */
+        allItemsShippable: (state) => state.items.every((it) => it.canShipCvs === true),
     },
 
     actions: {
@@ -101,6 +110,7 @@ export const useOrderStore = defineStore('order', {
                     unitPrice: variant.price ?? null,
                     quantity: qty,
                     image: variant.image || product.image || null,
+                    canShipCvs: variant.can_ship_cvs === true,
                 })
             }
 
@@ -142,7 +152,7 @@ export const useOrderStore = defineStore('order', {
          *
          * 失敗時**不清空購物車**，讓客人可以直接重試。
          */
-        async submit({ contactName, contactPhone, contactAddress, note }) {
+        async submit({ contactName, contactPhone, contactAddress, note, deliveryMethod, cvsStore }) {
             if (this.isEmpty || this.submitting) return null
 
             this.submitting = true
@@ -171,6 +181,8 @@ export const useOrderStore = defineStore('order', {
                     contactPhone,
                     contactAddress,
                     note,
+                    deliveryMethod,
+                    cvsStore,
                     items: this.items,
                 })
 
@@ -250,6 +262,8 @@ export const useOrderStore = defineStore('order', {
                         sku: v.sku || '',
                         unitPrice: freshPrice,
                         stock: v.stock ?? null,
+                        // 老闆可能在客人加入購物車之後才勾選，以後端為準
+                        canShipCvs: v.can_ship_cvs === true,
                         image: v.variant_image
                             ? getAssetUrl(v.variant_image)
                             : (product.image ? getAssetUrl(product.image) : item.image),
