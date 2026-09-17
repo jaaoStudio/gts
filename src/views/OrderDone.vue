@@ -45,7 +45,7 @@
             v-if="deliveryMethod === DELIVERY.homeDelivery"
           >與匯款方式</template>。
           <template v-if="deliveryMethod === DELIVERY.cvsCod">
-            包裹寄出後會以簡訊通知您到門市取貨，取貨時再付款。
+            <br>包裹寄出後會以簡訊通知您到門市取貨，取貨時再付款。
           </template>
           <span v-else class="font-semibold text-steel-800">確認前不需要先付款。</span>
         </p>

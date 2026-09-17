@@ -46,4 +46,16 @@ export default [
             globals: { ...globals.node },
         },
     },
+
+    {
+        // Directus flow 的 exec 腳本鏡像（見 docs/directus-flows/README.md）。
+        // 它們不會被打包進前端，是貼到 Directus 沙箱裡跑的 CommonJS——所以是
+        // `module.exports` 而非 ESM。刻意仍然進 lint 而不是加進 ignores：
+        // 那是線上真正在算錢的程式，打錯字的代價比前端還高。
+        files: ['docs/directus-flows/**/*.js'],
+        languageOptions: {
+            sourceType: 'commonjs',
+            globals: { ...globals.node },
+        },
+    },
 ]
