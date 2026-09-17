@@ -52,6 +52,37 @@ for f in json.load(sys.stdin)['data']:
     if m.get('readonly'): print(f['field'])"
 ```
 
+## ⚠️ 改 flow 的 operation：body 一定要包進 `options`
+
+`PATCH /operations/<id>` 的 body 是 **operation 自己的欄位**（`key` / `type` /
+`options` / `resolve` …），不是 options 的內容。把 options 物件直接當 body 送出去，
+Directus 會**照單全收**：`options` 裡的 `key` 會覆蓋掉 operation 的 `key`，而 `options`
+本身因為沒被指定就變成空的。
+
+2026-09-17 實際踩到：想給 `read_order` 多加一個查詢欄位，結果它的 `key` 被改成
+`["{{$trigger.keys[0]}}"]`、`options` 清空，**整條「訂購單存檔後自動計算」flow 從第一步
+就斷了約十分鐘**，而且沒有任何錯誤訊息，只是安靜地不再寫回金額。同一個錯誤也讓
+`{"code": "..."}` 這種寫法被 Directus 忽略，**新腳本根本沒進去而我以為推成功了**。
+
+```python
+# ❌ 錯：options 物件當 body，operation 的 key 被覆蓋
+api("PATCH", f"/operations/{op_id}", opt)
+# ❌ 錯：code 不是 operation 的欄位，被忽略，什麼都沒發生
+api("PATCH", f"/operations/{op_id}", {"code": src})
+# ✅ 對
+api("PATCH", f"/operations/{op_id}", {"options": {**opt, "code": src}})
+```
+
+**改完一定要回讀驗證**，不要相信 `http=200`：
+
+```python
+live = get(f"/operations?limit=-1&fields=key,options")
+# 1. 這支 operation 的 key 還在嗎？2. 線上 code 與本機檔案逐字元一致嗎？
+```
+
+flow 的 `exec` 腳本鏡像在 `docs/directus-flows/`，改之前先在本機用 node 餵假資料跑過。
+⚠️ 那裡不是真相來源，線上那份才是，**沒有自動同步**。
+
 > 此 token 讀得到 `fields` / `permissions` / `policies` / `presets` / `flows` / `revisions`
 > 與各 collection 的資料，但**讀不到 `directus_users` 與 `roles`（403）**——要查「某個人
 > 掛哪個 policy」得自己登入後台看。
