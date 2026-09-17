@@ -413,7 +413,7 @@ const deliveryOptions = computed(() => [
   {
     value: DELIVERY.cvsCod,
     label: DELIVERY_LABEL[DELIVERY.cvsCod],
-    hint: '到門市取貨時付現，不必先匯款。',
+    hint: '到門市取貨時付現。',
     disabled: !!cvsBlock.value,
   },
 ])
@@ -561,7 +561,13 @@ const submit = async () => {
     router.replace({
       name: 'OrderDone',
       params: { id: result.id },
-      state: { orderId: result.id, orderNumber: result.orderNumber },
+      // 交貨方式一起帶過去：完成頁的「下一步」文案要靠它分岔，而那頁只知道 id。
+      // 不帶的話它只能顯示中性文案，或多打一次 API 去問一件送出時就知道的事。
+      state: {
+        orderId: result.id,
+        orderNumber: result.orderNumber,
+        deliveryMethod: payload.deliveryMethod,
+      },
     })
   } else {
     router.replace({ name: 'OrderHistory' })

@@ -105,7 +105,17 @@ describe('送單成功事件', () => {
         }]])
         expect(navigation.replace).toHaveBeenCalledExactlyOnceWith(
             outcome === '正常取得單號'
-                ? { name: 'OrderDone', params: { id: 101 }, state: { orderId: 101, orderNumber: 'GTS-260915-0101' } }
+                ? {
+                    name: 'OrderDone',
+                    params: { id: 101 },
+                    // deliveryMethod 一起帶：完成頁的「下一步」文案靠它分岔，
+                    // 少了它超商客人會被告知「將通知您匯款方式」——而那永遠不會來
+                    state: {
+                        orderId: 101,
+                        orderNumber: 'GTS-260915-0101',
+                        deliveryMethod: 'home_delivery',
+                    },
+                }
                 : { name: 'OrderHistory' }
         )
     })

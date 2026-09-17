@@ -109,6 +109,8 @@ npm run preview
 | 運費為何是預估值、不進應付金額 | `docs/adr/0003` |
 | `payment_note` 的對帳規則（為何不做回報通知信、為何關掉 readonly） | `docs/adr/0004` |
 | GA4 與 cookie consent（為何 GA 裡沒有金額、為何不用 `useConsent()`、後台要關哪些開關）| `docs/adr/0005` |
+| **超商取貨付款**（為何配送與付款是同一個欄位、為何超商不套免運門檻、級距表為何有兩份）| `docs/adr/0006` |
+| **Directus flow 的 exec 腳本**（版控鏡像，可在本機餵假資料跑）| `docs/directus-flows/` |
 | Directus 資料結構 | skill `directus-schema-fetcher`（抓即時 schema，**碰資料層前先跑**）|
 | service / mapper 寫法 | skill `directus-service-layer` |
 | 商品分類批次維運 | skill `directus-catalog-categorization` |
@@ -135,6 +137,11 @@ npm run preview
 - 上線前 `site_settings` 必填：匯款銀行／帳號／戶名（缺一即視為未設定，
   客人會看到「請直接與我們聯絡」）、滿額免運門檻與預設運費（未填則一律不免運）、
   訂單通知信箱。
+  ⚠️ 這兩個運費欄位**只管宅配**。超商走 7-11 的公告級距，寫死在程式裡而不是後台，
+  而且**不套免運門檻**（why: `docs/adr/0006` 規則 1、2）。
+- **超商取貨付款預設是關的**：`product_variants.can_ship_cvs` 預設 `false`，老闆沒有
+  批次勾過的話，客人在訂購單頁看到的超商選項一律是灰的。勾選動線見
+  skill `directus-catalog-categorization`。
 
 ## 訂購單相關的硬規則
 
@@ -142,6 +149,11 @@ npm run preview
   依登入帳號補上。因此建立當下讀不回自己的單（HTTP 204），前端是靠
   「記錄送出前的最大 id → 輪詢等新單出現」取得訂單。
 - **金額一律由後端算**。`confirmed_total` 在每次存檔時重算，欄位為唯讀。
+- ⚠️ **運費規則同時活在前台與後端兩處，改一邊不算數。** 前台
+  `utils/orderTotals.js` 算的是給客人看的**預估**；真正進應付金額的是 Directus flow
+  「訂購單存檔後自動計算」的 `calc`（鏡像在 `docs/directus-flows/calc.js`）。
+  2026-09-17 就是漏了後端那份，超商單的應付金額被算成宅配的 140，**而且滿額還會被
+  算成免運 0**。兩邊不同步不會有任何錯誤訊息，148 個測試與三方 code review 全綠。
 - **新增 Directus 欄位後必須檢查所有 policy 的欄位清單**：`customer access` 對
   `products` / `site_settings` 等是逐一列欄位，查一個沒開放的欄位會讓**整個請求**
   回 FORBIDDEN。曾因此讓已登入客戶連商品頁都打不開。

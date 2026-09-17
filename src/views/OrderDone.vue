@@ -37,9 +37,17 @@
           </p>
         </div>
 
+        <!-- 下一步要依交貨方式分岔：對超商單講「會通知您匯款方式」是錯的指示，
+             那個匯款資訊永遠不會來。交貨方式不明時走中性版本——寧可少講一句，
+             也不要講一句對一半客人是錯的。 -->
         <p class="mt-6 leading-relaxed text-steel-600">
-          我們會盡快與您確認價格與庫存，確認後會通知您應付金額與匯款方式。
-          <span class="font-semibold text-steel-800">確認前不需要先付款。</span>
+          我們會盡快與您確認價格與庫存，確認後會通知您應付金額<template
+            v-if="deliveryMethod === DELIVERY.homeDelivery"
+          >與匯款方式</template>。
+          <template v-if="deliveryMethod === DELIVERY.cvsCod">
+            <br>包裹寄出後會以簡訊通知您到門市取貨，取貨時再付款。
+          </template>
+          <span v-else class="font-semibold text-steel-800">確認前不需要先付款。</span>
         </p>
 
         <div class="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -66,13 +74,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { orderService } from '../services/orderService'
+import { DELIVERY, orderService } from '../services/orderService'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCheckCircle } from '@phosphor-icons/vue'
 
 const route = useRoute()
 const orderNumber = ref(null)
+
+// 交貨方式只從 history state 取，**不為它多打一次 API**：它唯一的用途是挑一句文案，
+// 而拿不到時的中性版本本來就是正確的。重新整理會讓 state 消失，那時就走中性版本。
+const deliveryMethod = ref(null)
 
 // 四態各自對應一個真正不同的事實，不可合併：
 //   ready       單號在手上
@@ -104,7 +116,12 @@ onMounted(() => {
   // 綁 orderId 比對：history state 會跟著這個 entry 留在瀏覽器裡，
   // 不對照就可能把上一張單的單號貼到這張單上。
   const carried = window.history.state
-  if (carried?.orderNumber && String(carried.orderId) === String(route.params.id)) {
+  const sameOrder = String(carried?.orderId) === String(route.params.id)
+
+  // 交貨方式與單號分開判斷：單號讀不到時仍要顯示正確的下一步文案
+  if (sameOrder && carried?.deliveryMethod) deliveryMethod.value = carried.deliveryMethod
+
+  if (sameOrder && carried?.orderNumber) {
     orderNumber.value = carried.orderNumber
     state.value = 'ready'
     return

@@ -128,6 +128,12 @@ buildFilter({ categoryIds, keyword }) {
 - **讀取一律不帶 customer 條件**。權限已在 Directus 端過濾，前端不重複實作。
 - **金額欄位前端一律唯讀**。`confirmed_total` / `confirmed_price` / `status` 送了都會 403。
   客人唯一能寫的是 `payment_note`（回報匯款末五碼），且限 `status = quoted`。
+- **交貨方式（`delivery_method`）同時決定配送與付款**，不是兩個欄位。值域在
+  `orderService.js` 的 `DELIVERY`／`DELIVERY_LABEL`，狀態文案走 `orderStatusCopy(status,
+  deliveryMethod)`。⚠️ **不要退回直接讀 `ORDER_STATUS[status]`**，那對超商單會叫客人
+  去匯款（why: `docs/adr/0006`）。
+- **不適用的欄位一律送 `null`**。超商單送 `cvs_store`、`contact_address` 設 `null`；
+  宅配反過來。老闆讀哪一欄是由 `delivery_method` 決定的，另一欄留著殘值只會害他讀錯。
 
 ### ⚠️ 新增 Directus 欄位後必須同步權限的欄位清單
 
