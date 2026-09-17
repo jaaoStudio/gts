@@ -413,7 +413,7 @@ const deliveryOptions = computed(() => [
   {
     value: DELIVERY.cvsCod,
     label: DELIVERY_LABEL[DELIVERY.cvsCod],
-    hint: '到門市取貨時付現，不必先匯款。',
+    hint: '到門市取貨時付現。',
     disabled: !!cvsBlock.value,
   },
 ])
