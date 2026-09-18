@@ -38,6 +38,17 @@ module.exports = async function (data) {
         }
 
         if (isCvs) {
+            // ⚠️ 超過 7-11 代收上限就不要寄這封。交貨便收不了這筆錢（上限 5,000／件，
+            //    見 docs/adr/0006 規則 1），寄出去等於叫客人去櫃台付一筆付不掉的款。
+            //    這張單得改宅配或拆單，那是老闆的判斷；程式只負責不要先把錯的數字寄走。
+            //    ⚠️ 前台的 5,000 擋門比的是**小計**，而小計排除詢價品項，所以整車都是
+            //    詢價品項的單進得來，這個判斷不是多餘的（why: docs/adr/0006 Consequences）。
+            //    ⚠️ 5000 是 utils/orderTotals.js 的 CVS_IBON.maxCollectable 的第二份副本，
+            //    沙箱 import 不到 repo，改上限要兩邊一起動。
+            if (total > 5000) {
+                throw new Error('skip: 超商單應付 ' + total + ' 超過代收上限 5000，請改宅配或拆單');
+            }
+
             subject = '【已確認】' + no + '　取貨時應付 NT$' + total;
             body = [
                 '### 您的訂購單金額已確認',
@@ -91,8 +102,10 @@ module.exports = async function (data) {
             '| **物流單號** | ' + track + ' |',
         ];
         // 老闆沒按「確認報價」就直接出貨時 confirmed_total 是空的。寧可不講金額，
-        // 也不要寄一封寫著「取貨時應付 NT$0」的信出去。
-        if (total !== null && total !== undefined) {
+        // 也不要寄一封寫著「取貨時應付 NT$0」的信出去。超過代收上限時同理只略過
+        // 這一列而**不是整封不寄**（quoted 那邊是 throw）：貨都已經出了，門市、
+        // 單號與 7 天期限是客人唯一一次拿得到的資訊，不能因為金額有問題就扣住。
+        if (total !== null && total !== undefined && total <= 5000) {
             rows.push('| **取貨時應付** | **NT$' + total + '**（含運費） |');
         }
 

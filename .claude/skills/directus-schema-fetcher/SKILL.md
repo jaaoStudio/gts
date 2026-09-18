@@ -83,6 +83,18 @@ live = get(f"/operations?limit=-1&fields=key,options")
 flow 的 `exec` 腳本鏡像在 `docs/directus-flows/`，改之前先在本機用 node 餵假資料跑過。
 ⚠️ 那裡不是真相來源，線上那份才是，**沒有自動同步**。
 
+## ⚠️ 用 python 打這個 API 要自己帶 User-Agent
+
+前面那層 WAF 會 **403 掉 `Python-urllib/3.x` 的預設 UA**，token 完全正確也一樣。
+症狀很誤導：同一把 token 用 curl 是 200、用 python 是 403，看起來像權限問題，
+會讓人跑去翻 policy。
+
+```python
+req.add_header('User-Agent', 'curl/8.5.0')   # 少這行就 403
+```
+
+（`fetch_schema.sh` 用 curl，所以踩不到；改寫成 python 腳本時才會遇到。）
+
 > 此 token 讀得到 `fields` / `permissions` / `policies` / `presets` / `flows` / `revisions`
 > 與各 collection 的資料，但**讀不到 `directus_users` 與 `roles`（403）**——要查「某個人
 > 掛哪個 policy」得自己登入後台看。
