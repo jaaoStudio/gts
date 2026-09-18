@@ -13,15 +13,16 @@ module.exports = async function (data) {
     const customer_label = (c && (c.company_name || c.user_name)) || '（未知客戶）';
 
     // ⚠️ `company_name` / `user_name` 是客人自己改得動的（customerService 的白名單），
-    //    所以進信件 body 的那份必須跳脫，理由與 compute2 的 esc 相同。
+    //    所以進信件 body 的那份必須跳脫。`:` 與 `.` 也要跳——少了它們，裸的
+    //    `www.evil.tw` 會被 gfm autolink 成可點連結（理由與實測見 compute2.js 的 esc）。
     //    主旨用未跳脫的原值：它不經 markdown 算繪，跳脫只會讓收件匣看到反斜線；
     //    換行由 nodemailer 編碼，不構成標頭注入。
-    //    ⚠️ 兩支腳本各有一份 esc（沙箱裡 import 不到彼此），改一邊要改兩邊。
+    //    ⚠️ 兩支腳本各有一份跳脫（沙箱裡 import 不到彼此），改一邊要改兩邊。
     const customer_label_md = customer_label
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/([\\`*_[\]()!|~#])/g, '\\$1')
+        .replace(/([\\`*_[\]()!|~#:.])/g, '\\$1')
         .replace(/\s*[\r\n]+\s*/g, ' ');
 
     return { to, customer_label, customer_label_md };

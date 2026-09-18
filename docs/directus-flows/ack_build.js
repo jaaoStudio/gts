@@ -5,7 +5,11 @@ module.exports = async function (data) {
 
     const c = order.customer || {};
     const to = c.user_id && c.user_id.email;
-    // 會員一律以 Google 登入，理論上必有 email；沒有就安靜略過而非讓 flow 報錯
+    // ⚠️ 這個 throw 會讓**老闆的新單通知也一起不寄**：他那封排在客人這封之後
+    //    （ack_build → ack_mail → notify_to → pick_to → notify_mail），鏈斷在這裡
+    //    後面全不跑，而那是他唯一的新單觸發點。見 docs/adr/0006 的 ack_build 雷區。
+    //    會員一律以 Google 登入、理論上必有 email，所以實務上走不到；真要改成
+    //    「客人這封跳過、老闆那封照寄」得先把 notify 那段挪到鏈的前面。
     if (!to) throw new Error('skip: 客戶沒有 email');
 
     const lines = (order.items || []).map((it) => {

@@ -159,7 +159,9 @@ npm run preview
   `customer.company_name` 全是客戶端可寫的自由文字。不跳脫的話，備註欄一個
   `[正常的字](https://釣魚站)` 就是一封從本站網域寄出、通過 SPF/DKIM 的釣魚信。
   跳脫寫在 `docs/directus-flows/compute2.js` 與 `pick_to.js`，兩支各一份，改一邊
-  要改兩邊。寄給客人自己的信不在此列。
+  要改兩邊。⚠️ **`:` 與 `.` 也要跳**，否則裸的 `www.evil.tw` 會被 gfm autolink，
+  前面跳脫的中括號等於白做（四層表見 `docs/directus-flows/README.md`）。
+  寄給客人自己的信不在此列。
 - **新增 Directus 欄位後必須檢查所有 policy 的欄位清單**：`customer access` 對
   `products` / `site_settings` 等是逐一列欄位，查一個沒開放的欄位會讓**整個請求**
   回 FORBIDDEN。曾因此讓已登入客戶連商品頁都打不開。
