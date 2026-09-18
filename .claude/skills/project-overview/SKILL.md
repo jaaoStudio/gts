@@ -154,6 +154,12 @@ npm run preview
   「訂購單存檔後自動計算」的 `calc`（鏡像在 `docs/directus-flows/calc.js`）。
   2026-09-17 就是漏了後端那份，超商單的應付金額被算成宅配的 140，**而且滿額還會被
   算成免運 0**。兩邊不同步不會有任何錯誤訊息，148 個測試與三方 code review 全綠。
+- ⚠️ **客人填的欄位進到寄給老闆的信之前一律要跳脫。** `notify_mail` 是
+  `type: markdown`，Directus 會算繪成 HTML；`note` / `contact_name` / `product_name` /
+  `customer.company_name` 全是客戶端可寫的自由文字。不跳脫的話，備註欄一個
+  `[正常的字](https://釣魚站)` 就是一封從本站網域寄出、通過 SPF/DKIM 的釣魚信。
+  跳脫寫在 `docs/directus-flows/compute2.js` 與 `pick_to.js`，兩支各一份，改一邊
+  要改兩邊。寄給客人自己的信不在此列。
 - **新增 Directus 欄位後必須檢查所有 policy 的欄位清單**：`customer access` 對
   `products` / `site_settings` 等是逐一列欄位，查一個沒開放的欄位會讓**整個請求**
   回 FORBIDDEN。曾因此讓已登入客戶連商品頁都打不開。

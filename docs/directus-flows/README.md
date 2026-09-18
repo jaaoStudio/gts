@@ -9,6 +9,25 @@
 | 檔案 | Flow | Operation |
 |---|---|---|
 | `calc.js` | 訂購單存檔後自動計算（`items.update` on `orders`） | `calc` |
+| `cust_build.js` | 訂購單存檔後自動計算（`items.update` on `orders`） | `cust_build` |
+| `ack_build.js` | 訂購單送出後處理（`items.create` on `orders`） | `ack_build` |
+| `compute2.js` | 訂購單送出後處理（`items.create` on `orders`） | `compute2` |
+| `pick_to.js` | 訂購單送出後處理（`items.create` on `orders`） | `pick_to` |
+
+## ⚠️ 進得了信件 body 的客戶輸入一律要跳脫
+
+`notify_mail`（寄給老闆的新單通知）的 `type` 是 `markdown`，Directus 會把 body 算繪成
+HTML 再寄出。`compute2` 的 `note` / `contact` / `item_summary` 與 `pick_to` 的
+`customer_label_md` 全部來自客人自己填的欄位，**不跳脫的話，備註欄一個
+`[看起來正常的字](https://釣魚站)` 就會變成一封從本站網域寄出、通過 SPF/DKIM 的釣魚信**，
+收件人是老闆。HTML 與 markdown 兩層都要擋，只做其中一層仍留著管道。
+
+跳脫函式在 `compute2.js` 與 `pick_to.js` 各有一份（沙箱裡 import 不到彼此），**改一邊
+要改兩邊**。寄給客人自己的 `ack_build` / `cust_build` 不在此列——那兩封的內容只有
+他自己讀得到。
+
+`{{ }}` 是單次代換、代換進去的值不會被重新掃描，所以沒有 template injection 的面向；
+要擋的只有算繪成 HTML 這一段。
 
 ## calc.js
 
@@ -18,7 +37,9 @@
 ⚠️ 裡面的 `CVS_TIERS` 與前台 `CVS_IBON` 是同一份資料的兩份副本，改費率兩邊都要動
 （見 `docs/adr/0006` 規則 2）。
 
-本機驗證：
+本機驗證（**要先有這個目錄裡的 `package.json`**：根目錄是 `"type": "module"`，
+少了它 node 會把這裡的 `.js` 當 ESM 載入，第一行 `module.exports` 就
+`ReferenceError: module is not defined`）：
 
 ```js
 // t.mjs
