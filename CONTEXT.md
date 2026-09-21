@@ -44,13 +44,17 @@ _Avoid_: 產品, item, 貨品.
 A purchasable specification under a Product (Directus `product_variants`), where price and stock actually live. A Product has one or more Variants.
 _Avoid_: SKU (a field on a Variant, not its name), 款式.
 
-**配件** (Accessory):
+**配件** (Accessory, `product_variants.is_accessory`):
 一個只服務於本 Product、但**不與其他選項互斥**的品項：專用替刃、專用螺絲組。客人買
 「一支 270mm 鋸子」的同時會買「兩包替刃」與「一組螺絲」，三者一起成立。相對地，
 真正的 **Variant** 之間是**三選一**：買了 240mm 就不會再買 270mm。
-⚠️ **目前的資料模型不分這兩者**，配件與規格都存成 Variant，規格選擇器因此用一組單選鈕
-在演加購。這是已知的錯配，不是可以沿用的設計。
-_Avoid_: 把配件叫成規格／款式；把「同一頁賣的東西」當成「同一個東西的不同樣態」。
+判準只有一句：**這一筆跟同商品其他筆是「三選一」還是「可以一起買」？**
+配件與規格仍同存於 `product_variants`，靠這個旗標分辨。預設 `false`（＝視為規格），
+所以未經人工判斷的資料維持現狀，而不是被猜成配件。
+⚠️ **儲存端已分，呈現端還沒**：規格選擇器目前仍用一組單選鈕服務兩者，客人要加購得在
+同一組按鈕裡來回點。標記是人工逐件進行中（issue #34）。
+_Avoid_: 把配件叫成規格／款式；把「同一頁賣的東西」當成「同一個東西的不同樣態」；
+未標記就當成「已確認是規格」——那只是還沒有人看過。
 
 **規格圖** (Variant image, `product_variants.variant_image`):
 只拍某一個 Variant、不拍別的那張照片。一個 Variant 最多一張。
