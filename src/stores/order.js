@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { productService } from '../services/productService'
 import { DELIVERY, orderService } from '../services/orderService'
 import { cvsBlockReason } from '../utils/orderTotals'
-import { getAssetUrl } from '../utils/directus'
+import { ASSET_PRESETS, getAssetUrl } from '../utils/directus'
 
 const STORAGE_KEY = 'gts_order_items'
 
@@ -281,8 +281,8 @@ export const useOrderStore = defineStore('order', {
                         // 老闆可能在客人加入購物車之後才勾選，以後端為準
                         canShipCvs: v.can_ship_cvs === true,
                         image: v.variant_image
-                            ? getAssetUrl(v.variant_image)
-                            : (product.image ? getAssetUrl(product.image) : item.image),
+                            ? getAssetUrl(v.variant_image, ASSET_PRESETS.card)
+                            : (product.image ? getAssetUrl(product.image, ASSET_PRESETS.card) : item.image),
                     })
                 }
 

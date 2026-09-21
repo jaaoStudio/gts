@@ -42,10 +42,15 @@
           <!-- Gallery -->
           <div class="lg:sticky lg:top-24 lg:self-start">
             <div class="relative rounded-[2rem] bg-white p-2 ring-1 ring-steel-900/[0.06] shadow-[0_30px_60px_-30px_rgba(16,17,21,0.28)]">
-              <div class="aspect-square overflow-hidden rounded-[1.5rem] bg-steel-100">
-                <img :src="activeImage || heroPlaceholder" :alt="product.name" class="h-full w-full object-cover transition-opacity duration-300" />
-              </div>
-              <div v-if="productTags.length" class="absolute left-5 top-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="block aspect-square w-full cursor-zoom-in overflow-hidden rounded-[1.5rem] bg-steel-100"
+                :aria-label="`放大檢視 ${product.name}`"
+                @click="openLightbox"
+              >
+                <img :src="activeImageUrl" :alt="product.name" class="h-full w-full object-cover transition-opacity duration-300" />
+              </button>
+              <div v-if="productTags.length" class="pointer-events-none absolute left-5 top-5 flex flex-wrap gap-2">
                 <span
                   v-for="tag in productTags"
                   :key="tag.id"
@@ -55,18 +60,36 @@
                   {{ tag.name }}
                 </span>
               </div>
+
+              <!-- 大圖與規格是兩個各自可切換的狀態（點共用圖不會改規格）。不把目前規格
+                   常駐寫在圖上，客人會以為看到哪張圖就是在買哪一個，然後拿錯貨。 -->
+              <span
+                v-if="selectedVariantLabel"
+                class="pointer-events-none absolute bottom-5 left-5 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-steel-900/80 px-3 py-1.5 text-xs font-medium text-white backdrop-blur"
+              >
+                目前規格：{{ selectedVariantLabel }}
+              </span>
             </div>
 
-            <div v-if="galleryImages.length > 1" class="mt-4 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-              <button
-                v-for="(img, index) in galleryImages"
-                :key="index"
-                @click="activeImage = img"
-                class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all"
-                :class="activeImage === img ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
-              >
-                <img :src="img" class="h-full w-full object-cover" />
-              </button>
+            <!-- 規格圖與共用圖分段呈現。共用圖的定義是「不屬於任何單一規格的圖」
+                 （見 CONTEXT.md）；資料整理到哪，下面那一段就自動變乾淨，不用再改這裡。 -->
+            <div v-if="thumbGroups.length" class="mt-4 space-y-3">
+              <div v-for="group in thumbGroups" :key="group.label">
+                <p class="mb-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-steel-400">{{ group.label }}</p>
+                <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                  <button
+                    v-for="id in group.ids"
+                    :key="id"
+                    type="button"
+                    class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all"
+                    :class="activeImageId === id ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
+                    :aria-current="activeImageId === id ? 'true' : undefined"
+                    @click="activeImageId = id"
+                  >
+                    <img :src="imgUrl(id, ASSET_PRESETS.thumb)" alt="" loading="lazy" class="h-full w-full object-cover" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -113,7 +136,7 @@
             </div>
 
             <!-- 加入訂購單 -->
-            <div v-if="selectedVariant" class="mt-6">
+            <div v-if="publishedVariants.length" class="mt-6">
               <div class="flex flex-col gap-3 sm:flex-row">
                 <div class="flex items-center gap-1 rounded-full border border-steel-200 p-1.5">
                   <button
@@ -140,11 +163,13 @@
 
                 <button
                   type="button"
-                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98]"
+                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-steel-900 disabled:active:scale-100"
+                  :disabled="!selectedVariant"
                   @click="addToOrder"
                 >
                   <PhPlusCircle :size="20" weight="bold" />
-                  {{ justAdded ? '已加入訂購單' : '加入訂購單' }}
+                  <template v-if="!selectedVariant">請先選擇規格</template>
+                  <template v-else>{{ justAdded ? '已加入訂購單' : '加入訂購單' }}</template>
                 </button>
               </div>
 
@@ -218,6 +243,29 @@
     </main>
 
     <Footer />
+
+    <!-- Lightbox：object-contain 才看得到完整的圖。詳情頁大圖是 object-cover，
+         全站 159 張非正方形的圖在那裡是被裁掉兩側顯示的。 -->
+    <Teleport to="body">
+      <div
+        v-if="lightboxOpen"
+        class="fixed inset-0 z-100 flex items-center justify-center bg-steel-900/90 p-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`${product?.name} 放大檢視`"
+        @click="lightboxOpen = false"
+      >
+        <img :src="lightboxUrl" :alt="product?.name" class="max-h-full max-w-full object-contain" @click.stop />
+        <button
+          type="button"
+          class="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          aria-label="關閉放大檢視"
+          @click="lightboxOpen = false"
+        >
+          <PhX :size="20" weight="bold" />
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -234,7 +282,8 @@ import { normalizeSpecName, useOrderStore } from '../stores/order'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple,
-         PhPlus, PhMinus, PhPlusCircle, PhArrowRight } from '@phosphor-icons/vue'
+         PhPlus, PhMinus, PhPlusCircle, PhArrowRight, PhX } from '@phosphor-icons/vue'
+import { ASSET_PRESETS, getAssetUrl } from '../utils/directus'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
@@ -246,14 +295,55 @@ const product = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
-const activeImage = ref('')
 
-const galleryImages = computed(() => {
+// 存檔案 id 而非組好的網址：同一張圖在這一頁要出三種尺寸（縮圖／大圖／lightbox）
+const activeImageId = ref(null)
+
+const imgUrl = (id, preset) => getAssetUrl(id, preset)
+
+const activeImageUrl = computed(() => imgUrl(activeImageId.value, ASSET_PRESETS.detail) || heroPlaceholder)
+
+// 目前選中規格自己的圖。全站 1397 個規格只有 381 個有圖，所以多數商品這裡是 null，
+// 縮圖列只會出現共用圖那一段——那是正常的，不是壞掉。
+const variantImageId = computed(() => selectedVariant.value?.imageId || null)
+
+// 共用圖 = 主圖 + gallery。定義上是「不屬於任何單一規格的圖」（見 CONTEXT.md），
+// 但既有資料還沒整理乾淨，gallery 裡仍混著規格照，所以才要分段標示而不是保證。
+const sharedImageIds = computed(() => {
   if (!product.value) return []
-  const imgs = []
-  if (product.value.image) imgs.push(product.value.image)
-  if (product.value.gallery && Array.isArray(product.value.gallery)) imgs.push(...product.value.gallery)
-  return [...new Set(imgs)]
+  const ids = []
+  if (product.value.imageId) ids.push(product.value.imageId)
+  if (Array.isArray(product.value.galleryIds)) ids.push(...product.value.galleryIds)
+  return [...new Set(ids)]
+})
+
+const thumbGroups = computed(() => {
+  const groups = []
+  if (variantImageId.value) groups.push({ label: '此規格', ids: [variantImageId.value] })
+
+  const shared = sharedImageIds.value.filter((id) => id !== variantImageId.value)
+  if (shared.length) groups.push({ label: '商品其他照片', ids: shared })
+
+  // 全部加起來只有一張時整條縮圖列沒有意義
+  return groups.reduce((n, g) => n + g.ids.length, 0) > 1 ? groups : []
+})
+
+const lightboxOpen = ref(false)
+// full 而非原圖：原圖大小不受控（現有最大 1.18MB），而 full 封頂在 1600px。
+// 對現有的 1024 圖是「不放大、只轉檔」，看到的解析度一樣，檔案小一個數量級。
+const lightboxUrl = computed(() => imgUrl(activeImageId.value, ASSET_PRESETS.full) || heroPlaceholder)
+
+const onLightboxKey = (e) => { if (e.key === 'Escape') lightboxOpen.value = false }
+
+const openLightbox = () => {
+  if (!activeImageId.value) return
+  lightboxOpen.value = true
+}
+
+watch(lightboxOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+  if (open) window.addEventListener('keydown', onLightboxKey)
+  else window.removeEventListener('keydown', onLightboxKey)
 })
 
 // 外部通路連結只在詳情頁的 DETAIL_FIELDS 帶回，且已在 mapper 過濾過 scheme
@@ -280,7 +370,12 @@ const addToOrder = () => {
   addedTimer = setTimeout(() => { justAdded.value = false }, 2000)
 }
 
-onBeforeUnmount(() => clearTimeout(addedTimer))
+onBeforeUnmount(() => {
+  clearTimeout(addedTimer)
+  // lightbox 開著時離開這一頁，body 會永遠卡在 overflow:hidden，全站都捲不動
+  window.removeEventListener('keydown', onLightboxKey)
+  document.body.style.overflow = ''
+})
 
 // mapProduct 已把標籤攤平成 tag 物件陣列（id/name/color）
 const productTags = computed(() => product.value?.tags || [])
@@ -297,6 +392,13 @@ const sanitizedDescription = computed(() =>
 const publishedVariants = computed(() => {
   if (!product.value?.variants) return []
   return product.value.variants
+})
+
+// 只在「客人真的做過選擇」時才標示。單規格商品是系統自動選的，標出來反而像在說
+// 「你已經選好了」。normalizeSpecName 會把匯入殘留的 "Default" 清成空值。
+const selectedVariantLabel = computed(() => {
+  if (publishedVariants.value.length < 2 || !selectedVariant.value) return ''
+  return normalizeSpecName(selectedVariant.value.spec_name)
 })
 
 const priceDisplay = computed(() => {
@@ -327,6 +429,7 @@ const breadcrumbs = computed(() => {
 const fetchProduct = async (slug) => {
   loading.value = true
   error.value = null
+  selectedVariant.value = null
   try {
     const data = await productService.getProductBySlug(slug)
     product.value = data
@@ -336,10 +439,16 @@ const fetchProduct = async (slug) => {
       document.title = title
       setMeta('og:title', title, 'property')
       setMeta('og:description', data.short_description || '專業五金工具與耗材供應。', 'property')
-      if (data.image) setMeta('og:image', data.image, 'property')
+      // social 這組預設集刻意是 JPEG 而非 WebP：LINE 的預覽爬蟲對 WebP 支援不明，
+      // 而這個站的分享幾乎都走 LINE。尺寸也封頂，不讓原圖大小外溢到分享預覽。
+      if (data.imageId) setMeta('og:image', imgUrl(data.imageId, ASSET_PRESETS.social), 'property')
     }
-    if (data?.image) activeImage.value = data.image
-    if (publishedVariants.value.length > 0) selectedVariant.value = publishedVariants.value[0]
+    activeImageId.value = data?.imageId || null
+
+    // 只有單一規格時才自動選。多規格一律讓客人自己選：預選陣列第一個等於用 Directus
+    // 的 id 序幫客人決定，而那個順序跟商品毫無關係——曾經讓「折合鋸」這一頁開場就
+    // 顯示一包替刃的價格，客人按下加入訂購單拿到的也是替刃。
+    if (publishedVariants.value.length === 1) selectedVariant.value = publishedVariants.value[0]
   } catch (err) {
     error.value = 'Failed to load product'
     console.error(err)
@@ -352,12 +461,10 @@ watch(() => route.params.slug, (newSlug) => {
   if (newSlug) fetchProduct(newSlug)
 }, { immediate: false })
 
+// 切規格一律把大圖帶回該規格的圖；該規格沒有圖就退回商品主圖，而不是停在上一個
+// 規格的圖上（那就是「看到的是別人的照片」）。
 watch(selectedVariant, (newVal) => {
-  if (newVal && newVal.image) {
-    activeImage.value = newVal.image
-  } else if (product.value && product.value.image) {
-    activeImage.value = product.value.image
-  }
+  activeImageId.value = newVal?.imageId || product.value?.imageId || null
 })
 
 onMounted(() => {

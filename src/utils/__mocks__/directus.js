@@ -9,4 +9,7 @@
  */
 export default {}
 
-export const getAssetUrl = (id) => (id ? `https://assets.test/${id}` : null)
+export const ASSET_PRESETS = { thumb: 'thumb', card: 'card', detail: 'detail' }
+
+export const getAssetUrl = (id, preset) =>
+    id ? `https://assets.test/${id}${preset ? `?key=${preset}` : ''}` : null

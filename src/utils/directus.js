@@ -27,9 +27,24 @@ const directus = createDirectus(apiUrl)
 
 export default directus;
 
-export const getAssetUrl = (id) => {
+// Directus 的 storage_asset_transform 已切成「僅限預設集」，任意 ?width=/?quality=
+// 一律回 400。尺寸定義在 Directus 設定裡（見 .claude/skills/deploy-ops），不在版控，
+// 所以這裡只認 key，加新尺寸要先去後台開預設集。
+// 不傳 preset = 回原圖，且原圖大小不受控（目前最大 1.18MB，老闆改用手機原檔上傳會更大），
+// 所以前台沒有任何地方該用它——lightbox 走 full、og:image 走 social。
+export const ASSET_PRESETS = {
+  thumb: 'thumb',
+  card: 'card',
+  detail: 'detail',
+  full: 'full',
+  // 刻意是 JPEG 不是 WebP：LINE 的預覽爬蟲對 WebP 支援不明，而本站分享幾乎都走 LINE
+  social: 'social',
+};
+
+export const getAssetUrl = (id, preset) => {
   if (!id) return null;
   // 如果 DIRECTUS_URL 是相對路徑 (/api)，需要轉為完整的 Public URL
   const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL || DIRECTUS_URL;
-  return `${publicUrl}/assets/${id}`;
+  const base = `${publicUrl}/assets/${id}`;
+  return preset ? `${base}?key=${preset}` : base;
 };

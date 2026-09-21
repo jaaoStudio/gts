@@ -1,5 +1,5 @@
 import { readItems, aggregate } from '@directus/sdk'
-import directus, { getAssetUrl } from '../utils/directus'
+import directus, { ASSET_PRESETS, getAssetUrl } from '../utils/directus'
 
 // 1. 抽取共用欄位，未來五金行商品要加欄位只要改這裡
 const LIST_FIELDS = [
@@ -156,7 +156,7 @@ export const productService = {
             acc[id] = (results[i] || []).map((p) => ({
                 id: p.id,
                 name: p.name,
-                image: getAssetUrl(p.image),
+                image: getAssetUrl(p.image, ASSET_PRESETS.card),
             }))
             return acc
         }, {})
@@ -177,7 +177,7 @@ export const productService = {
 
         return items.map((c) => ({
             ...c,
-            preview_image: c.preview_image ? getAssetUrl(c.preview_image) : null,
+            preview_image: c.preview_image ? getAssetUrl(c.preview_image, ASSET_PRESETS.card) : null,
         }));
     },
 
@@ -285,7 +285,11 @@ export const productMapper = {
             .filter(v => v.status !== 'draft' && v.status !== 'archived')
             .map(v => ({
                 ...v,
-                image: v.variant_image ? getAssetUrl(v.variant_image) : null
+                // imageId 是給詳情頁用的：同一張圖在那裡要出三種尺寸（縮圖/大圖/lightbox），
+                // 只給組好的網址就得回頭解析字串。image 則是訂購單 store 會存進
+                // localStorage 的那一份，固定 card。
+                imageId: v.variant_image || null,
+                image: v.variant_image ? getAssetUrl(v.variant_image, ASSET_PRESETS.card) : null
             }))
 
         const variantPrices = variants
@@ -296,15 +300,17 @@ export const productMapper = {
             ? Math.min(...variantPrices)
             : 0
 
-        // 處理相簿圖片
-        let gallery = []
+        // gallery 一律只留檔案 id，不在這裡組網址：唯一的消費者是詳情頁，而它同一張圖
+        // 要出縮圖/大圖/lightbox 三種尺寸。⚠️ products_files 沒有 sort 欄位，順序就是
+        // junction 的 id 序，後台拖拉排不動（見 GitHub issue）。
+        let galleryIds = []
         if (item.gallery && Array.isArray(item.gallery)) {
-            gallery = item.gallery
+            galleryIds = item.gallery
                 .filter(g => g && g.directus_files_id)
-                .map(g => getAssetUrl(g.directus_files_id))
+                .map(g => g.directus_files_id)
         }
 
-        const mainImage = item.image ? getAssetUrl(item.image) : null
+        const mainImage = item.image ? getAssetUrl(item.image, ASSET_PRESETS.card) : null
 
         // 攤平商品標籤（junction → tag 物件），供詳情頁顯示多標籤。
         // 卡片用的主標籤仍走 badge/badgeColor（見上方 firstTag）。
@@ -330,7 +336,8 @@ export const productMapper = {
             description: item.description,
             price: displayPrice,
             image: mainImage,
-            gallery: gallery,
+            imageId: item.image || null,
+            galleryIds: galleryIds,
             category: primaryCategory,
             categories: m2mCategories,
             badge: firstTag ? firstTag.name : null,

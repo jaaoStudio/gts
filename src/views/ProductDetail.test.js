@@ -145,6 +145,75 @@ describe('add_to_cart', () => {
     })
 })
 
+// 多規格商品的圖與規格是兩個可以各自切換的狀態。這一組守的是「客人看到的圖」與
+// 「他實際會買到的規格」不會分岔——真的發生過：折合鋸那一頁開場就預選了 id 最小的
+// 「鋸片2片裝」，客人點了鋸子的照片後按加入訂購單，拿到的是兩片替刃。
+describe('多規格商品', () => {
+    const MULTI = {
+        ...PRODUCT,
+        imageId: 'main-img',
+        galleryIds: ['shared-1'],
+        variants: [
+            // 刻意讓 id 小的是「配件」：預選第一個就會選到它
+            { id: 10, spec_name: '鋸片2片裝', sku: 'B-2', price: 198, imageId: 'img-blade', image: null, status: 'published' },
+            { id: 11, spec_name: '整支鋸子', sku: 'S-1', price: 290, imageId: 'img-saw', image: null, status: 'published' },
+        ],
+    }
+
+    const bigImageSrc = () => wrapper.find('button[aria-label="放大檢視 鐵鎚"] img').attributes('src')
+    const variantButton = (text) =>
+        wrapper.findAll('button').find((b) => b.text().includes(text))
+    const addButton = () =>
+        wrapper.findAll('button').find((b) => b.text().includes('加入訂購單') || b.text().includes('請先選擇規格'))
+
+    beforeEach(async () => {
+        wrapper.unmount()
+        productService.getProductBySlug.mockResolvedValue(MULTI)
+        wrapper = mount(ProductDetail, {
+            global: {
+                stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                directives: { reveal: {} },
+            },
+        })
+        await flushPromises()
+    })
+
+    test('開頁不預選規格，加入訂購單按鈕停用', () => {
+        const btn = addButton()
+        expect(btn.text()).toContain('請先選擇規格')
+        expect(btn.attributes('disabled')).toBeDefined()
+        // 沒選規格時價格顯示區間，而不是某一個規格的價格
+        expect(wrapper.text()).toContain('NT$198 - NT$290')
+    })
+
+    test('選了規格之後，大圖換成該規格的圖', async () => {
+        expect(bigImageSrc()).toContain('main-img')
+
+        await variantButton('整支鋸子').trigger('click')
+
+        expect(bigImageSrc()).toContain('img-saw')
+        expect(addButton().attributes('disabled')).toBeUndefined()
+    })
+
+    test('點共用圖只換大圖，不會把已選的規格改掉', async () => {
+        await variantButton('整支鋸子').trigger('click')
+
+        const sharedThumb = wrapper.findAll('button')
+            .find((b) => b.find('img').exists() && b.find('img').attributes('src')?.includes('shared-1'))
+        expect(sharedThumb).toBeDefined()
+        await sharedThumb.trigger('click')
+
+        expect(bigImageSrc()).toContain('shared-1')
+        // 圖換了，但賣的還是鋸子：按鈕仍可按，且標示持續說明目前規格是哪一個
+        expect(addButton().attributes('disabled')).toBeUndefined()
+        expect(wrapper.text()).toContain('目前規格：整支鋸子')
+
+        await addButton().trigger('click')
+        await flushPromises()
+        expect(useOrderStore().items[0].specName).toBe('整支鋸子')
+    })
+})
+
 describe('未同意時', () => {
     test('掛載與加入訂購單都不送任何事件', async () => {
         wrapper.unmount()
