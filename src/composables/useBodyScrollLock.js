@@ -23,7 +23,8 @@ export const useBodyScrollLock = (isOpen) => {
         apply()
     }
 
-    watch(isOpen, (open) => set(!!open))
+    // immediate 不可省：ref 在 setup 當下就已經是 true 的元件，少了它永遠不會取得鎖
+    watch(isOpen, (open) => set(!!open), { immediate: true })
 
     // 鎖著的時候離開這一頁，body 會永遠卡在 overflow:hidden，全站都捲不動
     onBeforeUnmount(() => set(false))

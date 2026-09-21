@@ -257,6 +257,7 @@
       >
         <img :src="lightboxUrl" :alt="product?.name" class="max-h-full max-w-full object-contain" @click.stop />
         <button
+          ref="lightboxCloseRef"
           type="button"
           class="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
           aria-label="關閉放大檢視"
@@ -270,7 +271,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
 import { trackAddToCart, trackViewItem } from '../utils/analytics'
@@ -325,6 +326,11 @@ const lightboxUrl = computed(() => activeImage.value?.full || heroPlaceholder)
 
 const onLightboxKey = (e) => { if (e.key === 'Escape') lightboxOpen.value = false }
 
+// 宣告了 aria-modal 就得負責焦點，否則鍵盤與輔助技術使用者會停在被宣告為惰性的區域外面。
+// 這裡只做最低限度的進出，完整的 focus trap 全站沒有任何 modal 有，該一起做。
+const lightboxCloseRef = ref(null)
+let focusBeforeLightbox = null
+
 const openLightbox = () => {
   if (!activeImage.value) return
   lightboxOpen.value = true
@@ -332,9 +338,17 @@ const openLightbox = () => {
 
 useBodyScrollLock(lightboxOpen)
 
-watch(lightboxOpen, (open) => {
-  if (open) window.addEventListener('keydown', onLightboxKey)
-  else window.removeEventListener('keydown', onLightboxKey)
+watch(lightboxOpen, async (open) => {
+  if (open) {
+    window.addEventListener('keydown', onLightboxKey)
+    focusBeforeLightbox = document.activeElement
+    await nextTick()
+    lightboxCloseRef.value?.focus()
+  } else {
+    window.removeEventListener('keydown', onLightboxKey)
+    focusBeforeLightbox?.focus?.()
+    focusBeforeLightbox = null
+  }
 })
 
 // 外部通路連結只在詳情頁的 DETAIL_FIELDS 帶回，且已在 mapper 過濾過 scheme
@@ -420,6 +434,9 @@ const fetchProduct = async (slug) => {
   loading.value = true
   error.value = null
   selectedVariant.value = null
+  // 上一頁/下一頁在兩個商品之間切換時元件不會卸載，不關掉的話 lightbox 會蓋著
+  // 上一個商品的照片留在新商品的骨架上
+  lightboxOpen.value = false
   try {
     const data = await productService.getProductBySlug(slug)
     product.value = data

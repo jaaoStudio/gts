@@ -125,13 +125,18 @@ const router = createRouter({
     routes,
     scrollBehavior(to, from, savedPosition) {
         if (!savedPosition) return { top: 0 }
+        if (!to.meta?.awaitContent) return savedPosition
 
         // 資料是非同步撈的頁面，立刻還原時頁面還是骨架、高度不夠，savedPosition 會被
         // 瀏覽器夾成 0。等該頁自己說準備好了再還原（見 utils/contentReady）。
         // 靠 meta 而非路由名：下一個這種頁在自己那條路由加旗標就好，不用回來改這裡。
-        if (to.meta?.awaitContent) return waitForContent().then(() => savedPosition)
-
-        return savedPosition
+        return waitForContent().then(() => {
+            // ⚠️ 這個檢查不可省。vue-router 5 的 handleScroll 是
+            //   nextTick().then(scrollBehavior).then(p => p && scrollToPosition(p))
+            // promise resolve 之後它**不會**重新確認路由有沒有變。等待期間使用者若
+            // 又導航走了，回傳舊位置會把新頁面捲到上一頁的 Y。回 false = 這次不捲。
+            return router.currentRoute.value.fullPath === to.fullPath ? savedPosition : false
+        })
     }
 })
 

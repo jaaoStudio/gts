@@ -335,25 +335,34 @@ const queryWithPage = (page) => ({
 
 const fetchFromRoute = async () => {
   const requested = currentPage.value
-  try {
-    await productStore.fetchProducts(requested, {
-      categorySlug: categorySlug.value,
-      keyword: searchKeyword.value,
-    })
+  // 撈資料期間使用者可能已經離開這一頁。route 是響應式的，等回來時它指的已經是別頁，
+  // 底下每一個副作用都會打在錯的地方，所以一律先對照出發時的網址。
+  const startedAt = route.fullPath
 
-    // 網址是使用者能自己改的。超出範圍時退回最後一頁，而不是把人留在一片空白上。
-    // replace 會再觸發一次 watcher，但那時 requested <= totalPages，不會無限繞。
-    if (productStore.totalPages > 0 && requested > productStore.totalPages) {
-      router.replace({ path: '/products', query: queryWithPage(productStore.totalPages) })
-    }
-  } finally {
-    // nextTick 不可省：不等 DOM flush 就發訊號，router 還原捲動位置時清單仍是骨架，
-    // 瀏覽器會把 savedPosition 夾到頁面當下的高度。實測會少掉數百 px，而且時好時壞
-    // （router 的 .then 與 Vue 的 flush 都是 microtask，誰先誰後不穩定）。
-    // 必須無論成敗都發，漏發時 scrollBehavior 會枯等到逾時才還原。
-    await nextTick()
-    signalContentReady()
+  // fetchProducts 自己吞掉錯誤（設 store.error 而不 throw），所以這裡不需要 try。
+  // 也刻意不用 finally 發訊號：下面有兩條路徑「不該」發，放進 finally 就繞過去了。
+  await productStore.fetchProducts(requested, {
+    categorySlug: categorySlug.value,
+    keyword: searchKeyword.value,
+  })
+
+  if (route.fullPath !== startedAt) return
+
+  // 網址是使用者能自己改的。超出範圍時退回最後一頁，而不是把人留在一片空白上。
+  // replace 會再觸發一次 watcher，但那時 requested <= totalPages，不會無限繞。
+  if (productStore.totalPages > 0 && requested > productStore.totalPages) {
+    router.replace({ path: '/products', query: queryWithPage(productStore.totalPages) })
+    // 訊號留給 replace 之後那一趟。此刻畫面是越界的空清單（「找不到商品」），
+    // 現在發等於叫 scrollBehavior 對著那個空狀態還原捲動位置。
+    return
   }
+
+  // nextTick 不可省：不等 DOM flush 就發訊號，router 還原捲動位置時清單仍是骨架，
+  // 瀏覽器會把 savedPosition 夾到頁面當下的高度。實測會少掉數百 px，而且時好時壞
+  // （router 的 .then 與 Vue 的 flush 都是 microtask，誰先誰後不穩定）。
+  await nextTick()
+  if (route.fullPath !== startedAt) return
+  signalContentReady()
 }
 
 const goToPage = (page) => {

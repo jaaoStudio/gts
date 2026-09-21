@@ -63,14 +63,17 @@ describe('useBodyScrollLock', () => {
         b.unmount()
     })
 
+    test('掛載當下就已經是開著的，也要立刻鎖住', () => {
+        // watch 少了 immediate 的話這裡會是空字串：ref 在 setup 當下就是 true 的
+        // 元件永遠不會取得鎖
+        const w = mountLocker(ref(true))
+        expect(overflow()).toBe('hidden')
+        w.unmount()
+    })
+
     test('鎖著的時候卸載，鎖要跟著歸還', async () => {
         const open = ref(true)
         const w = mountLocker(open)
-        // watch 沒有 immediate，先翻一次讓它生效
-        open.value = false
-        await nextTick()
-        open.value = true
-        await nextTick()
         expect(overflow()).toBe('hidden')
 
         w.unmount()

@@ -126,7 +126,7 @@ export const productService = {
      *
      * 分類為 M2M 且每商品都掛 [父, 子]，故用父分類 id 直接就能撈到整個分支。
      *
-     * @returns {Promise<Record<string, Array<{id,name,image}>>>} 以分類 id 為鍵
+     * @returns {Promise<Record<string, Array<{id,name,images}>>>} 以分類 id 為鍵
      */
     async getCategoryPreviews(categoryIds = [], limit = 3) {
         if (!categoryIds.length) return {}
@@ -156,7 +156,8 @@ export const productService = {
             acc[id] = (results[i] || []).map((p) => ({
                 id: p.id,
                 name: p.name,
-                image: getAssetUrl(p.image, ASSET_PRESETS.card),
+                // 給整組尺寸：首頁 bento 的首格比其他格大一倍，card(400) 餵不飽它
+                images: mapImage(p.image),
             }))
             return acc
         }, {})
@@ -177,7 +178,7 @@ export const productService = {
 
         return items.map((c) => ({
             ...c,
-            preview_image: c.preview_image ? getAssetUrl(c.preview_image, ASSET_PRESETS.card) : null,
+            preview_image: mapImage(c.preview_image),
         }));
     },
 
