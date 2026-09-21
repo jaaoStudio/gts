@@ -61,8 +61,8 @@
                 </span>
               </div>
 
-              <!-- 大圖與規格是兩個各自可切換的狀態（點共用圖不會改規格）。不把目前規格
-                   常駐寫在圖上，客人會以為看到哪張圖就是在買哪一個，然後拿錯貨。 -->
+              <!-- 大圖與規格是兩個各自可切換的狀態：點共用圖不會改規格。拿掉這行標示，
+                   畫面上就沒有任何東西說得出客人買的是哪一個。 -->
               <span
                 v-if="selectedVariantLabel"
                 class="pointer-events-none absolute bottom-5 left-5 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-steel-900/80 px-3 py-1.5 text-xs font-medium text-white backdrop-blur"
@@ -71,19 +71,19 @@
               </span>
             </div>
 
-            <!-- 規格圖與共用圖分段呈現。共用圖的定義是「不屬於任何單一規格的圖」
-                 （見 CONTEXT.md）；資料整理到哪，下面那一段就自動變乾淨，不用再改這裡。 -->
+            <!-- 分段標示而非保證：gallery 裡仍混著規格照（issue #35），資料清到哪
+                 這裡就乾淨到哪，不用再改程式。 -->
             <div v-if="thumbGroups.length" class="mt-4 space-y-3">
               <div v-for="group in thumbGroups" :key="group.label">
                 <p class="mb-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-steel-400">{{ group.label }}</p>
                 <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
                   <button
                     v-for="img in group.images"
-                    :key="img.thumb"
+                    :key="img.id"
                     type="button"
                     class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all"
-                    :class="activeImage?.thumb === img.thumb ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
-                    :aria-current="activeImage?.thumb === img.thumb ? 'true' : undefined"
+                    :class="activeImage?.id === img.id ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
+                    :aria-current="activeImage?.id === img.id ? 'true' : undefined"
                     @click="activeImage = img"
                   >
                     <img :src="img.thumb" alt="" loading="lazy" class="h-full w-full object-cover" />
@@ -283,6 +283,7 @@ import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple,
          PhPlus, PhMinus, PhPlusCircle, PhArrowRight, PhX } from '@phosphor-icons/vue'
+import { useBodyScrollLock } from '../composables/useBodyScrollLock'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
@@ -295,28 +296,24 @@ const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
 
-// mapProduct 給的圖片物件 { thumb, detail, full }，不是網址字串
+// mapProduct 給的圖片物件 { id, thumb, card, detail, full }，不是網址字串
 const activeImage = ref(null)
 
 const activeImageUrl = computed(() => activeImage.value?.detail || heroPlaceholder)
 
-// 全站 1397 個規格只有 381 個有圖，所以多數商品這裡是 null，縮圖列只會出現
-// 「商品其他照片」那一段——那是正常的，不是壞掉。
-const variantImage = computed(() => selectedVariant.value?.images || null)
-
-// 「商品其他照片」= 主圖 + 共用圖，不等於 CONTEXT.md 的共用圖本身。
-// 既有資料的 gallery 裡仍混著規格照（issue #35），所以是分段標示而非保證。
+// 「商品其他照片」= 主圖 + 共用圖，不等於 CONTEXT.md 定義的共用圖（見該詞條）
 const sharedImages = computed(() => {
   if (!product.value) return []
   const all = [product.value.mainImage, ...(product.value.gallery || [])].filter(Boolean)
-  return [...new Map(all.map((img) => [img.thumb, img])).values()]
+  return [...new Map(all.map((img) => [img.id, img])).values()]
 })
 
 const thumbGroups = computed(() => {
+  const variantImage = selectedVariant.value?.images || null
   const groups = []
-  if (variantImage.value) groups.push({ label: '此規格', images: [variantImage.value] })
+  if (variantImage) groups.push({ label: '此規格', images: [variantImage] })
 
-  const shared = sharedImages.value.filter((img) => img.thumb !== variantImage.value?.thumb)
+  const shared = sharedImages.value.filter((img) => img.id !== variantImage?.id)
   if (shared.length) groups.push({ label: '商品其他照片', images: shared })
 
   // 全部加起來只有一張時整條縮圖列沒有意義
@@ -333,8 +330,9 @@ const openLightbox = () => {
   lightboxOpen.value = true
 }
 
+useBodyScrollLock(lightboxOpen)
+
 watch(lightboxOpen, (open) => {
-  document.body.style.overflow = open ? 'hidden' : ''
   if (open) window.addEventListener('keydown', onLightboxKey)
   else window.removeEventListener('keydown', onLightboxKey)
 })
@@ -365,9 +363,7 @@ const addToOrder = () => {
 
 onBeforeUnmount(() => {
   clearTimeout(addedTimer)
-  // lightbox 開著時離開這一頁，body 會永遠卡在 overflow:hidden，全站都捲不動
   window.removeEventListener('keydown', onLightboxKey)
-  document.body.style.overflow = ''
 })
 
 // mapProduct 已把標籤攤平成 tag 物件陣列（id/name/color）
@@ -387,10 +383,8 @@ const publishedVariants = computed(() => {
   return product.value.variants
 })
 
-// 只在「客人真的做過選擇」時才標示。單規格商品是系統自動選的，標出來反而像在說
-// 「你已經選好了」。
-// 正規化為空時要退回 raw：規格鈕顯示的是 raw spec_name，兩邊不一致的話，客人按下
-// 寫著「Default」的按鈕後這行字會整個消失——那正是這行字存在的意義。
+// 單規格商品不標示：那是系統自動選的，標出來會讀成「你已經選好了」。
+// 正規化為空要退回 raw，否則會與規格鈕上的 raw spec_name 分岔成一有一無。
 const selectedVariantLabel = computed(() => {
   if (publishedVariants.value.length < 2 || !selectedVariant.value) return ''
   const raw = selectedVariant.value.spec_name

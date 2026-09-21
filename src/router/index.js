@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { waitForContent } from '../utils/contentReady'
 import Home from '../views/Home.vue'
 import Products from '../views/Products.vue'
 import ProductDetail from '../views/ProductDetail.vue'
@@ -31,7 +32,7 @@ const routes = [
         path: '/products',
         name: 'Products',
         component: Products,
-        meta: { title: '所有商品｜金同心實業' }
+        meta: { title: '所有商品｜金同心實業', awaitContent: true }
     },
     {
         path: '/product/:slug',
@@ -119,29 +120,16 @@ const routes = [
     }
 ]
 
-// 等畫面把內容撐開再還原捲動位置。600ms 是保險絲：發訊號的那一頁若改壞了或撈失敗，
-// 最壞情況是還原晚半秒，而不是整個返回動作卡死。
-const contentReady = () => new Promise((resolve) => {
-    const done = () => {
-        clearTimeout(timer)
-        window.removeEventListener('app:content-ready', done)
-        resolve()
-    }
-    const timer = setTimeout(done, 600)
-    window.addEventListener('app:content-ready', done, { once: true })
-})
-
 const router = createRouter({
     history: createWebHistory(),
     routes,
     scrollBehavior(to, from, savedPosition) {
         if (!savedPosition) return { top: 0 }
 
-        // 商品列表的資料是非同步撈的。返回時立刻還原捲動位置，頁面還是骨架、高度不夠，
-        // 瀏覽器會把 savedPosition 夾成 0——看起來就像「返回沒有記住位置」。
-        // 等 Products.vue 撈完資料發出 app:content-ready 再還原。
-        // 只對這一條路由等待，否則每一次返回（首頁、訂購單…）都要多付一次 timeout。
-        if (to.name === 'Products') return contentReady().then(() => savedPosition)
+        // 資料是非同步撈的頁面，立刻還原時頁面還是骨架、高度不夠，savedPosition 會被
+        // 瀏覽器夾成 0。等該頁自己說準備好了再還原（見 utils/contentReady）。
+        // 靠 meta 而非路由名：下一個這種頁在自己那條路由加旗標就好，不用回來改這裡。
+        if (to.meta?.awaitContent) return waitForContent().then(() => savedPosition)
 
         return savedPosition
     }

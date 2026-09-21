@@ -149,9 +149,12 @@ describe('add_to_cart', () => {
 // 「他實際會買到的規格」不會分岔——真的發生過：折合鋸那一頁開場就預選了 id 最小的
 // 「鋸片2片裝」，客人點了鋸子的照片後按加入訂購單，拿到的是兩片替刃。
 describe('多規格商品', () => {
-    // 與 productMapper 的產出同形：每張圖是 { thumb, detail, full } 而非網址字串
+    // ⚠️ 要與 productService 的 mapImage() 同形。少一個鍵不會讓這裡報錯，而是讓
+    // 以該鍵比對身分的程式把所有圖看成同一張——漏了 id 時就是這樣紅的。
     const img = (id) => ({
+        id,
         thumb: `https://assets.test/${id}?key=thumb`,
+        card: `https://assets.test/${id}?key=card`,
         detail: `https://assets.test/${id}?key=detail`,
         full: `https://assets.test/${id}?key=full`,
     })

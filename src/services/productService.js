@@ -263,10 +263,13 @@ const safeExternalUrl = (url) => {
     }
 }
 
-// 詳情頁同一張圖要出三種尺寸（縮圖列／大圖／lightbox）。元件不得自己組 Directus 網址
-// （見 skill vue-component-conventions 與 directus-service-layer），所以在這裡一次給齊。
+// 一張圖的所有尺寸。元件不得自己組 Directus 網址（見 skill directus-service-layer），
+// 所以在這裡一次給齊。social 不在此列：它只有 og:image 一個消費者，放進來等於讓每張
+// 列表圖與規格圖都多算一條沒人讀的網址。
 const mapImage = (id) => (id ? {
+    id,
     thumb: getAssetUrl(id, ASSET_PRESETS.thumb),
+    card: getAssetUrl(id, ASSET_PRESETS.card),
     detail: getAssetUrl(id, ASSET_PRESETS.detail),
     full: getAssetUrl(id, ASSET_PRESETS.full),
 } : null)
@@ -291,12 +294,11 @@ export const productMapper = {
         // (2) 不再隱性依賴「policy 剛好有設 filter」，日後權限被改動也不會外洩下架規格。
         const variants = (item.variants || [])
             .filter(v => v.status !== 'draft' && v.status !== 'archived')
-            .map(v => ({
-                ...v,
-                images: mapImage(v.variant_image),
-                // 訂購單 store 會把這一份存進 localStorage，固定 card
-                image: v.variant_image ? getAssetUrl(v.variant_image, ASSET_PRESETS.card) : null
-            }))
+            .map(v => {
+                const images = mapImage(v.variant_image)
+                // image 是訂購單 store 存進 localStorage 的那一份，必須是字串不能是物件
+                return { ...v, images, image: images?.card ?? null }
+            })
 
         const variantPrices = variants
             .map(v => v.price)
@@ -306,8 +308,7 @@ export const productMapper = {
             ? Math.min(...variantPrices)
             : 0
 
-        // ⚠️ products_files 沒有 sort 欄位，順序就是 junction 的 id 序，後台拖拉排不動
-        // （見 GitHub issue #35）。
+        // ⚠️ products_files 沒有 sort 欄位，順序就是 junction id 序，後台拖拉排不動（issue #35）
         let gallery = []
         if (item.gallery && Array.isArray(item.gallery)) {
             gallery = item.gallery
@@ -315,7 +316,7 @@ export const productMapper = {
                 .map(g => mapImage(g.directus_files_id))
         }
 
-        const mainImage = item.image ? getAssetUrl(item.image, ASSET_PRESETS.card) : null
+        const mainImage = mapImage(item.image)
 
         // 攤平商品標籤（junction → tag 物件），供詳情頁顯示多標籤。
         // 卡片用的主標籤仍走 badge/badgeColor（見上方 firstTag）。
@@ -340,11 +341,11 @@ export const productMapper = {
             short_description: item.short_description,
             description: item.description,
             price: displayPrice,
-            image: mainImage,
-            mainImage: mapImage(item.image),
+            image: mainImage?.card ?? null,
+            mainImage,
             // og:image 刻意是 JPEG 而非 WebP，理由見 .claude/skills/deploy-ops
             socialImage: item.image ? getAssetUrl(item.image, ASSET_PRESETS.social) : null,
-            gallery: gallery,
+            gallery,
             category: primaryCategory,
             categories: m2mCategories,
             badge: firstTag ? firstTag.name : null,
