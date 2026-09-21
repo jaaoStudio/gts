@@ -54,7 +54,13 @@ description: Vue 3 SFC 撰寫慣例：結構、狀態流、命名、樣式與動
 2. **Store**：`const xxxStore = useXxxStore()` 放在頂層。
 3. **Props**：`defineProps({ ... })`，標明 type 與 required/default。
 4. **元件不直接呼叫 Directus** — 走 store → service。詳見 skill `directus-service-layer`。
-5. **rich-text 一律先消毒**：Directus 來的 HTML 要 `DOMPurify.sanitize()` 後才 `v-html`，防 stored XSS
+   這包含**圖片網址**：mapper 會把檔案 id 轉成 `{ id, thumb, card, detail, full }`，
+   元件只消費，不要自己 import `getAssetUrl`。
+5. **同一段 DOM 副作用在第二個元件出現時，抽進 `src/composables/`** —— 不是為了漂亮，
+   是因為各自持有全域狀態會互相覆蓋。實例：`body` 捲動鎖原本 Navbar 與詳情頁各寫一份、
+   都「還原成空字串」，從手機選單點進商品再開 lightbox，先關的那個會解掉另一個的鎖。
+   `useBodyScrollLock` 改成計數才修好。
+6. **rich-text 一律先消毒**：Directus 來的 HTML 要 `DOMPurify.sanitize()` 後才 `v-html`，防 stored XSS
    （見 `ProductDetail.vue`）。
 
 ## 命名
@@ -163,7 +169,7 @@ const entry = entries[entries.length - 1]
 
 <!-- 自 docs/gotchas.md 移入（2026-09-10），該檔已解散 -->
 
-## 送出流程:await 前後讀同一個 reactive 來源
+## await 前後讀同一個 reactive 來源(送出流程與導航)
 
 **這個坑在同一條分支上被抓到三次**(2026-09,`OrderDetail` 匯款回報、`OrderForm`
 送單、`Account` 儲存),形狀完全一樣,所以值得記下來。
@@ -203,3 +209,29 @@ const entry = entries[entries.length - 1]
 
 `v-model.trim` 只作用在使用者輸入。程式碼直接指派的預填值(如
 `form.contactPhone = c.phone || ''`)**不會被 trim**,所以閘門自己也要 `.trim()`。
+
+### 同一個病的第二種受害者:`route`(2026-09-21)
+
+被 `await` 拆開的不只表單欄位。**`route` 也是 reactive 的**,而使用者在那段空窗裡
+可以整個離開這一頁。`Products.vue` 就這樣中過兩次:
+
+- 開 `/products?page=999`(實際只有 55 頁),在請求回來前點去首頁。舊請求完成後照樣
+  `router.replace`,把人從首頁硬拉回 `/products?page=55`;而 `queryWithPage()` 展開的
+  是 `route.query`,那時已經是首頁的 query,兩邊還會混在一起。
+- 同一段的 `signalContentReady()` 原本放在 `finally`,於是越界那條路徑會在「找不到
+  商品」的空清單狀態就發訊號,等於叫 `scrollBehavior` 對著空畫面還原捲動位置。
+
+對策同上:**`await` 之前先定住 `route.fullPath`**,回來後不同就一概不做副作用。
+
+```js
+const startedAt = route.fullPath
+await productStore.fetchProducts(...)
+if (route.fullPath !== startedAt) return   // 走掉了:不 replace,也不發訊號
+```
+
+⚠️ 這種情況**不要用 `finally`**。`finally` 的意思是「無論如何都要做」,但這裡恰恰有
+兩條路徑不該做,放進去就繞過了守衛。
+
+同一個形狀在 router 那邊也有一份:`scrollBehavior` 回傳 promise 時,vue-router 5
+resolve 之後不會重新確認路由,得自己比對 `router.currentRoute`。見 skill
+`routing-and-auth` 的「新增路由步驟」第 6 點。

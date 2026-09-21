@@ -58,22 +58,33 @@ src/
 │                         # Shipping / Warranty / Privacy / Terms / AdminLogin(=/login) /
 │                         # AdminCallback / Account /
 │                         # OrderForm(=/order) / OrderDone / OrderHistory / OrderDetail
-│                         # （+ OrderDetail.test.js，唯一的元件測試）
+│                         # （元件測試：OrderDetail / OrderForm / ProductDetail）
 ├── stores/               # auth / product / category / settings / order / consent
 │                         # consent：GA 同意三態 + 副作用，main.js 呼叫 init()（+ 測試）
 ├── services/             # productService（+ productMapper）/ customerService /
 │                         # settingsService / orderService
+├── composables/
+│   ├── useShippingCopy.js      # 說明頁的運費文案
+│   └── useBodyScrollLock.js    # body 捲動鎖。**計數**而非各自設回空字串——手機選單與
+│                               # lightbox 會同時開著，先關的不可以解掉另一個的鎖（+ 測試）
 ├── directives/reveal.js  # v-reveal：IntersectionObserver + failsafe（勿改回 ScrollTrigger）
 ├── utils/
 │   ├── analytics.js      # GA4 事件與 pageTracker predicate（狀態在 stores/consent.js）。
 │   │                     # ⚠ 事件一律不帶金額；改這裡前先讀 ADR 0005（+ analytics.test.js）
-│   ├── directus.js       # SDK 單例（session 模式）+ getAssetUrl()
+│   ├── contentReady.js   # router 的 scrollBehavior 與非同步載入頁之間的握手。
+│   │                     # 事件名只在這裡出現一次；逾時是保險絲，不可短到跟訊號賽跑
+│   ├── directus.js       # SDK 單例（session 模式）+ getAssetUrl(id, preset) + ASSET_PRESETS
+│   │                     # ⚠ Directus 是「僅限預設集」模式，未定義的 key 回 400 並被 CF
+│   │                     #   快取。尺寸定義在後台不在版控，見 skill deploy-ops「圖片管線」
 │   └── seo.js            # setMeta()：runtime 改 <head> meta（目前僅 ProductDetail 用它設 og:*）
 │                         # ⚠ SPA runtime 設定，LINE/FB 爬蟲不執行 JS 故讀不到，
 │                         #   要精準社群卡需 SSR/預渲染
 └── router/index.js       # 路由 + 守衛 + afterEach 套 meta.title
                           # meta.noAnalytics 決定該頁要不要進 GA（main.js 的 exclude 靠它）
-                          # + index.test.js：requiresAuth 的路由一律必須標 noAnalytics
+                          # meta.awaitContent：該頁資料是非同步撈的，返回時 scrollBehavior
+                          #   要等它說準備好再還原捲動位置，否則會被夾到骨架的高度
+                          # + index.test.js：requiresAuth 必須標 noAnalytics、
+                          #   scrollBehavior 的過期等待要回 false 不可回舊位置
 ```
 
 **分層規則**：元件**不直接**呼叫 Directus → 走 Pinia store → store 委派 service → service 用 SDK。

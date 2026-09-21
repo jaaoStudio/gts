@@ -90,12 +90,24 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh && current_slot /opt/traefik/dynami
 | key | fit | 寬×高 | 品質 | 格式 | 用途 |
 |---|---|---|---|---|---|
 | `thumb` | inside | 160×160 | 70 | webp | 詳情頁縮圖列 |
-| `card` | inside | 400×500 | 75 | webp | 商品卡、分類預覽、訂購單品項 |
+| `card` | inside | 600×750 | 75 | webp | 商品卡、分類預覽、訂購單品項 |
 | `detail` | inside | 800×800 | 80 | webp | 詳情頁大圖 |
 | `full` | inside | 1600×1600 | 82 | webp | 詳情頁 lightbox |
 | `social` | inside | 1200×1200 | 80 | **jpeg** | `og:image` |
 
 五組都開 `withoutEnlargement`,所以對現有這批 ≤1024px 的圖不會放大,只是轉檔。
+
+⚠️ **尺寸要對著實際渲染寬度的 2 倍訂,不是憑感覺**。`card` 一開始訂 400,但商品卡實測
+渲染 216~264 CSS px,2 倍螢幕需要 430~530px —— 改動前那裡吃的是原圖(600~1024)所以清楚,
+換成 400 反而比改之前糊。量法:開 DevTools 讀 `img.getBoundingClientRect().width`,
+乘 2,再往上取。
+
+⚠️ **改既有 preset 的尺寸,網址不會變**(`?key=card` 還是 `?key=card`),所以 CF 邊緣會
+繼續發舊尺寸最多 1 天、客人瀏覽器最多 30 天。要嘛在前端還沒開始用那個 key 之前就改完,
+要嘛改完後去 CF 清快取。加新尺寸用新 key 則沒有這個問題。
+
+⚠️ **`PATCH /settings` 會整包覆寫 `storage_asset_presets`**。只送要改的那一筆等於把其他
+四組刪掉,全站圖片立刻壞。一律五組列齊。
 
 - **fit 必須是 `inside` 不能是 `cover`**:全站 159 張非正方形的圖,`cover` 會在伺服器端就
   裁掉,而前端已經用 `object-cover` 裁過一次。裁兩次會把鋸片圖上的紅字規格標示切掉。

@@ -37,7 +37,13 @@ export default directus
 - **`cache: 'no-cache'` 不可拿掉**：Directus 讀取回應帶 `Cache-Control: private, max-age=300`，
   拿掉會造成「後台存檔後重整仍看到舊資料」。
 - **Relative URL handling**: if `VITE_DIRECTUS_URL` starts with `/`, prepend `window.location.origin`.
-- `getAssetUrl(id)`: converts a Directus file UUID to a full asset URL.
+- `getAssetUrl(id, preset)`: converts a Directus file UUID to a full asset URL.
+  ⚠️ Directus 是**「僅限預設集」模式**：`preset` 必須是 `ASSET_PRESETS` 裡的
+  `thumb` / `card` / `detail` / `full` / `social` 之一，未定義的 key 回 **400**，
+  而 Cloudflare 會把那個 400 快取起來。尺寸定義在 Directus 後台、**不在版控**，
+  加新 key 的順序永遠是「先 Directus，驗過，再部署前端」。見 skill `deploy-ops`
+  的「圖片管線」。省略 `preset` 會回原圖，而原圖大小不受控（目前最大 1.18MB），
+  前台不該有地方用它。
 
 ## Service Object Pattern
 
@@ -75,14 +81,22 @@ export const productMapper = {
 ```
 
 ### Mapper Responsibilities
-- Convert Directus file UUIDs to full URLs via `getAssetUrl()`.
+- Convert Directus file UUIDs to full URLs via `getAssetUrl()`。
+  ⚠️ **元件不得自己組圖片網址**（與分層規則同一條）。詳情頁同一張圖要出縮圖/大圖/
+  lightbox 三種尺寸，所以 mapper 用 `mapImage(id)` 一次給齊
+  `{ id, thumb, card, detail, full }`，元件只消費。`social` 刻意不在裡面：它只有
+  `og:image` 一個消費者，放進來等於每張列表圖與規格圖都多算一條沒人讀的網址。
 - Calculate derived fields (e.g., `displayPrice` from variants min price).
 - **濾除下架規格**：`mapProduct` 會先排除 `status` 為 `draft`/`archived` 的 variant，
   之後才算最低價。故列表卡片與詳情頁看到的規格一致。用「排除 draft/archived」而非
   「只留 published」，避免 status 為空的舊資料被誤砍。
 - Normalize relational data. **分類已全面改用 M2M**（每商品 `[父, 子]`）；主分類取「有 parent 的子分類葉節點」，M2O `category` 已棄用全空。批次維運/重歸類見 `directus-catalog-categorization`。
 - Extract tag badges.
-- Process gallery images.
+- Process gallery images。⚠️ `product.gallery` 與 `variant.images` 是 **`mapImage` 物件
+  陣列/物件，不是網址字串**；`product.image` 與 `variant.image` 才是字串（固定 `card`，
+  因為訂購單 store 會把它存進 localStorage，物件不能序列化）。
+  圖片身分一律比 `img.id`，不要比網址字串——preset 名稱一改那個隱含等式就斷，
+  而斷法是「選取高亮失效」這種不會有人寫測試的症狀。
 
 ## Directus SDK Usage
 
