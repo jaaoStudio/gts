@@ -78,15 +78,15 @@
                 <p class="mb-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-steel-400">{{ group.label }}</p>
                 <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
                   <button
-                    v-for="id in group.ids"
-                    :key="id"
+                    v-for="img in group.images"
+                    :key="img.thumb"
                     type="button"
                     class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all"
-                    :class="activeImageId === id ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
-                    :aria-current="activeImageId === id ? 'true' : undefined"
-                    @click="activeImageId = id"
+                    :class="activeImage?.thumb === img.thumb ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
+                    :aria-current="activeImage?.thumb === img.thumb ? 'true' : undefined"
+                    @click="activeImage = img"
                   >
-                    <img :src="imgUrl(id, ASSET_PRESETS.thumb)" alt="" loading="lazy" class="h-full w-full object-cover" />
+                    <img :src="img.thumb" alt="" loading="lazy" class="h-full w-full object-cover" />
                   </button>
                 </div>
               </div>
@@ -244,8 +244,8 @@
 
     <Footer />
 
-    <!-- Lightbox：object-contain 才看得到完整的圖。詳情頁大圖是 object-cover，
-         全站 159 張非正方形的圖在那裡是被裁掉兩側顯示的。 -->
+    <!-- object-contain 不可換成 object-cover：大圖那邊是 cover，非正方形的圖在那裡
+         被裁掉兩側，這裡是唯一看得到完整內容的地方。 -->
     <Teleport to="body">
       <div
         v-if="lightboxOpen"
@@ -283,7 +283,6 @@ import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple,
          PhPlus, PhMinus, PhPlusCircle, PhArrowRight, PhX } from '@phosphor-icons/vue'
-import { ASSET_PRESETS, getAssetUrl } from '../utils/directus'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
@@ -296,47 +295,41 @@ const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
 
-// 存檔案 id 而非組好的網址：同一張圖在這一頁要出三種尺寸（縮圖／大圖／lightbox）
-const activeImageId = ref(null)
+// mapProduct 給的圖片物件 { thumb, detail, full }，不是網址字串
+const activeImage = ref(null)
 
-const imgUrl = (id, preset) => getAssetUrl(id, preset)
+const activeImageUrl = computed(() => activeImage.value?.detail || heroPlaceholder)
 
-const activeImageUrl = computed(() => imgUrl(activeImageId.value, ASSET_PRESETS.detail) || heroPlaceholder)
+// 全站 1397 個規格只有 381 個有圖，所以多數商品這裡是 null，縮圖列只會出現
+// 「商品其他照片」那一段——那是正常的，不是壞掉。
+const variantImage = computed(() => selectedVariant.value?.images || null)
 
-// 目前選中規格自己的圖。全站 1397 個規格只有 381 個有圖，所以多數商品這裡是 null，
-// 縮圖列只會出現共用圖那一段——那是正常的，不是壞掉。
-const variantImageId = computed(() => selectedVariant.value?.imageId || null)
-
-// 共用圖 = 主圖 + gallery。定義上是「不屬於任何單一規格的圖」（見 CONTEXT.md），
-// 但既有資料還沒整理乾淨，gallery 裡仍混著規格照，所以才要分段標示而不是保證。
-const sharedImageIds = computed(() => {
+// 「商品其他照片」= 主圖 + 共用圖，不等於 CONTEXT.md 的共用圖本身。
+// 既有資料的 gallery 裡仍混著規格照（issue #35），所以是分段標示而非保證。
+const sharedImages = computed(() => {
   if (!product.value) return []
-  const ids = []
-  if (product.value.imageId) ids.push(product.value.imageId)
-  if (Array.isArray(product.value.galleryIds)) ids.push(...product.value.galleryIds)
-  return [...new Set(ids)]
+  const all = [product.value.mainImage, ...(product.value.gallery || [])].filter(Boolean)
+  return [...new Map(all.map((img) => [img.thumb, img])).values()]
 })
 
 const thumbGroups = computed(() => {
   const groups = []
-  if (variantImageId.value) groups.push({ label: '此規格', ids: [variantImageId.value] })
+  if (variantImage.value) groups.push({ label: '此規格', images: [variantImage.value] })
 
-  const shared = sharedImageIds.value.filter((id) => id !== variantImageId.value)
-  if (shared.length) groups.push({ label: '商品其他照片', ids: shared })
+  const shared = sharedImages.value.filter((img) => img.thumb !== variantImage.value?.thumb)
+  if (shared.length) groups.push({ label: '商品其他照片', images: shared })
 
   // 全部加起來只有一張時整條縮圖列沒有意義
-  return groups.reduce((n, g) => n + g.ids.length, 0) > 1 ? groups : []
+  return groups.reduce((n, g) => n + g.images.length, 0) > 1 ? groups : []
 })
 
 const lightboxOpen = ref(false)
-// full 而非原圖：原圖大小不受控（現有最大 1.18MB），而 full 封頂在 1600px。
-// 對現有的 1024 圖是「不放大、只轉檔」，看到的解析度一樣，檔案小一個數量級。
-const lightboxUrl = computed(() => imgUrl(activeImageId.value, ASSET_PRESETS.full) || heroPlaceholder)
+const lightboxUrl = computed(() => activeImage.value?.full || heroPlaceholder)
 
 const onLightboxKey = (e) => { if (e.key === 'Escape') lightboxOpen.value = false }
 
 const openLightbox = () => {
-  if (!activeImageId.value) return
+  if (!activeImage.value) return
   lightboxOpen.value = true
 }
 
@@ -395,10 +388,13 @@ const publishedVariants = computed(() => {
 })
 
 // 只在「客人真的做過選擇」時才標示。單規格商品是系統自動選的，標出來反而像在說
-// 「你已經選好了」。normalizeSpecName 會把匯入殘留的 "Default" 清成空值。
+// 「你已經選好了」。
+// 正規化為空時要退回 raw：規格鈕顯示的是 raw spec_name，兩邊不一致的話，客人按下
+// 寫著「Default」的按鈕後這行字會整個消失——那正是這行字存在的意義。
 const selectedVariantLabel = computed(() => {
   if (publishedVariants.value.length < 2 || !selectedVariant.value) return ''
-  return normalizeSpecName(selectedVariant.value.spec_name)
+  const raw = selectedVariant.value.spec_name
+  return normalizeSpecName(raw) || (raw || '').trim()
 })
 
 const priceDisplay = computed(() => {
@@ -439,15 +435,12 @@ const fetchProduct = async (slug) => {
       document.title = title
       setMeta('og:title', title, 'property')
       setMeta('og:description', data.short_description || '專業五金工具與耗材供應。', 'property')
-      // social 這組預設集刻意是 JPEG 而非 WebP：LINE 的預覽爬蟲對 WebP 支援不明，
-      // 而這個站的分享幾乎都走 LINE。尺寸也封頂，不讓原圖大小外溢到分享預覽。
-      if (data.imageId) setMeta('og:image', imgUrl(data.imageId, ASSET_PRESETS.social), 'property')
+      if (data.socialImage) setMeta('og:image', data.socialImage, 'property')
     }
-    activeImageId.value = data?.imageId || null
+    activeImage.value = data?.mainImage || null
 
-    // 只有單一規格時才自動選。多規格一律讓客人自己選：預選陣列第一個等於用 Directus
-    // 的 id 序幫客人決定，而那個順序跟商品毫無關係——曾經讓「折合鋸」這一頁開場就
-    // 顯示一包替刃的價格，客人按下加入訂購單拿到的也是替刃。
+    // 只有單一規格時才自動選。多規格不可以預選陣列第一個——那等於用 Directus 的 id 序
+    // 幫客人決定他要買哪一個。
     if (publishedVariants.value.length === 1) selectedVariant.value = publishedVariants.value[0]
   } catch (err) {
     error.value = 'Failed to load product'
@@ -464,7 +457,7 @@ watch(() => route.params.slug, (newSlug) => {
 // 切規格一律把大圖帶回該規格的圖；該規格沒有圖就退回商品主圖，而不是停在上一個
 // 規格的圖上（那就是「看到的是別人的照片」）。
 watch(selectedVariant, (newVal) => {
-  activeImageId.value = newVal?.imageId || product.value?.imageId || null
+  activeImage.value = newVal?.images || product.value?.mainImage || null
 })
 
 onMounted(() => {

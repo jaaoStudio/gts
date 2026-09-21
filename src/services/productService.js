@@ -263,6 +263,14 @@ const safeExternalUrl = (url) => {
     }
 }
 
+// 詳情頁同一張圖要出三種尺寸（縮圖列／大圖／lightbox）。元件不得自己組 Directus 網址
+// （見 skill vue-component-conventions 與 directus-service-layer），所以在這裡一次給齊。
+const mapImage = (id) => (id ? {
+    thumb: getAssetUrl(id, ASSET_PRESETS.thumb),
+    detail: getAssetUrl(id, ASSET_PRESETS.detail),
+    full: getAssetUrl(id, ASSET_PRESETS.full),
+} : null)
+
 /**
  * 產品資料轉換器
  */
@@ -285,10 +293,8 @@ export const productMapper = {
             .filter(v => v.status !== 'draft' && v.status !== 'archived')
             .map(v => ({
                 ...v,
-                // imageId 是給詳情頁用的：同一張圖在那裡要出三種尺寸（縮圖/大圖/lightbox），
-                // 只給組好的網址就得回頭解析字串。image 則是訂購單 store 會存進
-                // localStorage 的那一份，固定 card。
-                imageId: v.variant_image || null,
+                images: mapImage(v.variant_image),
+                // 訂購單 store 會把這一份存進 localStorage，固定 card
                 image: v.variant_image ? getAssetUrl(v.variant_image, ASSET_PRESETS.card) : null
             }))
 
@@ -300,14 +306,13 @@ export const productMapper = {
             ? Math.min(...variantPrices)
             : 0
 
-        // gallery 一律只留檔案 id，不在這裡組網址：唯一的消費者是詳情頁，而它同一張圖
-        // 要出縮圖/大圖/lightbox 三種尺寸。⚠️ products_files 沒有 sort 欄位，順序就是
-        // junction 的 id 序，後台拖拉排不動（見 GitHub issue）。
-        let galleryIds = []
+        // ⚠️ products_files 沒有 sort 欄位，順序就是 junction 的 id 序，後台拖拉排不動
+        // （見 GitHub issue #35）。
+        let gallery = []
         if (item.gallery && Array.isArray(item.gallery)) {
-            galleryIds = item.gallery
+            gallery = item.gallery
                 .filter(g => g && g.directus_files_id)
-                .map(g => g.directus_files_id)
+                .map(g => mapImage(g.directus_files_id))
         }
 
         const mainImage = item.image ? getAssetUrl(item.image, ASSET_PRESETS.card) : null
@@ -336,8 +341,10 @@ export const productMapper = {
             description: item.description,
             price: displayPrice,
             image: mainImage,
-            imageId: item.image || null,
-            galleryIds: galleryIds,
+            mainImage: mapImage(item.image),
+            // og:image 刻意是 JPEG 而非 WebP，理由見 .claude/skills/deploy-ops
+            socialImage: item.image ? getAssetUrl(item.image, ASSET_PRESETS.social) : null,
+            gallery: gallery,
             category: primaryCategory,
             categories: m2mCategories,
             badge: firstTag ? firstTag.name : null,

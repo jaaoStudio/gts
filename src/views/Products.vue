@@ -315,10 +315,9 @@ const submitJump = () => {
   jumpInput.value = ''
 }
 
-// 頁碼的真相來源是網址，不是 store。少了這一層，客人點進商品再返回就會回到第 1 頁
-// （router 的 savedPosition 也跟著失效，因為清單長度對不上）。
-// 所有導向 /products 的連結（Navbar、側欄、Footer、搜尋）都是整包換掉 query，
-// 所以切分類或搜尋時 page 會自然消失，不需要額外歸零。
+// 頁碼的真相來源是網址，不是 store。
+// ⚠️ 切分類/搜尋之所以不用手動歸零，是因為所有導向 /products 的連結都整包換掉 query。
+// 新增連結時若改成只覆寫單一 query 鍵，page 會被帶著跑到不存在的頁。
 const pageFromRoute = computed(() => {
   const n = Number(route.query.page)
   return Number.isInteger(n) && n >= 1 ? n : 1
@@ -332,21 +331,22 @@ const queryWithPage = (page) => ({
 
 const fetchFromRoute = async () => {
   const requested = pageFromRoute.value
-  await productStore.fetchProducts(requested, {
-    categorySlug: categorySlug.value,
-    keyword: searchKeyword.value,
-  })
+  try {
+    await productStore.fetchProducts(requested, {
+      categorySlug: categorySlug.value,
+      keyword: searchKeyword.value,
+    })
 
-  // 網址是使用者能自己改的。超出範圍時退回最後一頁，而不是把人留在一片空白上。
-  // replace 會再觸發一次 watcher，但那時 requested <= totalPages，不會無限繞。
-  if (productStore.totalPages > 0 && requested > productStore.totalPages) {
-    router.replace({ path: '/products', query: queryWithPage(productStore.totalPages) })
-    return
+    // 網址是使用者能自己改的。超出範圍時退回最後一頁，而不是把人留在一片空白上。
+    // replace 會再觸發一次 watcher，但那時 requested <= totalPages，不會無限繞。
+    if (productStore.totalPages > 0 && requested > productStore.totalPages) {
+      router.replace({ path: '/products', query: queryWithPage(productStore.totalPages) })
+    }
+  } finally {
+    // 通知 router 的 scrollBehavior：清單已經撐開，可以還原捲動位置了。
+    // 必須無論成敗都發——漏發時 scrollBehavior 會枯等到 600ms 逾時才還原。
+    window.dispatchEvent(new Event('app:content-ready'))
   }
-
-  // 通知 router 的 scrollBehavior：清單已經撐開，可以還原捲動位置了。
-  // 少了這一行，返回時頁面高度還是 0，savedPosition 會被瀏覽器夾成 0。
-  window.dispatchEvent(new Event('app:content-ready'))
 }
 
 const goToPage = (page) => {

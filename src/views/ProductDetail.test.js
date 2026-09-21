@@ -149,14 +149,21 @@ describe('add_to_cart', () => {
 // 「他實際會買到的規格」不會分岔——真的發生過：折合鋸那一頁開場就預選了 id 最小的
 // 「鋸片2片裝」，客人點了鋸子的照片後按加入訂購單，拿到的是兩片替刃。
 describe('多規格商品', () => {
+    // 與 productMapper 的產出同形：每張圖是 { thumb, detail, full } 而非網址字串
+    const img = (id) => ({
+        thumb: `https://assets.test/${id}?key=thumb`,
+        detail: `https://assets.test/${id}?key=detail`,
+        full: `https://assets.test/${id}?key=full`,
+    })
+
     const MULTI = {
         ...PRODUCT,
-        imageId: 'main-img',
-        galleryIds: ['shared-1'],
+        mainImage: img('main-img'),
+        gallery: [img('shared-1')],
         variants: [
             // 刻意讓 id 小的是「配件」：預選第一個就會選到它
-            { id: 10, spec_name: '鋸片2片裝', sku: 'B-2', price: 198, imageId: 'img-blade', image: null, status: 'published' },
-            { id: 11, spec_name: '整支鋸子', sku: 'S-1', price: 290, imageId: 'img-saw', image: null, status: 'published' },
+            { id: 10, spec_name: '鋸片2片裝', sku: 'B-2', price: 198, images: img('img-blade'), image: null, status: 'published' },
+            { id: 11, spec_name: '整支鋸子', sku: 'S-1', price: 290, images: img('img-saw'), image: null, status: 'published' },
         ],
     }
 
@@ -193,6 +200,30 @@ describe('多規格商品', () => {
 
         expect(bigImageSrc()).toContain('img-saw')
         expect(addButton().attributes('disabled')).toBeUndefined()
+    })
+
+    // 規格鈕顯示 raw spec_name，標示走 normalizeSpecName。兩邊不一致時，客人按下寫著
+    // 「Default」的按鈕後標示會整個消失——而那行字正是為了讓他知道自己買的是哪一個。
+    // 今天 374 個 Default 都在單規格商品上（標示本來就不顯示），所以這是潛伏的。
+    test('規格名是匯入殘留的 Default 時，標示退回原字串而不是消失', async () => {
+        wrapper.unmount()
+        productService.getProductBySlug.mockResolvedValue({
+            ...MULTI,
+            variants: [
+                { id: 20, spec_name: 'Default', sku: 'D-1', price: 50, images: img('a'), image: null, status: 'published' },
+                { id: 21, spec_name: '加長型', sku: 'D-2', price: 80, images: img('b'), image: null, status: 'published' },
+            ],
+        })
+        wrapper = mount(ProductDetail, {
+            global: {
+                stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                directives: { reveal: {} },
+            },
+        })
+        await flushPromises()
+
+        await variantButton('Default').trigger('click')
+        expect(wrapper.text()).toContain('目前規格：Default')
     })
 
     test('點共用圖只換大圖，不會把已選的規格改掉', async () => {
