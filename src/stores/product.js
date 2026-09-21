@@ -8,7 +8,9 @@ export const useProductStore = defineStore('product', {
         loading: false,
         error: null,
 
-        // 分頁相關狀態
+        // 分頁相關狀態。⚠️ currentPage 是「上一次 fetch 用的頁碼」的鏡像，**不是**真相
+        // 來源——真相在網址的 ?page=（見 Products.vue）。不要新增從 store 自己翻頁的
+        // action，那會讓網址與畫面分岔，返回上一頁就又會回到第 1 頁。
         currentPage: 1,
         itemsPerPage: 12,
         totalItems: 0,
@@ -89,24 +91,6 @@ export const useProductStore = defineStore('product', {
                 console.error(err)
             } finally {
                 this.loading = false
-            }
-        },
-
-        async nextPage() {
-            if (this.hasNextPage) {
-                await this.fetchProducts(this.currentPage + 1, this.currentFilters)
-            }
-        },
-
-        async prevPage() {
-            if (this.hasPrevPage) {
-                await this.fetchProducts(this.currentPage - 1, this.currentFilters)
-            }
-        },
-
-        async goToPage(page) {
-            if (page >= 1 && page <= this.totalPages) {
-                await this.fetchProducts(page, this.currentFilters)
             }
         },
 
