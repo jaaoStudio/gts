@@ -44,6 +44,27 @@ _Avoid_: 產品, item, 貨品.
 A purchasable specification under a Product (Directus `product_variants`), where price and stock actually live. A Product has one or more Variants.
 _Avoid_: SKU (a field on a Variant, not its name), 款式.
 
+**配件** (Accessory):
+一個只服務於本 Product、但**不與其他選項互斥**的品項：專用替刃、專用螺絲組。客人買
+「一支 270mm 鋸子」的同時會買「兩包替刃」與「一組螺絲」，三者一起成立。相對地，
+真正的 **Variant** 之間是**三選一**：買了 240mm 就不會再買 270mm。
+⚠️ **目前的資料模型不分這兩者**，配件與規格都存成 Variant，規格選擇器因此用一組單選鈕
+在演加購。這是已知的錯配，不是可以沿用的設計。
+_Avoid_: 把配件叫成規格／款式；把「同一頁賣的東西」當成「同一個東西的不同樣態」。
+
+**規格圖** (Variant image, `product_variants.variant_image`):
+只拍某一個 Variant、不拍別的那張照片。一個 Variant 最多一張。
+_Avoid_: 主圖 (那是 Product 的)、縮圖 (那是尺寸不是用途)。
+
+**共用圖** (`products.gallery`):
+**不屬於任何單一 Variant** 的商品照片：使用情境、尺寸對照表、材質特寫、整組總覽。
+判準只有一句：**這張圖能不能只配給其中一個 Variant？能，它就該是規格圖，不該放這裡。**
+放錯的代價很具體——客人切到 A 規格，卻在下方看到 B 規格的照片，而站上唯一能告訴他
+「你現在要買的是哪一個」的，就只剩價格旁邊那行字。
+⚠️ **既有資料尚未符合這條規則**：匯入時把規格照一併倒進了 gallery，所以前台是分段標示
+「此規格 / 商品其他照片」而非保證，資料清到哪畫面就乾淨到哪。
+_Avoid_: 相簿、附圖 (聽起來像「多放幾張沒差」)；把它當成「主圖以外的全部」。
+
 **CVS-shippable** (超商可寄, `product_variants.can_ship_cvs`):
 Whether a Variant is judged to fit 7-11's parcel limits. A judgement the Admin makes from
 experience, **not a measurement** — the catalogue records no weight or dimensions, and the
