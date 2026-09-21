@@ -8,8 +8,8 @@ export const useProductStore = defineStore('product', {
         loading: false,
         error: null,
 
-        // 分頁相關狀態
-        currentPage: 1,
+        // ⚠️ 這裡刻意沒有 currentPage：頁碼的真相在網址（見 Products.vue）。
+        // 在 store 放一份會立刻變成第二個來源，而畫面會建在那份鏡像上。
         itemsPerPage: 12,
         totalItems: 0,
         totalPages: 0,
@@ -20,12 +20,6 @@ export const useProductStore = defineStore('product', {
             keyword: ''
         }
     }),
-
-    getters: {
-        hasNextPage: (state) => state.currentPage < state.totalPages,
-
-        hasPrevPage: (state) => state.currentPage > 1,
-    },
 
     actions: {
         /**
@@ -38,7 +32,6 @@ export const useProductStore = defineStore('product', {
         async fetchProducts(page = 1, filters = {}) {
             this.loading = true
             this.error = null
-            this.currentPage = page
 
             // 合併新舊篩選條件
             this.currentFilters = {
@@ -73,7 +66,7 @@ export const useProductStore = defineStore('product', {
                 }
 
                 const response = await productService.getFilteredProducts({
-                    page: this.currentPage,
+                    page,
                     limit: this.itemsPerPage,
                     categoryIds: categoryIds,
                     keyword: this.currentFilters.keyword
@@ -89,24 +82,6 @@ export const useProductStore = defineStore('product', {
                 console.error(err)
             } finally {
                 this.loading = false
-            }
-        },
-
-        async nextPage() {
-            if (this.hasNextPage) {
-                await this.fetchProducts(this.currentPage + 1, this.currentFilters)
-            }
-        },
-
-        async prevPage() {
-            if (this.hasPrevPage) {
-                await this.fetchProducts(this.currentPage - 1, this.currentFilters)
-            }
-        },
-
-        async goToPage(page) {
-            if (page >= 1 && page <= this.totalPages) {
-                await this.fetchProducts(page, this.currentFilters)
             }
         },
 

@@ -222,6 +222,12 @@ email 一樣也不通，zh-TW 訊息是「此使用者屬於其他服務」（`I
 3. 除核心店面頁外一律 lazy-load
 4. 給 `meta.title`（格式 `<頁名>｜金同心實業`）
 5. 需登入加 `meta: { requiresAuth: true }`；限管理員再加 `requiresAdmin: true`
+6. **資料是非同步撈的頁面**加 `meta: { awaitContent: true }`，並在撈完、`nextTick` 之後
+   呼叫 `signalContentReady()`（`utils/contentReady`）。少了它，客人從該頁點進內頁再
+   返回時，捲動位置會在骨架還在的瞬間被還原、夾到骨架的高度（實測 1400 被夾成 1062），
+   而且撈得快的時候又正常，看起來像隨機失敗。
+   ⚠️ 該頁若在撈完前就被離開，**不要**發訊號、也不要做 `router.replace` 之類的副作用。
+   理由與寫法見 skill `vue-component-conventions` 的「await 前後讀同一個 reactive 來源」。
 
 <!-- 自 docs/gotchas.md 移入（2026-09-10），該檔已解散 -->
 

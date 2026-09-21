@@ -42,10 +42,15 @@
           <!-- Gallery -->
           <div class="lg:sticky lg:top-24 lg:self-start">
             <div class="relative rounded-[2rem] bg-white p-2 ring-1 ring-steel-900/[0.06] shadow-[0_30px_60px_-30px_rgba(16,17,21,0.28)]">
-              <div class="aspect-square overflow-hidden rounded-[1.5rem] bg-steel-100">
-                <img :src="activeImage || heroPlaceholder" :alt="product.name" class="h-full w-full object-cover transition-opacity duration-300" />
-              </div>
-              <div v-if="productTags.length" class="absolute left-5 top-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="block aspect-square w-full cursor-zoom-in overflow-hidden rounded-[1.5rem] bg-steel-100"
+                :aria-label="`放大檢視 ${product.name}`"
+                @click="openLightbox"
+              >
+                <img :src="activeImageUrl" :alt="product.name" class="h-full w-full object-cover transition-opacity duration-300" />
+              </button>
+              <div v-if="productTags.length" class="pointer-events-none absolute left-5 top-5 flex flex-wrap gap-2">
                 <span
                   v-for="tag in productTags"
                   :key="tag.id"
@@ -55,18 +60,36 @@
                   {{ tag.name }}
                 </span>
               </div>
+
+              <!-- 大圖與規格是兩個各自可切換的狀態：點共用圖不會改規格。拿掉這行標示，
+                   畫面上就沒有任何東西說得出客人買的是哪一個。 -->
+              <span
+                v-if="selectedVariantLabel"
+                class="pointer-events-none absolute bottom-5 left-5 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-steel-900/80 px-3 py-1.5 text-xs font-medium text-white backdrop-blur"
+              >
+                目前規格：{{ selectedVariantLabel }}
+              </span>
             </div>
 
-            <div v-if="galleryImages.length > 1" class="mt-4 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-              <button
-                v-for="(img, index) in galleryImages"
-                :key="index"
-                @click="activeImage = img"
-                class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all"
-                :class="activeImage === img ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
-              >
-                <img :src="img" class="h-full w-full object-cover" />
-              </button>
+            <!-- 分段標示而非保證：gallery 裡仍混著規格照（issue #35），資料清到哪
+                 這裡就乾淨到哪，不用再改程式。 -->
+            <div v-if="thumbGroups.length" class="mt-4 space-y-3">
+              <div v-for="group in thumbGroups" :key="group.label">
+                <p class="mb-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-steel-400">{{ group.label }}</p>
+                <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                  <button
+                    v-for="img in group.images"
+                    :key="img.id"
+                    type="button"
+                    class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all"
+                    :class="activeImage?.id === img.id ? 'border-brand-500' : 'border-steel-200 hover:border-brand-500/50'"
+                    :aria-current="activeImage?.id === img.id ? 'true' : undefined"
+                    @click="activeImage = img"
+                  >
+                    <img :src="img.thumb" alt="" loading="lazy" class="h-full w-full object-cover" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -113,7 +136,7 @@
             </div>
 
             <!-- 加入訂購單 -->
-            <div v-if="selectedVariant" class="mt-6">
+            <div v-if="publishedVariants.length" class="mt-6">
               <div class="flex flex-col gap-3 sm:flex-row">
                 <div class="flex items-center gap-1 rounded-full border border-steel-200 p-1.5">
                   <button
@@ -140,11 +163,13 @@
 
                 <button
                   type="button"
-                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98]"
+                  class="flex flex-1 items-center justify-center gap-2.5 rounded-full bg-steel-900 px-6 py-4 font-display text-base font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-steel-900 disabled:active:scale-100"
+                  :disabled="!selectedVariant"
                   @click="addToOrder"
                 >
                   <PhPlusCircle :size="20" weight="bold" />
-                  {{ justAdded ? '已加入訂購單' : '加入訂購單' }}
+                  <template v-if="!selectedVariant">請先選擇規格</template>
+                  <template v-else>{{ justAdded ? '已加入訂購單' : '加入訂購單' }}</template>
                 </button>
               </div>
 
@@ -218,11 +243,35 @@
     </main>
 
     <Footer />
+
+    <!-- object-contain 不可換成 object-cover：大圖那邊是 cover，非正方形的圖在那裡
+         被裁掉兩側，這裡是唯一看得到完整內容的地方。 -->
+    <Teleport to="body">
+      <div
+        v-if="lightboxOpen"
+        class="fixed inset-0 z-100 flex items-center justify-center bg-steel-900/90 p-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`${product?.name} 放大檢視`"
+        @click="lightboxOpen = false"
+      >
+        <img :src="lightboxUrl" :alt="product?.name" class="max-h-full max-w-full object-contain" @click.stop />
+        <button
+          ref="lightboxCloseRef"
+          type="button"
+          class="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          aria-label="關閉放大檢視"
+          @click="lightboxOpen = false"
+        >
+          <PhX :size="20" weight="bold" />
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
 import { trackAddToCart, trackViewItem } from '../utils/analytics'
@@ -234,7 +283,8 @@ import { normalizeSpecName, useOrderStore } from '../stores/order'
 import Navbar from '../components/Navbar.vue'
 import Footer from '../components/Footer.vue'
 import { PhCaretRight, PhPhoneCall, PhSmileyXEyes, PhStorefront, PhBagSimple,
-         PhPlus, PhMinus, PhPlusCircle, PhArrowRight } from '@phosphor-icons/vue'
+         PhPlus, PhMinus, PhPlusCircle, PhArrowRight, PhX } from '@phosphor-icons/vue'
+import { useBodyScrollLock } from '../composables/useBodyScrollLock'
 import heroPlaceholder from '@/assets/product-placeholder.svg'
 
 const route = useRoute()
@@ -246,14 +296,59 @@ const product = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const selectedVariant = ref(null)
-const activeImage = ref('')
 
-const galleryImages = computed(() => {
+// mapProduct 給的圖片物件 { id, thumb, card, detail, full }，不是網址字串
+const activeImage = ref(null)
+
+const activeImageUrl = computed(() => activeImage.value?.detail || heroPlaceholder)
+
+// 「商品其他照片」= 主圖 + 共用圖，不等於 CONTEXT.md 定義的共用圖（見該詞條）
+const sharedImages = computed(() => {
   if (!product.value) return []
-  const imgs = []
-  if (product.value.image) imgs.push(product.value.image)
-  if (product.value.gallery && Array.isArray(product.value.gallery)) imgs.push(...product.value.gallery)
-  return [...new Set(imgs)]
+  const all = [product.value.mainImage, ...(product.value.gallery || [])].filter(Boolean)
+  return [...new Map(all.map((img) => [img.id, img])).values()]
+})
+
+const thumbGroups = computed(() => {
+  const variantImage = selectedVariant.value?.images || null
+  const groups = []
+  if (variantImage) groups.push({ label: '此規格', images: [variantImage] })
+
+  const shared = sharedImages.value.filter((img) => img.id !== variantImage?.id)
+  if (shared.length) groups.push({ label: '商品其他照片', images: shared })
+
+  // 全部加起來只有一張時整條縮圖列沒有意義
+  return groups.reduce((n, g) => n + g.images.length, 0) > 1 ? groups : []
+})
+
+const lightboxOpen = ref(false)
+const lightboxUrl = computed(() => activeImage.value?.full || heroPlaceholder)
+
+const onLightboxKey = (e) => { if (e.key === 'Escape') lightboxOpen.value = false }
+
+// 宣告了 aria-modal 就得負責焦點，否則鍵盤與輔助技術使用者會停在被宣告為惰性的區域外面。
+// 這裡只做最低限度的進出，完整的 focus trap 全站沒有任何 modal 有，該一起做。
+const lightboxCloseRef = ref(null)
+let focusBeforeLightbox = null
+
+const openLightbox = () => {
+  if (!activeImage.value) return
+  lightboxOpen.value = true
+}
+
+useBodyScrollLock(lightboxOpen)
+
+watch(lightboxOpen, async (open) => {
+  if (open) {
+    window.addEventListener('keydown', onLightboxKey)
+    focusBeforeLightbox = document.activeElement
+    await nextTick()
+    lightboxCloseRef.value?.focus()
+  } else {
+    window.removeEventListener('keydown', onLightboxKey)
+    focusBeforeLightbox?.focus?.()
+    focusBeforeLightbox = null
+  }
 })
 
 // 外部通路連結只在詳情頁的 DETAIL_FIELDS 帶回，且已在 mapper 過濾過 scheme
@@ -280,7 +375,10 @@ const addToOrder = () => {
   addedTimer = setTimeout(() => { justAdded.value = false }, 2000)
 }
 
-onBeforeUnmount(() => clearTimeout(addedTimer))
+onBeforeUnmount(() => {
+  clearTimeout(addedTimer)
+  window.removeEventListener('keydown', onLightboxKey)
+})
 
 // mapProduct 已把標籤攤平成 tag 物件陣列（id/name/color）
 const productTags = computed(() => product.value?.tags || [])
@@ -297,6 +395,14 @@ const sanitizedDescription = computed(() =>
 const publishedVariants = computed(() => {
   if (!product.value?.variants) return []
   return product.value.variants
+})
+
+// 單規格商品不標示：那是系統自動選的，標出來會讀成「你已經選好了」。
+// 正規化為空要退回 raw，否則會與規格鈕上的 raw spec_name 分岔成一有一無。
+const selectedVariantLabel = computed(() => {
+  if (publishedVariants.value.length < 2 || !selectedVariant.value) return ''
+  const raw = selectedVariant.value.spec_name
+  return normalizeSpecName(raw) || (raw || '').trim()
 })
 
 const priceDisplay = computed(() => {
@@ -327,6 +433,10 @@ const breadcrumbs = computed(() => {
 const fetchProduct = async (slug) => {
   loading.value = true
   error.value = null
+  selectedVariant.value = null
+  // 上一頁/下一頁在兩個商品之間切換時元件不會卸載，不關掉的話 lightbox 會蓋著
+  // 上一個商品的照片留在新商品的骨架上
+  lightboxOpen.value = false
   try {
     const data = await productService.getProductBySlug(slug)
     product.value = data
@@ -336,10 +446,13 @@ const fetchProduct = async (slug) => {
       document.title = title
       setMeta('og:title', title, 'property')
       setMeta('og:description', data.short_description || '專業五金工具與耗材供應。', 'property')
-      if (data.image) setMeta('og:image', data.image, 'property')
+      if (data.socialImage) setMeta('og:image', data.socialImage, 'property')
     }
-    if (data?.image) activeImage.value = data.image
-    if (publishedVariants.value.length > 0) selectedVariant.value = publishedVariants.value[0]
+    activeImage.value = data?.mainImage || null
+
+    // 只有單一規格時才自動選。多規格不可以預選陣列第一個——那等於用 Directus 的 id 序
+    // 幫客人決定他要買哪一個。
+    if (publishedVariants.value.length === 1) selectedVariant.value = publishedVariants.value[0]
   } catch (err) {
     error.value = 'Failed to load product'
     console.error(err)
@@ -352,12 +465,10 @@ watch(() => route.params.slug, (newSlug) => {
   if (newSlug) fetchProduct(newSlug)
 }, { immediate: false })
 
+// 切規格一律把大圖帶回該規格的圖；該規格沒有圖就退回商品主圖，而不是停在上一個
+// 規格的圖上（那就是「看到的是別人的照片」）。
 watch(selectedVariant, (newVal) => {
-  if (newVal && newVal.image) {
-    activeImage.value = newVal.image
-  } else if (product.value && product.value.image) {
-    activeImage.value = product.value.image
-  }
+  activeImage.value = newVal?.images || product.value?.mainImage || null
 })
 
 onMounted(() => {

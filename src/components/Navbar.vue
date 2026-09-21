@@ -265,8 +265,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useBodyScrollLock } from '../composables/useBodyScrollLock'
 import { useCategoryStore } from '../stores/category'
 import { useAuthStore } from '../stores/auth'
 import { useOrderStore } from '../stores/order'
@@ -299,13 +300,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
-  document.body.style.overflow = ''
 })
 
-// Lock body scroll while the full-screen menu is open
-watch(mobileMenuOpen, (open) => {
-  document.body.style.overflow = open ? 'hidden' : ''
-})
+useBodyScrollLock(mobileMenuOpen)
 
 function handleClickOutside(e) {
   if (userMenuRef.value && !userMenuRef.value.contains(e.target)) {

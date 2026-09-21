@@ -46,6 +46,101 @@ ssh hetzner 'cd ~/gts-web && . ./lib-slot.sh && current_slot /opt/traefik/dynami
 - **郵件**:Directus 走 Resend SMTP relay(`smtp.resend.com:587`,帳號固定字串 `resend`,
   密碼為 API key)。VM 對外 **port 25 被 Hetzner 封鎖**,只能用 relay,不要考慮自架 MTA。
 
+## 圖片管線:三個設定都在線上,不在版控(2026-09-21 建立)
+
+商品圖的尺寸、格式、快取**沒有一個寫在這個 repo 裡**。`npm run build` 全綠、code review
+全過,圖照樣可以全站破掉。改圖片相關的東西之前先讀這一節。
+
+**1. Cloudflare Cache Rule(zone: `gtxin.com.tw`)**
+
+| | |
+|---|---|
+| 運算式 | `(http.request.full_uri wildcard r"https://core.gtxin.com.tw/assets/*")` |
+| 快取資格 | 適用快取 |
+| 邊緣 TTL | **忽略快取控制標頭**,設 1 天 |
+| 快取索引鍵 | 預設(**含查詢字串**) |
+
+建立前 `cf-cache-status` 是 `DYNAMIC`,每一張圖都回源 Hetzner,實測 TTFB 1.18 秒;
+建立後 `HIT` 0.48 秒。
+
+- **邊緣 TTL 必須選「忽略」**:來源回 `Vary: Origin`,Cloudflare 看到 `Accept-Encoding`
+  以外的 Vary 就判不可快取。遵循來源標頭的話這條規則等於沒開。
+- **絕對不要勾「忽略查詢字串」**:`?key=` 是靠 query string 區分尺寸的,勾了會讓縮圖與
+  原圖共用同一格快取,畫面隨機錯亂。
+- ⚠️ **Directus 的「取代檔案」保留同一個 UUID**,所以老闆換了商品照,網址一模一樣,
+  邊緣最多還會發舊圖一天。要立刻生效:CF → 快取 → 設定 → 清除快取 → 自訂清除,貼完整網址。
+
+**2. Cloudflare Request Header Transform Rule(同 zone)**
+
+同一條運算式,動作是**移除 `Cookie` 標頭**。
+
+`gtxin.com.tw` 與 `core.gtxin.com.tw` 是 same-site,登入中的客人連 `<img>` 都會夾帶
+`directus_session_token`。而快取索引鍵裡沒有 cookie,若有私有檔案,管理員載入過一次就會
+被邊緣發給所有人。拔掉 Cookie 之後 Directus 收到的每個 asset 請求都是匿名的,**外洩在結構
+上不可能**,而且登入客人一樣吃得到快取。
+
+⚠️ 代價:**Directus 管理介面預覽私有檔案會 403**。目前 2535 個檔案全部匿名可讀,所以無感;
+真要放私有檔案時,那條路是死的,得另開不經這條規則的路徑。
+
+**3. Directus Storage Asset Presets(設定 → 檔案與儲存)**
+
+`storage_asset_transform` = **`presets`**(僅限預設集)。任意 `?width=`/`?quality=` 一律回 400,
+避免有人用無窮組合逼 Directus 現場生圖塞爆磁碟與邊緣快取。
+
+| key | fit | 寬×高 | 品質 | 格式 | 用途 |
+|---|---|---|---|---|---|
+| `thumb` | inside | 160×160 | 70 | webp | 詳情頁縮圖列 |
+| `card` | inside | 600×750 | 75 | webp | 商品卡、分類預覽、訂購單品項 |
+| `detail` | inside | 800×800 | 80 | webp | 詳情頁大圖 |
+| `full` | inside | 1600×1600 | 82 | webp | 詳情頁 lightbox |
+| `social` | inside | 1200×1200 | 80 | **jpeg** | `og:image` |
+
+五組都開 `withoutEnlargement`,所以對現有這批 ≤1024px 的圖不會放大,只是轉檔。
+
+⚠️ **尺寸要對著實際渲染寬度的 2 倍訂,不是憑感覺**。`card` 一開始訂 400,但商品卡實測
+渲染 216~264 CSS px,2 倍螢幕需要 430~530px —— 改動前那裡吃的是原圖(600~1024)所以清楚,
+換成 400 反而比改之前糊。量法:開 DevTools 讀 `img.getBoundingClientRect().width`,
+乘 2,再往上取。
+
+⚠️ **改既有 preset 的尺寸,網址不會變**(`?key=card` 還是 `?key=card`),所以 CF 邊緣會
+繼續發舊尺寸最多 1 天、客人瀏覽器最多 30 天。要嘛在前端還沒開始用那個 key 之前就改完,
+要嘛改完後去 CF 清快取。加新尺寸用新 key 則沒有這個問題。
+
+⚠️ **`PATCH /settings` 會整包覆寫 `storage_asset_presets`**。只送要改的那一筆等於把其他
+四組刪掉,全站圖片立刻壞。一律五組列齊。
+
+- **fit 必須是 `inside` 不能是 `cover`**:全站 159 張非正方形的圖,`cover` 會在伺服器端就
+  裁掉,而前端已經用 `object-cover` 裁過一次。裁兩次會把鋸片圖上的紅字規格標示切掉。
+- **format 必須寫死 `webp`,不能用 `auto`**:`auto` 看 `Accept` 標頭決定,但上面那條 CF 規則
+  是照網址快取、不看 `Accept`,誰先到誰定生死,老瀏覽器會拿到不支援的格式。
+- **無參數網址仍回原圖**(已實測,`presets` 模式只擋「有帶參數但對不到預設集」的請求)。
+  但**前台不該有任何地方用它**:原圖大小不受控,目前最大就有 1.18MB。lightbox 走 `full`、
+  `og:image` 走 `social`,兩個都封頂。
+- ⚠️ **改預設集要走在前端部署之前**。前端打一個不存在的 `?key=` 會拿到 400,而 CF 會把那個
+  400 快取一天。加新 key 的順序永遠是:先 Directus,驗過,再部署前端。
+- ⚠️ **HEIC 沒有被測過**。目前 2535 個檔案是 2532 JPEG + 2 SVG + 1 PNG。sharp 預設編譯不含
+  HEIF 解碼,若有人從 iPhone(格式設「高效率」)上傳 `.heic`,`?key=` 很可能失敗,而 CF 會把
+  那個錯誤快取起來。請上傳者把 iPhone 設定 → 相機 → 格式改成「相容性最佳」。
+
+**改完怎麼驗**(三條都要跑,第二條第二次必須是 `HIT`):
+
+```bash
+ID=35d115e7-74e1-402a-9267-312f48e23e35
+# 1. 三組預設集通,且是 webp
+for k in thumb card detail; do
+  curl -s -o /dev/null -w "$k: %{http_code} %{size_download} %{content_type}\n" \
+    "https://core.gtxin.com.tw/assets/$ID?key=$k"
+done
+# 2. 邊緣有快取
+curl -sI "https://core.gtxin.com.tw/assets/$ID" | grep -i cf-cache
+curl -sI "https://core.gtxin.com.tw/assets/$ID" | grep -i cf-cache
+# 3. 任意參數被擋(要 4xx,不是 200)
+curl -s -o /dev/null -w "raw: %{http_code}\n" "https://core.gtxin.com.tw/assets/$ID?width=137"
+```
+
+⚠️ 驗「無參數會不會被擋」時走 `https://gtxin.com.tw/api/assets/<id>`(Traefik 反代,不在 CF
+cache rule 的比對範圍),否則萬一回 403 會被寫進邊緣快取,翻回設定也救不回來。
+
 ## 部署流程(自動)
 
 **merge / push 到 `main`** → GitHub Actions(`.github/workflows/deploy.yml`):

@@ -27,9 +27,21 @@ const directus = createDirectus(apiUrl)
 
 export default directus;
 
-export const getAssetUrl = (id) => {
+// 尺寸與格式定義在 Directus 後台，不在版控（見 .claude/skills/deploy-ops 的「圖片管線」）。
+// 這裡只認 key：加新尺寸要先去後台開預設集，否則前台會拿到 400 並被 CF 快取一天。
+export const ASSET_PRESETS = {
+  thumb: 'thumb',
+  card: 'card',
+  detail: 'detail',
+  full: 'full',
+  social: 'social',
+};
+
+// 省略 preset 會回原圖，而原圖大小不受控，商品圖一律帶 preset。
+export const getAssetUrl = (id, preset) => {
   if (!id) return null;
   // 如果 DIRECTUS_URL 是相對路徑 (/api)，需要轉為完整的 Public URL
   const publicUrl = import.meta.env.VITE_DIRECTUS_PUBLIC_URL || DIRECTUS_URL;
-  return `${publicUrl}/assets/${id}`;
+  const base = `${publicUrl}/assets/${id}`;
+  return preset ? `${base}?key=${preset}` : base;
 };

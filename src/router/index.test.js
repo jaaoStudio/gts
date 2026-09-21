@@ -12,7 +12,51 @@ import { describe, expect, test, vi } from 'vitest'
 vi.mock('../utils/directus')
 
 import router from './index'
+import { signalContentReady } from '../utils/contentReady'
 import { isExcludedFromAnalytics } from '../utils/analytics'
+
+// scrollBehavior 對「非同步載入資料的頁面」會先等該頁說準備好（見 utils/contentReady）。
+// 這一組守的是等待期間使用者又導航走的情況。
+//
+// ⚠️ 這裡編碼了一個 vue-router 的實作細節：它的 handleScroll 是
+//     nextTick().then(scrollBehavior).then(p => p && scrollToPosition(p))
+// promise resolve 之後**不會**重新確認路由。哪天升級套件後它自己會檢查了，這些測試
+// 仍會過（回傳 false 本來就是合法的「不要捲」），但那時就可以考慮拿掉那個檢查。
+describe('scrollBehavior 的過期等待', () => {
+    const behavior = (to, savedPosition) =>
+        router.options.scrollBehavior(to, {}, savedPosition)
+
+    test('等待期間使用者導航走了，回傳 false 而不是舊位置', async () => {
+        await router.push('/')
+        const pending = behavior(
+            { fullPath: '/products?page=3', meta: { awaitContent: true } },
+            { top: 1400 },
+        )
+        signalContentReady()
+        // 回舊位置的話，首頁會被捲到 1400
+        expect(await pending).toBe(false)
+    })
+
+    test('還停在同一頁時照常還原', async () => {
+        await router.push('/products?page=3')
+        const pending = behavior(
+            { fullPath: '/products?page=3', meta: { awaitContent: true } },
+            { top: 1400 },
+        )
+        signalContentReady()
+        expect(await pending).toEqual({ top: 1400 })
+    })
+
+    test('沒有 awaitContent 的路由不等待，直接還原', async () => {
+        await router.push('/')
+        expect(behavior({ fullPath: '/', meta: {} }, { top: 200 })).toEqual({ top: 200 })
+    })
+
+    test('首次進入（沒有 savedPosition）一律回到頂端', () => {
+        expect(behavior({ fullPath: '/products', meta: { awaitContent: true } }, null))
+            .toEqual({ top: 0 })
+    })
+})
 
 describe('分析排除規則', () => {
     test('需要登入的路由一律不得送進分析', () => {

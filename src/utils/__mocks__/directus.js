@@ -9,4 +9,12 @@
  */
 export default {}
 
-export const getAssetUrl = (id) => (id ? `https://assets.test/${id}` : null)
+// ⚠️ 要與 utils/directus.js 的 ASSET_PRESETS 逐鍵一致。少一個 key 時，讀它的程式
+// 會拿到 undefined、組出不帶 ?key= 的網址，而測試多半沒有斷言到那一段——全綠但已經
+// 在說謊。加預設集時這裡要一起加。
+export const ASSET_PRESETS = {
+    thumb: 'thumb', card: 'card', detail: 'detail', full: 'full', social: 'social',
+}
+
+export const getAssetUrl = (id, preset) =>
+    id ? `https://assets.test/${id}${preset ? `?key=${preset}` : ''}` : null

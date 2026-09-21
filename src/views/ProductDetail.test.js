@@ -145,6 +145,109 @@ describe('add_to_cart', () => {
     })
 })
 
+// 多規格商品的圖與規格是兩個可以各自切換的狀態。這一組守的是「客人看到的圖」與
+// 「他實際會買到的規格」不會分岔——真的發生過：折合鋸那一頁開場就預選了 id 最小的
+// 「鋸片2片裝」，客人點了鋸子的照片後按加入訂購單，拿到的是兩片替刃。
+describe('多規格商品', () => {
+    // ⚠️ 要與 productService 的 mapImage() 同形。少一個鍵不會讓這裡報錯，而是讓
+    // 以該鍵比對身分的程式把所有圖看成同一張——漏了 id 時就是這樣紅的。
+    const img = (id) => ({
+        id,
+        thumb: `https://assets.test/${id}?key=thumb`,
+        card: `https://assets.test/${id}?key=card`,
+        detail: `https://assets.test/${id}?key=detail`,
+        full: `https://assets.test/${id}?key=full`,
+    })
+
+    const MULTI = {
+        ...PRODUCT,
+        mainImage: img('main-img'),
+        gallery: [img('shared-1')],
+        variants: [
+            // 刻意讓 id 小的是「配件」：預選第一個就會選到它
+            { id: 10, spec_name: '鋸片2片裝', sku: 'B-2', price: 198, images: img('img-blade'), image: null, status: 'published' },
+            { id: 11, spec_name: '整支鋸子', sku: 'S-1', price: 290, images: img('img-saw'), image: null, status: 'published' },
+        ],
+    }
+
+    const bigImageSrc = () => wrapper.find('button[aria-label="放大檢視 鐵鎚"] img').attributes('src')
+    const variantButton = (text) =>
+        wrapper.findAll('button').find((b) => b.text().includes(text))
+    const addButton = () =>
+        wrapper.findAll('button').find((b) => b.text().includes('加入訂購單') || b.text().includes('請先選擇規格'))
+
+    beforeEach(async () => {
+        wrapper.unmount()
+        productService.getProductBySlug.mockResolvedValue(MULTI)
+        wrapper = mount(ProductDetail, {
+            global: {
+                stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                directives: { reveal: {} },
+            },
+        })
+        await flushPromises()
+    })
+
+    test('開頁不預選規格，加入訂購單按鈕停用', () => {
+        const btn = addButton()
+        expect(btn.text()).toContain('請先選擇規格')
+        expect(btn.attributes('disabled')).toBeDefined()
+        // 沒選規格時價格顯示區間，而不是某一個規格的價格
+        expect(wrapper.text()).toContain('NT$198 - NT$290')
+    })
+
+    test('選了規格之後，大圖換成該規格的圖', async () => {
+        expect(bigImageSrc()).toContain('main-img')
+
+        await variantButton('整支鋸子').trigger('click')
+
+        expect(bigImageSrc()).toContain('img-saw')
+        expect(addButton().attributes('disabled')).toBeUndefined()
+    })
+
+    // 規格鈕顯示 raw spec_name，標示走 normalizeSpecName。兩邊不一致時，客人按下寫著
+    // 「Default」的按鈕後標示會整個消失——而那行字正是為了讓他知道自己買的是哪一個。
+    // 今天 374 個 Default 都在單規格商品上（標示本來就不顯示），所以這是潛伏的。
+    test('規格名是匯入殘留的 Default 時，標示退回原字串而不是消失', async () => {
+        wrapper.unmount()
+        productService.getProductBySlug.mockResolvedValue({
+            ...MULTI,
+            variants: [
+                { id: 20, spec_name: 'Default', sku: 'D-1', price: 50, images: img('a'), image: null, status: 'published' },
+                { id: 21, spec_name: '加長型', sku: 'D-2', price: 80, images: img('b'), image: null, status: 'published' },
+            ],
+        })
+        wrapper = mount(ProductDetail, {
+            global: {
+                stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                directives: { reveal: {} },
+            },
+        })
+        await flushPromises()
+
+        await variantButton('Default').trigger('click')
+        expect(wrapper.text()).toContain('目前規格：Default')
+    })
+
+    test('點共用圖只換大圖，不會把已選的規格改掉', async () => {
+        await variantButton('整支鋸子').trigger('click')
+
+        const sharedThumb = wrapper.findAll('button')
+            .find((b) => b.find('img').exists() && b.find('img').attributes('src')?.includes('shared-1'))
+        expect(sharedThumb).toBeDefined()
+        await sharedThumb.trigger('click')
+
+        expect(bigImageSrc()).toContain('shared-1')
+        // 圖換了，但賣的還是鋸子：按鈕仍可按，且標示持續說明目前規格是哪一個
+        expect(addButton().attributes('disabled')).toBeUndefined()
+        expect(wrapper.text()).toContain('目前規格：整支鋸子')
+
+        await addButton().trigger('click')
+        await flushPromises()
+        expect(useOrderStore().items[0].specName).toBe('整支鋸子')
+    })
+})
+
 describe('未同意時', () => {
     test('掛載與加入訂購單都不送任何事件', async () => {
         wrapper.unmount()

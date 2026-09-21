@@ -138,15 +138,15 @@
               <div class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
                 <button
                   @click="goToPage(1)"
-                  :disabled="!productStore.hasPrevPage"
+                  :disabled="!hasPrevPage"
                   class="hidden h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
                   aria-label="第一頁"
                 >
                   <PhCaretDoubleLeft :size="16" weight="bold" />
                 </button>
                 <button
-                  @click="goToPage(productStore.currentPage - 1)"
-                  :disabled="!productStore.hasPrevPage"
+                  @click="goToPage(currentPage - 1)"
+                  :disabled="!hasPrevPage"
                   class="flex h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="上一頁"
                 >
@@ -164,8 +164,8 @@
                     v-else
                     @click="goToPage(item)"
                     class="h-10 min-w-10 rounded-full px-3 font-mono text-sm font-medium transition-colors"
-                    :class="item === productStore.currentPage ? 'bg-steel-900 text-white' : 'border border-steel-200 bg-white text-steel-700 hover:border-steel-900'"
-                    :aria-current="item === productStore.currentPage ? 'page' : undefined"
+                    :class="item === currentPage ? 'bg-steel-900 text-white' : 'border border-steel-200 bg-white text-steel-700 hover:border-steel-900'"
+                    :aria-current="item === currentPage ? 'page' : undefined"
                     :aria-label="`第 ${item} 頁`"
                   >
                     {{ item }}
@@ -173,8 +173,8 @@
                 </template>
 
                 <button
-                  @click="goToPage(productStore.currentPage + 1)"
-                  :disabled="!productStore.hasNextPage"
+                  @click="goToPage(currentPage + 1)"
+                  :disabled="!hasNextPage"
                   class="flex h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="下一頁"
                 >
@@ -182,7 +182,7 @@
                 </button>
                 <button
                   @click="goToPage(productStore.totalPages)"
-                  :disabled="!productStore.hasNextPage"
+                  :disabled="!hasNextPage"
                   class="hidden h-10 w-10 items-center justify-center rounded-full border border-steel-200 bg-white text-steel-700 transition-colors hover:border-steel-900 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
                   aria-label="最後一頁"
                 >
@@ -192,7 +192,7 @@
 
               <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
                 <p class="font-mono text-xs text-steel-400">
-                  第 {{ productStore.currentPage }} / {{ productStore.totalPages }} 頁 · 共 {{ productStore.totalItems }} 件
+                  第 {{ currentPage }} / {{ productStore.totalPages }} 頁 · 共 {{ productStore.totalItems }} 件
                 </p>
 
                 <!-- 頁數多到出現省略號時才給跳頁框；頁數少時逐頁點就夠，多一個輸入框只是噪音 -->
@@ -232,8 +232,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { signalContentReady } from '../utils/contentReady'
 import { useProductStore } from '../stores/product'
 import { useCategoryStore } from '../stores/category'
 import Navbar from '../components/Navbar.vue'
@@ -276,7 +277,7 @@ const onMqChange = (e) => { isCompact.value = e.matches }
 
 const pageItems = computed(() => {
   const total = productStore.totalPages
-  const current = productStore.currentPage
+  const current = currentPage.value
   const max = isCompact.value ? PAGE_WINDOW_MIN : PAGE_WINDOW_MAX
   if (total <= max) {
     return Array.from({ length: total }, (_, i) => i + 1)
@@ -315,26 +316,67 @@ const submitJump = () => {
   jumpInput.value = ''
 }
 
-const fetchFilteredProducts = async (page = 1) => {
-  await productStore.fetchProducts(page, {
+// 頁碼的真相來源是網址，不是 store。
+// ⚠️ 切分類/搜尋之所以不用手動歸零，是因為所有導向 /products 的連結都整包換掉 query。
+// 新增連結時若改成只覆寫單一 query 鍵，page 會被帶著跑到不存在的頁。
+const currentPage = computed(() => {
+  const n = Number(route.query.page)
+  return Number.isInteger(n) && n >= 1 ? n : 1
+})
+
+const hasPrevPage = computed(() => currentPage.value > 1)
+const hasNextPage = computed(() => currentPage.value < productStore.totalPages)
+
+// page=1 不寫進網址，讓 /products 與 /products?page=1 不會變成兩個 URL
+const queryWithPage = (page) => ({
+  ...route.query,
+  page: page > 1 ? String(page) : undefined,
+})
+
+const fetchFromRoute = async () => {
+  const requested = currentPage.value
+  // 撈資料期間使用者可能已經離開這一頁。route 是響應式的，等回來時它指的已經是別頁，
+  // 底下每一個副作用都會打在錯的地方，所以一律先對照出發時的網址。
+  const startedAt = route.fullPath
+
+  // fetchProducts 自己吞掉錯誤（設 store.error 而不 throw），所以這裡不需要 try。
+  // 也刻意不用 finally 發訊號：下面有兩條路徑「不該」發，放進 finally 就繞過去了。
+  await productStore.fetchProducts(requested, {
     categorySlug: categorySlug.value,
     keyword: searchKeyword.value,
   })
+
+  if (route.fullPath !== startedAt) return
+
+  // 網址是使用者能自己改的。超出範圍時退回最後一頁，而不是把人留在一片空白上。
+  // replace 會再觸發一次 watcher，但那時 requested <= totalPages，不會無限繞。
+  if (productStore.totalPages > 0 && requested > productStore.totalPages) {
+    router.replace({ path: '/products', query: queryWithPage(productStore.totalPages) })
+    // 訊號留給 replace 之後那一趟。此刻畫面是越界的空清單（「找不到商品」），
+    // 現在發等於叫 scrollBehavior 對著那個空狀態還原捲動位置。
+    return
+  }
+
+  // nextTick 不可省：不等 DOM flush 就發訊號，router 還原捲動位置時清單仍是骨架，
+  // 瀏覽器會把 savedPosition 夾到頁面當下的高度。實測會少掉數百 px，而且時好時壞
+  // （router 的 .then 與 Vue 的 flush 都是 microtask，誰先誰後不穩定）。
+  await nextTick()
+  if (route.fullPath !== startedAt) return
+  signalContentReady()
 }
 
 const goToPage = (page) => {
-  if (page >= 1 && page <= productStore.totalPages) {
-    fetchFilteredProducts(page)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  if (page < 1 || page > productStore.totalPages || page === currentPage.value) return
+  // 捲回頂端交給 router 的 scrollBehavior，這裡不要再自己 scrollTo，否則兩邊會打架
+  router.push({ path: '/products', query: queryWithPage(page) })
 }
 
 const clearFilters = () => {
   router.push('/products')
 }
 
-watch(() => [route.query.category, route.query.search], () => {
-  fetchFilteredProducts(1)
+watch(() => [route.query.category, route.query.search, route.query.page], () => {
+  fetchFromRoute()
 }, { immediate: false })
 
 onMounted(async () => {
@@ -344,7 +386,7 @@ onMounted(async () => {
   mq.addEventListener('change', onMqChange)
 
   await categoryStore.fetchCategories()
-  fetchFilteredProducts(1)
+  fetchFromRoute()
 })
 
 onUnmounted(() => mq?.removeEventListener('change', onMqChange))

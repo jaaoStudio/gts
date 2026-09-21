@@ -135,13 +135,13 @@
               分類名稱在任何斷點都壓得住圖。
             -->
             <div
-              v-if="previewFor(cat)"
+              v-if="previewFor(cat, i === 0)"
               class="pointer-events-none absolute inset-y-0 right-0 overflow-hidden"
               :class="i === 0 ? 'w-[56%]' : 'w-[62%]'"
             >
               <img
-                :src="previewFor(cat).image"
-                :alt="previewFor(cat).name"
+                :src="previewFor(cat, i === 0).image"
+                :alt="previewFor(cat, i === 0).name"
                 loading="lazy"
                 draggable="false"
                 class="mask-diagonal-fade h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.06]"
@@ -241,10 +241,13 @@ const bentoCategories = computed(() => categoryStore.categoryTree.slice(0, 5))
 // 分類卡右側的圖，依序：後台指定的代表圖 → 該分類最新一件商品的主圖 → 都沒有就回
 // null，卡片自動退回純圖示樣式。分兩層是因為商品照多半是零售包裝照，構圖雜；
 // preview_image 讓人工挑一張乾淨的蓋過去，且可以只補幾個分類，不必一次到位。
-const previewFor = (cat) => {
-  if (cat.preview_image) return { image: cat.preview_image, name: cat.name }
+// isHero 是 bento 的首格（col-span-2 row-span-2），實際渲染寬度約是其他格的兩倍，
+// card(400) 在 2 倍螢幕上會糊，所以那一格吃 detail(800)。
+const previewFor = (cat, isHero = false) => {
+  const size = isHero ? 'detail' : 'card'
+  if (cat.preview_image) return { image: cat.preview_image[size], name: cat.name }
   const product = (categoryStore.previews[cat.id] || [])[0]
-  return product ? { image: product.image, name: product.name } : null
+  return product?.images ? { image: product.images[size], name: product.name } : null
 }
 
 const values = [
