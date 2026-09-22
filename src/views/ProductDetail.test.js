@@ -20,7 +20,12 @@ vi.mock('../stores/category', () => ({
 vi.mock('../stores/settings', () => ({
     useSettingsStore: () => ({ shippingRule: null, lineUrl: '', fetchSettings: async () => {} }),
 }))
-vi.mock('../services/productService', () => ({
+// ⚠️ 用 importOriginal 保留模組裡的純函式（displayPrices / productMapper），只擋掉會
+// 打網路的 productService。整個換掉的話，元件 import 的 displayPrices 會是 undefined
+// ——而且症狀不是「找不到函式」，是**整個元件渲染失敗**，看起來像資料沒載入。
+// 附帶好處：起價規則在這裡跑的是真的那一份，不是照著寫的第二份。
+vi.mock('../services/productService', async (importOriginal) => ({
+    ...(await importOriginal()),
     productService: { getProductBySlug: vi.fn(), getProducts: vi.fn(), getRelated: vi.fn() },
 }))
 vi.mock('vue-router', () => ({
@@ -262,6 +267,32 @@ describe('多規格商品', () => {
         test('價格區間不含配件——否則下緣會是螺絲組的 70 元', () => {
             expect(wrapper.text()).toContain('NT$280 - NT$300')
             expect(wrapper.text()).not.toContain('NT$70 - ')
+        })
+
+        // 卡片與詳情頁必須共用 displayPrices()，不是各寫一份「一樣」的邏輯。
+        // 先前兩份的退路條件分岔過：一邊看「有沒有規格**有標價**」、另一邊看
+        // 「有沒有規格」。只有在「規格全是詢價 + 配件有價」時才看得出差別——
+        // 把這一版種回去，這條會紅，其他全綠。
+        test('規格全是詢價、配件有價時，退回配件的價格而不是顯示詢問價格', async () => {
+            wrapper.unmount()
+            productService.getProductBySlug.mockResolvedValue({
+                ...MULTI,
+                variants: [
+                    { id: 40, spec_name: '270mm', price: null, images: img('a'), image: null, status: 'published', is_accessory: false },
+                    { id: 41, spec_name: '210mm', price: null, images: img('b'), image: null, status: 'published', is_accessory: false },
+                    { id: 42, spec_name: '專用螺絲組', price: 70, images: img('c'), image: null, status: 'published', is_accessory: true },
+                ],
+            })
+            wrapper = mount(ProductDetail, {
+                global: {
+                    stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                    directives: { reveal: {} },
+                },
+            })
+            await flushPromises()
+
+            expect(wrapper.text()).toContain('NT$70')
+            expect(wrapper.text()).not.toContain('詢問價格')
         })
 
         test('選到配件時標示寫「目前配件」，不是「目前規格」', async () => {

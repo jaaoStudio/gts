@@ -172,7 +172,7 @@
                   @click="addToOrder"
                 >
                   <PhPlusCircle :size="20" weight="bold" />
-                  <template v-if="!selectedVariant">請先選擇規格</template>
+                  <template v-if="!selectedVariant">{{ choosePrompt }}</template>
                   <template v-else>{{ justAdded ? '已加入訂購單' : '加入訂購單' }}</template>
                 </button>
               </div>
@@ -280,7 +280,7 @@ import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
 import { trackAddToCart, trackViewItem } from '../utils/analytics'
 import { useRoute } from 'vue-router'
-import { productService } from '../services/productService'
+import { displayPrices, productService } from '../services/productService'
 import { useCategoryStore } from '../stores/category'
 import { useSettingsStore } from '../stores/settings'
 import { normalizeSpecName, useOrderStore } from '../stores/order'
@@ -412,6 +412,12 @@ const variantGroups = computed(() => {
   return groups
 })
 
+// 整件商品的品項全被標成配件時畫面上沒有「規格」那一區，按鈕就不能叫客人去選一個
+// 看不到的東西。目前沒有這種商品，但資料沒有任何地方擋著。
+const choosePrompt = computed(() =>
+  publishedVariants.value.some((v) => !v.is_accessory) ? '請先選擇規格' : '請先選擇配件'
+)
+
 // 單規格商品不標示：那是系統自動選的，標出來會讀成「你已經選好了」。
 // 正規化為空要退回 raw，否則會與規格鈕上的 raw spec_name 分岔成一有一無。
 const selectedVariantLabel = computed(() => {
@@ -425,10 +431,8 @@ const selectedVariantLabel = computed(() => {
 
 const priceDisplay = computed(() => {
   if (publishedVariants.value.length === 0) return '詢問價格'
-  // 與卡片的起價同一條規則：配件不算，否則區間下緣會是螺絲組的價格
-  const specs = publishedVariants.value.filter((v) => !v.is_accessory)
-  const prices = (specs.length ? specs : publishedVariants.value)
-    .map((v) => v.price).filter((p) => p !== null)
+  // 與卡片的起價共用同一個函式，不是「照著寫一份」——先前兩份的退路條件分岔過
+  const prices = displayPrices(publishedVariants.value)
   if (prices.length === 0) return '詢問價格'
   const min = Math.min(...prices)
   const max = Math.max(...prices)
