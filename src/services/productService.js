@@ -301,9 +301,12 @@ export const productMapper = {
                 return { ...v, images, image: images?.card ?? null }
             })
 
-        const variantPrices = variants
-            .map(v => v.price)
-            .filter(p => p !== null && p !== undefined)
+        // 起價只算規格，不算配件。配件通常是全商品最便宜的那一筆（替刃、螺絲組），
+        // 算進去會讓折合鋸的卡片寫「NT$70 起」——那是螺絲的價格，客人會以為 70 元
+        // 買得到鋸子。沒有任何規格有標價時才退回全部，免得整件變成 0。
+        const priced = (list) => list.map(v => v.price).filter(p => p !== null && p !== undefined)
+        const specPrices = priced(variants.filter(v => !v.is_accessory))
+        const variantPrices = specPrices.length > 0 ? specPrices : priced(variants)
 
         const displayPrice = variantPrices.length > 0
             ? Math.min(...variantPrices)

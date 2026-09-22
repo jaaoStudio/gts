@@ -229,6 +229,57 @@ describe('多規格商品', () => {
         expect(wrapper.text()).toContain('目前規格：Default')
     })
 
+    // 配件（is_accessory）在這一頁是「分區顯示」而非「另一種行為」：同一組單選、
+    // 選一個加一次。真正有行為差異的只有兩處——分在哪一區、以及不算進起價。
+    describe('配件', () => {
+        const WITH_ACC = {
+            ...MULTI,
+            variants: [
+                { id: 30, spec_name: '專用螺絲組', sku: 'A-1', price: 70, images: img('a'), image: null, status: 'published', is_accessory: true },
+                { id: 31, spec_name: '270mm', sku: 'S-1', price: 300, images: img('b'), image: null, status: 'published', is_accessory: false },
+                { id: 32, spec_name: '210mm', sku: 'S-2', price: 280, images: img('c'), image: null, status: 'published', is_accessory: false },
+            ],
+        }
+
+        beforeEach(async () => {
+            wrapper.unmount()
+            productService.getProductBySlug.mockResolvedValue(WITH_ACC)
+            wrapper = mount(ProductDetail, {
+                global: {
+                    stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                    directives: { reveal: {} },
+                },
+            })
+            await flushPromises()
+        })
+
+        test('分成「選擇規格」與「專屬配件」兩區', () => {
+            const labels = wrapper.findAll('p').map((p) => p.text())
+                .filter((t) => t === '選擇規格' || t === '專屬配件')
+            expect(labels).toEqual(['選擇規格', '專屬配件'])
+        })
+
+        test('價格區間不含配件——否則下緣會是螺絲組的 70 元', () => {
+            expect(wrapper.text()).toContain('NT$280 - NT$300')
+            expect(wrapper.text()).not.toContain('NT$70 - ')
+        })
+
+        test('選到配件時標示寫「目前配件」，不是「目前規格」', async () => {
+            await variantButton('專用螺絲組').trigger('click')
+            expect(wrapper.text()).toContain('目前配件：專用螺絲組')
+
+            await variantButton('270mm').trigger('click')
+            expect(wrapper.text()).toContain('目前規格：270mm')
+        })
+
+        test('配件加得進訂購單，行為與規格相同', async () => {
+            await variantButton('專用螺絲組').trigger('click')
+            await addButton().trigger('click')
+            await flushPromises()
+            expect(useOrderStore().items[0].specName).toBe('專用螺絲組')
+        })
+    })
+
     test('點共用圖只換大圖，不會把已選的規格改掉', async () => {
         await variantButton('整支鋸子').trigger('click')
 
