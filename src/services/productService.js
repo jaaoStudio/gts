@@ -264,6 +264,28 @@ const safeExternalUrl = (url) => {
     }
 }
 
+/**
+ * 算起價／價格區間時「算數」的那些價格：**只取規格，不取配件**。
+ *
+ * 配件通常是全商品最便宜的那一筆（替刃、螺絲組），算進去會讓折合鋸的卡片寫
+ * 「NT$70 起」——那是螺絲的價格，客人會以為 70 元買得到鋸子。
+ * 沒有任何規格標價時才退回全部，免得整件變成 0。
+ *
+ * ⚠️ 卡片（mapProduct 的 displayPrice）與詳情頁的價格區間**必須共用這一個函式**。
+ * 先前兩邊各寫一份，退路條件就分岔了：一邊看「有沒有規格有標價」、另一邊看
+ * 「有沒有規格」，於是全是詢價的規格配一個有價配件時，卡片顯示 NT$70、詳情頁
+ * 顯示詢問價格。
+ *
+ * ⚠️ 這條規則隱性依賴 LIST_FIELDS 帶回 is_accessory（目前靠 'variants.*'）。
+ * 若哪天為了縮小 payload 把它改成逐一列欄位而漏掉 is_accessory，這裡會把配件
+ * 全當成規格，卡片安靜地退回「NT$70 起」。productService.test.js 守著這件事。
+ */
+export const displayPrices = (variants = []) => {
+    const priced = (list) => list.map(v => v.price).filter(p => p !== null && p !== undefined)
+    const specPrices = priced(variants.filter(v => !v.is_accessory))
+    return specPrices.length > 0 ? specPrices : priced(variants)
+}
+
 // 一張圖的所有尺寸。元件不得自己組 Directus 網址（見 skill directus-service-layer），
 // 所以在這裡一次給齊。social 不在此列：它只有 og:image 一個消費者，放進來等於讓每張
 // 列表圖與規格圖都多算一條沒人讀的網址。
@@ -301,9 +323,7 @@ export const productMapper = {
                 return { ...v, images, image: images?.card ?? null }
             })
 
-        const variantPrices = variants
-            .map(v => v.price)
-            .filter(p => p !== null && p !== undefined)
+        const variantPrices = displayPrices(variants)
 
         const displayPrice = variantPrices.length > 0
             ? Math.min(...variantPrices)

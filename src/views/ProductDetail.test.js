@@ -20,7 +20,12 @@ vi.mock('../stores/category', () => ({
 vi.mock('../stores/settings', () => ({
     useSettingsStore: () => ({ shippingRule: null, lineUrl: '', fetchSettings: async () => {} }),
 }))
-vi.mock('../services/productService', () => ({
+// ⚠️ 用 importOriginal 保留模組裡的純函式（displayPrices / productMapper），只擋掉會
+// 打網路的 productService。整個換掉的話，元件 import 的 displayPrices 會是 undefined
+// ——而且症狀不是「找不到函式」，是**整個元件渲染失敗**，看起來像資料沒載入。
+// 附帶好處：起價規則在這裡跑的是真的那一份，不是照著寫的第二份。
+vi.mock('../services/productService', async (importOriginal) => ({
+    ...(await importOriginal()),
     productService: { getProductBySlug: vi.fn(), getProducts: vi.fn(), getRelated: vi.fn() },
 }))
 vi.mock('vue-router', () => ({
@@ -227,6 +232,83 @@ describe('多規格商品', () => {
 
         await variantButton('Default').trigger('click')
         expect(wrapper.text()).toContain('目前規格：Default')
+    })
+
+    // 配件（is_accessory）在這一頁是「分區顯示」而非「另一種行為」：同一組單選、
+    // 選一個加一次。真正有行為差異的只有兩處——分在哪一區、以及不算進起價。
+    describe('配件', () => {
+        const WITH_ACC = {
+            ...MULTI,
+            variants: [
+                { id: 30, spec_name: '專用螺絲組', sku: 'A-1', price: 70, images: img('a'), image: null, status: 'published', is_accessory: true },
+                { id: 31, spec_name: '270mm', sku: 'S-1', price: 300, images: img('b'), image: null, status: 'published', is_accessory: false },
+                { id: 32, spec_name: '210mm', sku: 'S-2', price: 280, images: img('c'), image: null, status: 'published', is_accessory: false },
+            ],
+        }
+
+        beforeEach(async () => {
+            wrapper.unmount()
+            productService.getProductBySlug.mockResolvedValue(WITH_ACC)
+            wrapper = mount(ProductDetail, {
+                global: {
+                    stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                    directives: { reveal: {} },
+                },
+            })
+            await flushPromises()
+        })
+
+        test('分成「選擇規格」與「專屬配件」兩區', () => {
+            const labels = wrapper.findAll('p').map((p) => p.text())
+                .filter((t) => t === '選擇規格' || t === '專屬配件')
+            expect(labels).toEqual(['選擇規格', '專屬配件'])
+        })
+
+        test('價格區間不含配件——否則下緣會是螺絲組的 70 元', () => {
+            expect(wrapper.text()).toContain('NT$280 - NT$300')
+            expect(wrapper.text()).not.toContain('NT$70 - ')
+        })
+
+        // 卡片與詳情頁必須共用 displayPrices()，不是各寫一份「一樣」的邏輯。
+        // 先前兩份的退路條件分岔過：一邊看「有沒有規格**有標價**」、另一邊看
+        // 「有沒有規格」。只有在「規格全是詢價 + 配件有價」時才看得出差別——
+        // 把這一版種回去，這條會紅，其他全綠。
+        test('規格全是詢價、配件有價時，退回配件的價格而不是顯示詢問價格', async () => {
+            wrapper.unmount()
+            productService.getProductBySlug.mockResolvedValue({
+                ...MULTI,
+                variants: [
+                    { id: 40, spec_name: '270mm', price: null, images: img('a'), image: null, status: 'published', is_accessory: false },
+                    { id: 41, spec_name: '210mm', price: null, images: img('b'), image: null, status: 'published', is_accessory: false },
+                    { id: 42, spec_name: '專用螺絲組', price: 70, images: img('c'), image: null, status: 'published', is_accessory: true },
+                ],
+            })
+            wrapper = mount(ProductDetail, {
+                global: {
+                    stubs: { 'router-link': { template: '<a><slot /></a>' } },
+                    directives: { reveal: {} },
+                },
+            })
+            await flushPromises()
+
+            expect(wrapper.text()).toContain('NT$70')
+            expect(wrapper.text()).not.toContain('詢問價格')
+        })
+
+        test('選到配件時標示寫「目前配件」，不是「目前規格」', async () => {
+            await variantButton('專用螺絲組').trigger('click')
+            expect(wrapper.text()).toContain('目前配件：專用螺絲組')
+
+            await variantButton('270mm').trigger('click')
+            expect(wrapper.text()).toContain('目前規格：270mm')
+        })
+
+        test('配件加得進訂購單，行為與規格相同', async () => {
+            await variantButton('專用螺絲組').trigger('click')
+            await addButton().trigger('click')
+            await flushPromises()
+            expect(useOrderStore().items[0].specName).toBe('專用螺絲組')
+        })
     })
 
     test('點共用圖只換大圖，不會把已選的規格改掉', async () => {

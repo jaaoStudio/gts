@@ -67,7 +67,7 @@
                 v-if="selectedVariantLabel"
                 class="pointer-events-none absolute bottom-5 left-5 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-steel-900/80 px-3 py-1.5 text-xs font-medium text-white backdrop-blur"
               >
-                目前規格：{{ selectedVariantLabel }}
+                {{ selectedVariantLabel }}
               </span>
             </div>
 
@@ -106,20 +106,24 @@
                 {{ selectedVariant ? formatPrice(selectedVariant.price) : priceDisplay }}
               </p>
 
-              <!-- Variants -->
-              <div v-if="publishedVariants.length > 1" class="mt-6">
-                <p class="mb-3 font-mono text-xs uppercase tracking-[0.16em] text-steel-500">選擇規格</p>
-                <div class="flex flex-wrap gap-2.5">
-                  <button
-                    v-for="variant in publishedVariants"
-                    :key="variant.id"
-                    @click="selectedVariant = variant"
-                    class="rounded-xl border-2 px-4 py-3 text-left transition-all"
-                    :class="selectedVariant?.id === variant.id ? 'border-brand-500 bg-brand-50' : 'border-steel-200 hover:border-steel-400'"
-                  >
-                    <span class="block font-display text-sm font-semibold text-steel-900">{{ variant.spec_name }}</span>
-                    <span class="block font-mono text-xs text-steel-500">{{ formatPrice(variant.price) }}</span>
-                  </button>
+              <!-- Variants：規格與配件分兩區顯示，但**行為完全相同**——同一組單選，
+                   選一個加一次。分區只是讓客人看得出哪些是加購品、哪些是三選一。 -->
+              <div v-if="publishedVariants.length > 1" class="mt-6 space-y-5">
+                <div v-for="group in variantGroups" :key="group.label">
+                  <p class="mb-3 font-mono text-xs uppercase tracking-[0.16em] text-steel-500">{{ group.label }}</p>
+                  <div class="flex flex-wrap gap-2.5">
+                    <button
+                      v-for="variant in group.items"
+                      :key="variant.id"
+                      type="button"
+                      @click="selectedVariant = variant"
+                      class="rounded-xl border-2 px-4 py-3 text-left transition-all"
+                      :class="selectedVariant?.id === variant.id ? 'border-brand-500 bg-brand-50' : 'border-steel-200 hover:border-steel-400'"
+                    >
+                      <span class="block font-display text-sm font-semibold text-steel-900">{{ variant.spec_name }}</span>
+                      <span class="block font-mono text-xs text-steel-500">{{ formatPrice(variant.price) }}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -168,7 +172,7 @@
                   @click="addToOrder"
                 >
                   <PhPlusCircle :size="20" weight="bold" />
-                  <template v-if="!selectedVariant">請先選擇規格</template>
+                  <template v-if="!selectedVariant">{{ choosePrompt }}</template>
                   <template v-else>{{ justAdded ? '已加入訂購單' : '加入訂購單' }}</template>
                 </button>
               </div>
@@ -276,7 +280,7 @@ import DOMPurify from 'dompurify'
 import { setMeta } from '../utils/seo'
 import { trackAddToCart, trackViewItem } from '../utils/analytics'
 import { useRoute } from 'vue-router'
-import { productService } from '../services/productService'
+import { displayPrices, productService } from '../services/productService'
 import { useCategoryStore } from '../stores/category'
 import { useSettingsStore } from '../stores/settings'
 import { normalizeSpecName, useOrderStore } from '../stores/order'
@@ -397,17 +401,38 @@ const publishedVariants = computed(() => {
   return product.value.variants
 })
 
+// 規格與配件分兩區顯示，但**行為完全相同**：同一組單選、選一個加一次。
+// 分區只是讓客人看得出哪些是加購品。配件不進起價計算，那一步在 mapper 做。
+const variantGroups = computed(() => {
+  const specs = publishedVariants.value.filter((v) => !v.is_accessory)
+  const accessories = publishedVariants.value.filter((v) => v.is_accessory)
+  const groups = []
+  if (specs.length) groups.push({ label: '選擇規格', items: specs })
+  if (accessories.length) groups.push({ label: '專屬配件', items: accessories })
+  return groups
+})
+
+// 整件商品的品項全被標成配件時畫面上沒有「規格」那一區，按鈕就不能叫客人去選一個
+// 看不到的東西。目前沒有這種商品，但資料沒有任何地方擋著。
+const choosePrompt = computed(() =>
+  publishedVariants.value.some((v) => !v.is_accessory) ? '請先選擇規格' : '請先選擇配件'
+)
+
 // 單規格商品不標示：那是系統自動選的，標出來會讀成「你已經選好了」。
 // 正規化為空要退回 raw，否則會與規格鈕上的 raw spec_name 分岔成一有一無。
 const selectedVariantLabel = computed(() => {
   if (publishedVariants.value.length < 2 || !selectedVariant.value) return ''
   const raw = selectedVariant.value.spec_name
-  return normalizeSpecName(raw) || (raw || '').trim()
+  const name = normalizeSpecName(raw) || (raw || '').trim()
+  if (!name) return ''
+  // 選到配件時不能寫「目前規格」——那正好是這次要讓客人分清楚的兩件事
+  return `${selectedVariant.value.is_accessory ? '目前配件' : '目前規格'}：${name}`
 })
 
 const priceDisplay = computed(() => {
   if (publishedVariants.value.length === 0) return '詢問價格'
-  const prices = publishedVariants.value.map((v) => v.price).filter((p) => p !== null)
+  // 與卡片的起價共用同一個函式，不是「照著寫一份」——先前兩份的退路條件分岔過
+  const prices = displayPrices(publishedVariants.value)
   if (prices.length === 0) return '詢問價格'
   const min = Math.min(...prices)
   const max = Math.max(...prices)
