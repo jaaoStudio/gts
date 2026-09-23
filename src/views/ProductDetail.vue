@@ -38,7 +38,8 @@
           <span class="text-steel-900">{{ product.name }}</span>
         </nav>
 
-        <div class="grid gap-10 lg:grid-cols-2 lg:gap-14">
+        <!-- grid-cols-1 不可省：隱含欄會被縮圖列撐寬，minmax(0,1fr) 才會鎖住容器寬 -->
+        <div class="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-14">
           <!-- Gallery -->
           <div class="lg:sticky lg:top-24 lg:self-start">
             <div class="relative rounded-[2rem] bg-white p-2 ring-1 ring-steel-900/[0.06] shadow-[0_30px_60px_-30px_rgba(16,17,21,0.28)]">
