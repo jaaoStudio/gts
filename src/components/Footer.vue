@@ -19,7 +19,7 @@
             class="group inline-flex w-max items-center gap-2.5 rounded-full bg-white py-1.5 pl-5 pr-1.5 font-display text-sm font-semibold text-steel-950 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-brand-500 hover:text-white active:scale-[0.98]"
           >
             撥打 04-26580936
-            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-steel-100 text-steel-900 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-steel-950 group-hover:text-white">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-steel-100 text-steel-900 transition-colors duration-300 group-hover:bg-steel-950 group-hover:text-white">
               <PhPhoneCall :size="16" weight="bold" />
             </span>
           </a>
