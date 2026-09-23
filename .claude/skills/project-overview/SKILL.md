@@ -115,7 +115,7 @@ npm run preview
 | 主題 | 去哪看 |
 |---|---|
 | 領域詞彙 | `CONTEXT.md` |
-| Google SSO / Worker double-tap | `docs/adr/0001` + skill `routing-and-auth` |
+| Google SSO（含已拔除的 Worker double-tap）| `docs/adr/0001` + skill `routing-and-auth` |
 | 設計系統決策 | `docs/adr/0002` + skill `tailwind-design-system` |
 | 運費為何是預估值、不進應付金額 | `docs/adr/0003` |
 | `payment_note` 的對帳規則（為何不做回報通知信、為何關掉 readonly） | `docs/adr/0004` |

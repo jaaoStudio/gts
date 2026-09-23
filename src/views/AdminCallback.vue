@@ -4,10 +4,9 @@
     <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[28rem] w-[28rem] rounded-full bg-brand-500/10 blur-[120px]" />
 
     <div class="relative text-center">
-      <!-- Loading — 視覺接續 worker/auth-callback-worker.js 的過場頁。
-           那頁是本頁的前一個畫面(第二擊 navigation 期間畫面仍停在那),兩邊長得一樣
-           才不會在中間閃一下。⚠️ 這裡刻意不重播 logo 描邊動畫,只承接呼吸循環——
-           一次性動畫在換頁時重播會很明顯。改動任一邊記得同步另一邊。 -->
+      <!-- Loading — 與 worker/auth-callback-worker.js 的過場頁同款。那支的 Route 目前已拔除,
+           但若接回,那頁就是本頁的前一個畫面,兩邊長得一樣才不會在中間閃一下,
+           所以刻意不重播 logo 描邊動畫、只承接呼吸循環。改動任一邊記得同步另一邊。 -->
       <div v-if="!error" class="flex flex-col items-center">
         <svg class="block h-[76px] w-[76px]" viewBox="0 0 512 512" fill="none" role="img" aria-label="金同心實業">
           <path d="M133 419.56V184.04C133 122.6 163.72 91.8799 225.16 91.8799H286.6C348.04 91.8799 378.76 122.6 378.76 184.04V419.56" stroke="#101115" stroke-width="30.72" stroke-linecap="round" />

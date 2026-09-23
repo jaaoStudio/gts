@@ -136,11 +136,9 @@ authStore.init().then(() => {
 使用者點登入
      │  authStore.getGoogleLoginUrl()
      ▼  ${VITE_DIRECTUS_PUBLIC_URL}/auth/login/google?redirect=<origin>/admin/callback
-Cloudflare Worker 攔截 /auth/login/google/callback → double-tap（見 ADR 0001）
-     │  第一擊：邊緣立刻回 spinner，導向同一組參數 + 尾端 &_edge=1
-     │  第二擊：切掉旗標，fetch 給德國的 Directus
+Google 同意畫面（等德國後端的期間，Google 自己會顯示進度條）
      ▼
-Google 同意畫面 → Directus 換 token、寫 session、302 回 /admin/callback
+Directus /auth/login/google/callback → 換 token、寫 session、302 回 /admin/callback
      │  （session cookie 此時已種好）
      ▼
 AdminCallback.vue → authStore.handleCallback()
@@ -157,11 +155,10 @@ AdminCallback.vue → authStore.handleCallback()
 - **本機 dev 需 https + 自訂網域**：`vite.config.js` 的 `mkcert({ hosts: [...] })` 必須包含
   實際進站網域（如 `local.gtxin.com.tw`），否則憑證不涵蓋、直接 `CERT_COMMON_NAME_INVALID`。
   該網域也要放進上面的白名單。
-- **改 double-tap 要動 Worker**：callback 路徑或 double-tap 行為調整時，
-  Worker（`worker/auth-callback-worker.js`）與前端必須一起改。
-  送到 Directus 的 `code`/`state` **一個 byte 都不能改**（勿用 `URLSearchParams` 重新序列化）。
-- **要優化先看 Worker log**：第二擊會 `console.log` 一筆 `sso_callback_upstream`
-  （含 `ms`/`status`/`colo`/`ua`）。這是判斷還值不值得優化的唯一依據，不要憑感覺調。
+- **Cloudflare Worker double-tap 已拔除（2026-09-23）**：Google 自帶進度條後它就沒有
+  存在理由，CF 上的 Route 已移除，callback 直接進 Directus。`worker/auth-callback-worker.js`
+  與 CF 上的 script 都保留著，要接回只需加回 Route；接回前先讀 ADR 0001 的 gotchas
+  （尤其 `code`/`state` 一個 byte 都不能改、狀態不可放 cookie）。
 
 ## 帳號登不進去：先查 `status` 與 `provider`，不要從程式碼找
 
