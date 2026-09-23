@@ -138,6 +138,17 @@ Account）不用另外處理。
 ```
 按鈕一律 **pill（`rounded-full`）**，文字用 `font-display`。
 
+**帶尾綴圓鈕的 pill** 有兩種尺寸，勿自創第三種：
+
+| 尺寸 | 用在 | pill | 圓鈕 | 圓鈕 hover |
+|---|---|---|---|---|
+| 標準 | 首頁 hero、CTA 區 | `py-2.5 pl-6 pr-2.5 text-base gap-3` | `h-9 w-9`、圖示 18 | 變色 + 微位移（`translate-x-0.5 -translate-y-0.5`） |
+| compact | 與 `LineButton` 並排（Footer 撥打） | `py-1.5 pl-5 pr-1.5 text-sm gap-2.5` | `h-8 w-8`、圖示 16 | **只變色、不位移** |
+
+- compact 的高度 6 + 32 + 6 = 44px，是為了對齊 `LineButton`（`py-3` + `text-sm` 行高）。
+  改 `LineButton` 的內距或字級要一起改這裡。
+- compact 不位移，是因為外距只有 6px，位移 2px 後上、右只剩 4px，下方 8px，看起來圓鈕歪掉。
+
 ### 價格 / 數字
 一律 `font-mono`：`<span class="font-mono text-lg font-semibold tracking-tight text-steel-900">NT$1,200</span>`
 （`ProductCard` 慣例：無價時顯示「詢價」，下方附 `起`。）

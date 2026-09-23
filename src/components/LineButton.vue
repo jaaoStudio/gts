@@ -1,4 +1,5 @@
 <template>
+  <!-- Footer 的撥打按鈕靠 py-3 + text-sm（44px）對齊這顆，改內距或字級要一起改 Footer.vue -->
   <a
     v-if="url"
     :href="url"
