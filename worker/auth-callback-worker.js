@@ -2,6 +2,7 @@
  * Cloudflare Worker — Google SSO callback 的 double-tap spinner
  *
  * 背景見 docs/adr/0001-google-sso-登入流程.md。
+ * ⚠️ 2026-09-23 起 CF 上的 Route 已拔除，這支目前不在登入路徑上（Google 已自帶進度條）。
  * 後端 Directus 在歐洲，callback 這一跳要等數秒，使用者會盯著凍住的 Google 頁。
  * 這支 Worker 在邊緣先回一頁 spinner，再把瀏覽器導回同一組 OAuth 參數交給後端處理。
  *

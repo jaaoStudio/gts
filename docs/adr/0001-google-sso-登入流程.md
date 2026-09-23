@@ -8,6 +8,19 @@ status: accepted
 
 前台採用 **Directus 內建 Google SSO**:前端把使用者導向 `${VITE_DIRECTUS_PUBLIC_URL}/auth/login/google?redirect=<origin>/admin/callback`,Google 認證後 Directus 種下 refresh cookie 並把瀏覽器導回前台的 `/admin/callback`;前台在該頁打 `POST /auth/refresh`(`withCredentials`)把 cookie 換成 access token 存進 `localStorage`,再依 `role.admin_access` 導向 `/admin` 或 `/account`。
 
+> **2026-09-23 更新(Worker 已拔除,決策已變)**:Google 在 callback 等待期間
+> 自己加上了遮罩與進度條(桌機、手機實測都有),本 ADR 要解決的「Google 頁像凍住」
+> 已經不存在。所以 Cloudflare 上 `core.gtxin.com.tw/auth/login/google/callback*`
+> 的 **Route 已拔除**,callback 改為直接交給 Directus,也就是下方被否決的
+> 「直接回跳、不放 Worker」。實測整體耗時與掛 Worker 時相同:Worker 只是讓畫面
+> 早一秒換成自家過場頁,本身還多一趟約 400ms 的往返。
+>
+> - **Worker script 仍留在 CF、原始碼仍在 `worker/`**,以備 Google 哪天拿掉進度條。
+>   要接回只需把 Route 加回去,前端不用改;接回後下方 Worker 相關的 gotchas 才又適用。
+> - 拔除後就沒有 `sso_callback_upstream` 這筆 log 了。要量 callback 耗時,
+>   得看 Directus 端或暫時接回 Route。
+> - 其餘 gotchas(redirect 白名單、mkcert 網域、auth 走 public URL)與 Worker 無關,照舊。
+
 > **2026-09-07 更新(網域已變,決策不變)**:全站改用 **`gtxin.com.tw`**。
 > 本文中出現的 `gts-core.jaao.tw` 一律改讀作 **`core.gtxin.com.tw`**、
 > `local.jaao.tw` 改讀作 **`local.gtxin.com.tw`**(舊網域僅保留 301 轉址,
@@ -30,7 +43,7 @@ Worker 用「先回 spinner、再重打一次」把載入畫面塞在中間,讓�
 
 ## Considered options
 
-- **直接回跳、不放 Worker**:最單純,但使用者會盯著凍住的 Google 頁數秒,以為壞了。被否決。
+- **直接回跳、不放 Worker**:最單純,但使用者會盯著凍住的 Google 頁數秒,以為壞了。被否決。**2026-09-23 起改採此方案**,理由見文首更新。
 - **把後端搬近一點 / 加節點**:治本但成本高、非當前可動。暫不採。**2026-07 實測後確認投報率低**:從台灣量 `gts-core.jaao.tw`,`/server/ping`(純記憶體)、`/auth/login/google`、`/items/products`(碰 DB)的 TTFB 全部落在 390–440ms,碰 DB 與不碰 DB 幾乎沒差 → 後端與 DB 都健康,跨洲往返基準就是約 390ms。距離只值這 390ms,搬遷省不到使用者真正感受到的那一秒。
 - **Worker 改 streaming(單次往返:先 flush spinner,背景 fetch 後端,尾端注入跳轉)**:不可行。HTTP headers 一旦送出就無法再補 `Set-Cookie`,Directus 的 session cookie 會遺失,登入必敗。
 - **第一擊回 302 而非 HTML**(比 meta refresh 快):不可行。302 期間畫面仍停在 Google,spinner 根本不會出現,等於沒做。
