@@ -1,5 +1,5 @@
 <template>
-  <div class="relative flex min-h-[100dvh] items-center justify-center bg-steel-50 px-5 py-16 sm:px-8">
+  <div class="relative flex min-h-[100dvh] items-center justify-center overflow-clip bg-steel-50 px-5 py-16 sm:px-8">
     <!-- Blueprint texture + brand glow, matching the site language -->
     <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-60" />
     <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[32rem] w-[32rem] rounded-full bg-brand-500/10 blur-[120px]" />

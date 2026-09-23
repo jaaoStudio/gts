@@ -111,6 +111,18 @@ Geist 而非 Inter（4.1）、Phosphor 且不手繪 SVG（3.C / 9.E）、單一�
 <p class="font-mono text-xs uppercase tracking-[0.2em] text-brand-600">Section</p>
 ```
 
+### 背景光暈（blueprint 底紋 + 角落 blur glow）
+```html
+<div class="relative overflow-clip ...">
+  <div class="pointer-events-none absolute inset-0 bg-blueprint opacity-60" />
+  <div class="pointer-events-none absolute right-[-10%] top-[-10%] h-[28rem] w-[28rem] rounded-full bg-brand-500/10 blur-[120px]" />
+```
+⚠️ **光暈刻意用負 offset 擺到角落外，外層一定要裁切**，否則會把頁面撐出捲軸。
+2026-09 登入頁就是漏了這個：1910 寬的視窗被撐到 2101、高度也多出 120px。
+用 `overflow-clip` 而不是 `overflow-hidden`（不會多一個捲動容器）；只需要擋橫向時
+用 `overflow-x-clip`（首頁 `<main>`）。已經在 `overflow-hidden` 卡片裡的（Footer、
+Account）不用另外處理。
+
 ### 卡片（`ProductCard.vue`：同心圓角 + 內核）
 外層 `rounded-[1.6rem] bg-white p-1.5 ring-1 ring-steel-900/[0.06]`，
 內核 `rounded-[1.15rem] bg-steel-50`。hover：`-translate-y-1` + 加深陰影 + `ring-steel-900/10`，
